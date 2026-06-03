@@ -43,10 +43,7 @@ async def async_get_config_entry_diagnostics(
         },
         "adaptive_comfort": {
             "running_mean_outdoor": coordinator.running_mean_outdoor,
-            "shifted_band": [
-                coordinator.adaptive_band_low,
-                coordinator.adaptive_band_high,
-            ],
+            "shifted_cool_edge": coordinator.adaptive_band_high,
         },
         "temperature_slope": coordinator.temperature_slope,
         "hvac_action_reason": coordinator.hvac_action_reason(),

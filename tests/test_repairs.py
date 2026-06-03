@@ -31,7 +31,7 @@ async def test_adaptive_comfort_without_outdoor_sensor_raises_and_clears(
     # No outdoor sensor configured, adaptive comfort off by default -> no issue.
     assert registry.async_get_issue(DOMAIN, "outdoor_sensor_missing") is None
 
-    switch = entity_id_for("switch", f"{cid}_adaptive_comfort")
+    switch = entity_id_for("switch", f"{cid}_adaptive_cooling_comfort")
     await hass.services.async_call(
         "switch", "turn_on", {ATTR_ENTITY_ID: switch}, blocking=True
     )

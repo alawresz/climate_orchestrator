@@ -556,7 +556,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         # a clear mistake. Outdoor gating is on by default, so don't nag about it.
         self._toggle_issue(
             "outdoor_sensor_missing",
-            settings.adaptive_comfort and self.outdoor_sensor is None,
+            settings.adaptive_cooling_comfort and self.outdoor_sensor is None,
             "outdoor_sensor_missing",
         )
         # These two are transient right after a restart (sensors haven't
@@ -621,12 +621,12 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             base_band.heat_edge,
             base_band.cool_edge,
             self._rmot,
-            settings.adaptive_comfort_max_shift,
-            bias=settings.adaptive_comfort_bias,
-            response=settings.adaptive_comfort_response,
+            settings.adaptive_cooling_comfort_max_shift,
+            bias=settings.adaptive_cooling_comfort_onset_bias,
+            response=settings.adaptive_cooling_comfort_response,
         )
         self._adaptive_band = Band(heat_edge=heat_edge, cool_edge=cool_edge)
-        return self._adaptive_band if settings.adaptive_comfort else base_band
+        return self._adaptive_band if settings.adaptive_cooling_comfort else base_band
 
     @property
     def comfort_influence(self) -> float:
@@ -644,13 +644,12 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         return self._rmot
 
     @property
-    def adaptive_band_low(self) -> float | None:
-        """Would-be heat edge after the adaptive shift (preview)."""
-        return self._adaptive_band.heat_edge if self._adaptive_band else None
-
-    @property
     def adaptive_band_high(self) -> float | None:
-        """Would-be cool edge after the adaptive shift (preview)."""
+        """Would-be cool edge after the adaptive-comfort shift (preview).
+
+        Only the cool edge is ever relaxed; the heat edge is never touched, so
+        there is no matching "low" accessor.
+        """
         return self._adaptive_band.cool_edge if self._adaptive_band else None
 
     @callback
@@ -796,7 +795,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         the accumulator is then advanced for next cycle from the current error.
         """
         base = settings.ac_setpoint_bias
-        if kind is not DeviceKind.COOLER or not settings.adaptive_ac_bias:
+        if kind is not DeviceKind.COOLER or not settings.self_tuning_ac_bias:
             return base
 
         integral = self._ac_bias_integral.get(entity_id, 0.0)

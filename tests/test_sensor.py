@@ -63,7 +63,7 @@ async def test_adaptive_comfort_shifts_band_when_enabled(
     await hass.services.async_call(
         "switch",
         "turn_on",
-        {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_adaptive_comfort")},
+        {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_adaptive_cooling_comfort")},
         blocking=True,
     )
     await hass.services.async_call(
@@ -76,21 +76,17 @@ async def test_adaptive_comfort_shifts_band_when_enabled(
     await hass.async_block_till_done()
 
     # Defaults: cool edge 24.5, bias +1 -> onset 25.5; outdoor 30 -> excess 4.5,
-    # max_shift 2, response 5. The cool edge eases up by the saturating amount;
-    # the heat edge is never touched, so it stays at the preset's 20.5.
+    # max_shift 2, response 5. Only the cool edge eases up (there is no
+    # adaptive heat-setpoint sensor — the heat edge never moves).
     expected_cool = 24.5 + 2.0 * (1.0 - math.exp(-4.5 / 5.0))
-    low = hass.states.get(entity_id_for("sensor", f"{cid}_adaptive_heat_setpoint"))
     high = hass.states.get(entity_id_for("sensor", f"{cid}_adaptive_cool_setpoint"))
-    assert float(low.state) == pytest.approx(20.5, abs=0.05)
     assert float(high.state) == pytest.approx(expected_cool, abs=0.05)
 
     # Mild weather: outdoor 17 is well below the onset, so nothing shifts at all.
     coordinator._rmot = 17.0
     await coordinator.async_refresh()
     await hass.async_block_till_done()
-    low = hass.states.get(entity_id_for("sensor", f"{cid}_adaptive_heat_setpoint"))
     high = hass.states.get(entity_id_for("sensor", f"{cid}_adaptive_cool_setpoint"))
-    assert float(low.state) == pytest.approx(20.5, abs=0.05)
     assert float(high.state) == pytest.approx(24.5, abs=0.05)
 
 

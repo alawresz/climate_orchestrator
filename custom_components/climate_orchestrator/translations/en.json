@@ -46,7 +46,6 @@
       "home_avg_humidity": { "name": "Home average humidity" },
       "home_feels_like_temperature": { "name": "Home feels-like temperature" },
       "temperature_slope": { "name": "Temperature slope" },
-      "adaptive_heat_setpoint": { "name": "Adaptive heat setpoint" },
       "adaptive_cool_setpoint": { "name": "Adaptive cool setpoint" },
       "running_mean_outdoor_temperature": {
         "name": "Running mean outdoor temperature"
@@ -116,9 +115,15 @@
       "cool_off_outdoor": { "name": "Cooling off below outdoor temperature" },
       "ac_setpoint_bias": { "name": "AC cooling setpoint bias" },
       "ac_setpoint_bias_max": { "name": "Max AC cooling setpoint bias" },
-      "adaptive_comfort_max_shift": { "name": "Adaptive comfort max shift" },
-      "adaptive_comfort_bias": { "name": "Adaptive comfort onset bias" },
-      "adaptive_comfort_response": { "name": "Adaptive comfort response" },
+      "adaptive_cooling_comfort_max_shift": {
+        "name": "Adaptive cooling comfort max shift"
+      },
+      "adaptive_cooling_comfort_onset_bias": {
+        "name": "Adaptive cooling comfort onset bias"
+      },
+      "adaptive_cooling_comfort_response": {
+        "name": "Adaptive cooling comfort response"
+      },
       "window_open_delay": { "name": "Window open delay" },
       "valve_maintenance_interval": { "name": "Valve maintenance interval" },
       "sensor_max_age": { "name": "Sensor staleness timeout" },
@@ -137,9 +142,9 @@
       "outdoor_temp_gating": { "name": "Outdoor temperature gating" },
       "frost_protection": { "name": "Frost protection" },
       "ac_heating_assist": { "name": "AC heating assist" },
-      "adaptive_ac_bias": { "name": "Adaptive AC bias" },
+      "self_tuning_ac_bias": { "name": "Self-tuning AC bias" },
       "auto_valve_maintenance": { "name": "Automatic valve maintenance" },
-      "adaptive_comfort": { "name": "Adaptive comfort" }
+      "adaptive_cooling_comfort": { "name": "Adaptive cooling comfort" }
     },
     "select": {
       "calibration_mode": {

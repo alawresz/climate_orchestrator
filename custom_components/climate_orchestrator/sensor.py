@@ -131,15 +131,6 @@ SENSORS: tuple[SmartClimateSensorDescription, ...] = (
         value_fn=lambda coord, _data: coord.temperature_slope,
     ),
     SmartClimateSensorDescription(
-        key="adaptive_heat_setpoint",
-        translation_key="adaptive_heat_setpoint",
-        device_class=SensorDeviceClass.TEMPERATURE,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        suggested_display_precision=1,
-        value_fn=lambda coord, _data: coord.adaptive_band_low,
-    ),
-    SmartClimateSensorDescription(
         key="adaptive_cool_setpoint",
         translation_key="adaptive_cool_setpoint",
         device_class=SensorDeviceClass.TEMPERATURE,
