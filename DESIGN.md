@@ -33,14 +33,16 @@ A Home Assistant custom integration that exposes a **single, whole-home smart cl
 
 ---
 
-## 2. Reference hardware (current install)
+## 2. Target hardware
 
-| Role | Entities | Integration | Notes |
-|------|----------|-------------|-------|
-| TRV ×3 | `climate.trv_1/2/3` | Zigbee2MQTT (`mqtt`) | SONOFF TRVZB. Exposes valve opening/closing degree (0–100%), `local_temperature_calibration`, `external_temperature_input`. |
-| AC ×1 | `climate.153931629367557_climate` | `midea_ac_lan` | Modes off/auto/cool/dry/heat/fan_only; setpoint 16–30 @0.5; reports `outdoor_temperature` and `indoor_humidity`. **No sensor-offset lever — control is setpoint-only.** |
+The integration is built around two classes of `climate` device, distinguished by *how* each can be steered:
 
-Design implication: TRVs support *both* valve control and sensor-offset calibration; the AC supports *neither* — only setpoint, mode, fan, swing. The device abstraction must accommodate both control philosophies (see §6).
+| Class | Representative devices | Control levers |
+|-------|------------------------|----------------|
+| **Radiator valve (TRV)** | Zigbee thermostatic valves such as the SONOFF TRVZB (via Zigbee2MQTT) | valve opening % (0–100), `local_temperature_calibration`, and a normal setpoint |
+| **Air conditioner** | mini-split / window / portable units (e.g. Midea-class) | setpoint, mode, fan, swing — **setpoint-only**, no sensor-offset lever |
+
+Design implication: TRVs support *both* valve control and sensor-offset calibration; an AC supports *neither* — only setpoint, mode, fan, swing. The device abstraction must accommodate both control philosophies (see §6). Any HA `climate` entity in these classes works: the adapter reads each device's reported capabilities (heat/cool/dry, setpoint range and step) at runtime and drives only what it actually supports.
 
 ---
 
@@ -52,16 +54,16 @@ Design implication: TRVs support *both* valve control and sensor-offset calibrat
                          └───────────────┬───────────────┘
                                          │ target, mode, preset
                          ┌───────────────▼───────────────┐
-                         │      OrchestratorCoordinator    │  (DataUpdateCoordinator)
+                         │     SmartClimateCoordinator     │  (DataUpdateCoordinator)
                          │  - holds shared runtime state   │
                          │  - runs the control loop        │
                          └───┬───────────┬──────────────┬──┘
                   sensor data │           │ control law  │ device commands
         ┌────────────────────▼──┐   ┌─────▼──────────┐  ┌▼─────────────────────┐
-        │  SensorRegistry        │   │  ControlEngine │  │  DeviceController(s)  │
-        │  - area→sensor map     │   │  - comfort idx │  │  - TrvController (MPC)│
-        │  - per-area aggregates │   │  - hysteresis  │  │  - AcController (bias)│
-        │  - home-wide average   │   │  - coordination│  │  via DeviceAdapter    │
+        │  sensing.build_snapshot│   │  control.engine│  │  ClimateAdapter / dev │
+        │  - area→sensor map     │   │   .decide      │  │  - TRV: MPC valve /   │
+        │  - staleness guard     │   │  - comfort idx │  │    local offset       │
+        │  - home-wide average   │   │  - hysteresis  │  │  - AC: setpoint bias  │
         └────────────────────────┘   └────────────────┘  └──────────────────────┘
                                          │
                          ┌───────────────▼───────────────┐
@@ -71,9 +73,9 @@ Design implication: TRVs support *both* valve control and sensor-offset calibrat
                          └──────────────────────────────────────────────────────┘
 ```
 
-**Why a coordinator.** A single `DataUpdateCoordinator` owns the shared runtime state (current sensor readings, aggregates, learned MPC state, feature-flag values) and runs one control cycle per trigger. All entities (the climate entity, switches, numbers, sensors) read from the coordinator. This avoids the a prior-art integration "god-object" by keeping the `ClimateEntity` thin and pushing logic into testable, dependency-light modules (`ControlEngine`, `SensorRegistry`, `*Controller`).
+**Why a coordinator.** A single `DataUpdateCoordinator` (`SmartClimateCoordinator`) owns the shared runtime state (current sensor readings, aggregates, learned MPC state, feature-flag values) and runs one control cycle per trigger. All entities (the climate entity, switches, numbers, sensors) read from the coordinator. This avoids the a prior-art integration "god-object" by keeping the `ClimateEntity` thin and pushing logic into testable, dependency-light modules (the pure `control/` package, the `sensing/` snapshot builder, and per-TRV `MpcController`s), with all device I/O behind a `ClimateAdapter`.
 
-**Control cycle triggers.** A control cycle runs on: any subscribed sensor change, any managed-device state change, target/preset/mode change, a feature-flag entity change, and a periodic keepalive (default 5 min, to re-assert offsets and run MPC).
+**Control cycle triggers.** A control cycle runs on: any subscribed sensor change, any managed-device state change, target/preset/mode change, a feature-flag entity change, and a periodic keepalive (`UPDATE_INTERVAL_SECONDS`, default 60 s, to re-assert offsets and run MPC).
 
 ---
 
@@ -163,7 +165,7 @@ A single arbiter decides the whole-home `hvac_action` each cycle:
 1. Compute per-device heating and cooling demand (§5.2).
 2. Global guards in priority order: **window-open** (suppress the affected area — detected automatically from `window`/`door`/`opening`/`garage_door` `binary_sensor`s in the device's area, after an optional grace delay; see §6.5; **coolers can be exempted** via `ac_ignore_window` for a portable/exhaust-hose split that needs its window open to vent — heaters are never exempted), **frost protection** (force heating if any area below frost temp, overrides everything), **outdoor-temp gating** (see §5.5).
 3. Mutual exclusion: a device cannot heat and cool simultaneously; the neutral deadband normally guarantees this, and the arbiter asserts it as an invariant (unit-tested).
-4. Dispatch commands to the relevant `DeviceController`s.
+4. Build each device's command (`devices/command.py`) and dispatch it through that device's `ClimateAdapter`.
 
 **AC heating assist.** Radiators own heating by default. If the `ac_heating_assist` toggle is on and an AC supports `heat`, the arbiter may also command that AC to heat — configurable as *supplement* (engage when an area's heating demand persists and its radiators are saturated) or *substitute* (areas with an AC but weak/no TRV coverage). Still bound by the single-target band and the heat/cool mutual-exclusion invariant.
 
@@ -297,7 +299,7 @@ All tunables persist (RestoreNumber/RestoreEntity) and re-run control on change.
 
 **Numbers also include** the six editable per-preset edges (`preset_{away,home,sleep}_{heat,cool}`), and one **per-area band offset** (`area_offset_<area_id>`, °C, range ±`AREA_BAND_OFFSET_LIMIT`) created for each area that contains a managed device. A positive offset shifts that area's whole band up — the room runs warmer (heats sooner, releases later); negative runs it cooler. It's applied in the engine by subtracting the offset from the area's *local* effective reading only (clamped to `[MIN_TEMP, MAX_TEMP]`), never the home average — so it biases just that room without distorting the whole-home OR-trigger (§5.2). The set of area entities is fixed at setup; moving a device to a new area needs a reload. **Window detection** is wired from area `binary_sensor`s. The **TRV calibration mode** select carries no entity category, so it appears under the device's *Controls* section.
 
-**Not yet built (future):** per-device applied-valve-% sensors, dedicated `dew_point_alert`/`window_open`/`frost_active` binary sensors, and a `keepalive_interval` select. (Per-TRV learned MPC params are now exposed as diagnostic sensors, and self-tuning AC bias is implemented — see §6.2.)
+**Not yet built (future):** a configurable `keepalive_interval` (the cycle interval is currently the fixed `UPDATE_INTERVAL_SECONDS`). Everything else once listed here is now implemented — per-TRV learned MPC params, the per-device valve-% / action / runtime / cycles sensors, and the dedicated `window_open`/`frost_active`/`dew_point_active` binary sensors all exist (§8), as does self-tuning AC bias (§6.2).
 
 ---
 
@@ -323,47 +325,51 @@ Each numerical piece is a **pure, separately unit-tested function** fed syntheti
 climate_orchestrator/
 ├── custom_components/
 │   └── climate_orchestrator/
-│       ├── __init__.py            # setup, coordinator wiring, platform forwarding
+│       ├── __init__.py            # setup, coordinator wiring, platform forwarding, services
 │       ├── manifest.json
-│       ├── const.py
-│       ├── config_flow.py / options_flow
-│       ├── coordinator.py         # OrchestratorCoordinator
+│       ├── const.py               # domain, defaults, presets, tuning constants
+│       ├── models.py              # SmartClimateData, DeviceReading, Band, Status (pure value objects)
+│       ├── config_flow.py         # config + options flow (TRVs/ACs, outdoor sensor, weather entity, hints)
+│       ├── coordinator.py         # SmartClimateCoordinator: snapshot + control cycle + persistence
+│       ├── settings.py            # NumberSetting/SwitchSetting registries + RuntimeSettings resolver
+│       ├── entity.py              # shared base entity + hub DeviceInfo
+│       ├── diagnostics.py         # downloadable diagnostics dump
 │       ├── control/
-│       │   ├── engine.py          # ControlEngine: hysteresis + arbitration
-│       │   ├── comfort.py         # feels_like(), dew_point()  (pure)
-│       │   ├── hysteresis.py      # demand state machine (pure)
+│       │   ├── engine.py          # arbitration: guards + capability gating + per-area offset (pure)
+│       │   ├── hysteresis.py      # OR-engage / AND-release demand law (pure)
+│       │   ├── comfort.py         # apparent temperature + dew point (pure)
+│       │   ├── adaptive_comfort.py# running-mean outdoor + saturating cool-edge relaxation (pure)
+│       │   ├── adaptive_bias.py   # self-tuning AC setpoint bias (integral feedback) (pure)
+│       │   ├── window.py          # window-open suppression + grace debounce (pure)
+│       │   ├── slope.py           # least-squares home temperature slope (pure)
+│       │   ├── throttle.py        # AC setpoint write throttling (pure)
+│       │   ├── forecast.py        # hourly→per-step forecast expansion for preconditioning (pure)
 │       │   └── mpc/
-│       │       ├── model.py       # thermal model + sysid (scipy)
-│       │       ├── observer.py    # Kalman
-│       │       └── optimizer.py   # scipy.optimize horizon solve
-│       ├── sensors/registry.py    # area matching + aggregates (pure-ish)
+│       │       ├── model.py       # first-order thermal model + system ID (scipy)
+│       │       ├── observer.py    # Kalman state estimate
+│       │       ├── optimizer.py   # receding-horizon valve solve; scalar or forecast series (scipy)
+│       │       └── controller.py  # stateful per-room MPC (observe + optimise + persist)
+│       ├── sensing/
+│       │   ├── registry.py        # area matching, snapshot build, staleness guard
+│       │   └── aggregate.py       # mean-or-none / slope helpers (pure)
 │       ├── devices/
-│       │   ├── adapter.py         # Protocol + capabilities
-│       │   ├── trv_z2m.py
-│       │   ├── ac_midea.py
-│       │   └── generic.py
-│       ├── climate.py             # thin ClimateEntity
-│       ├── switch.py / number.py / select.py / sensor.py / binary_sensor.py
-│       ├── store.py               # persistence helpers
+│       │   ├── adapter.py         # ClimateAdapter: capabilities + read/apply over HA climate services
+│       │   ├── model.py           # DeviceCommand / Mode / AdapterCapabilities (pure)
+│       │   ├── command.py         # decision → device command (pure)
+│       │   ├── reconcile.py       # step-diff command minimisation (pure)
+│       │   └── trv.py             # TRV number discovery + local-offset helpers
+│       ├── climate.py             # the single whole-home ClimateEntity
+│       ├── sensor.py / binary_sensor.py / switch.py / number.py / select.py
+│       ├── icons.json / strings.json
 │       └── translations/en.json
-├── tests/
-│   ├── conftest.py                # hass fixtures (pytest-homeassistant-custom-component)
-│   ├── test_comfort.py            # reference-value tables
-│   ├── test_hysteresis.py         # the OR-engage/AND-release law
-│   ├── test_control_engine.py     # arbitration, guards, invariants
-│   ├── test_sensor_registry.py    # area matching + fallbacks
-│   ├── test_mpc_*.py              # sysid/observer/optimizer on synthetic sims
-│   ├── test_devices_*.py          # adapters with mocked services
-│   ├── test_config_flow.py
-│   └── test_init.py / snapshot tests (syrupy)
+├── tests/                         # ~45 test modules — see §12
 ├── pyproject.toml                 # uv-managed, ruff + mypy + pytest config
-├── .pre-commit-config.yaml
 ├── .github/workflows/ci.yml       # ruff, mypy, pytest+coverage, hassfest, HACS (GitHub Actions)
+├── .github/workflows/release.yml  # python-semantic-release on green CI
 ├── hacs.json
+├── CHANGELOG.md
 └── README.md
 ```
-
-Dev layout is a standalone repo; the integration is symlinked/copied into `config/custom_components/climate_orchestrator/` for live testing on the user's HA.
 
 ---
 
@@ -406,10 +412,10 @@ Two consequences of feature-branch prereleases: PSR commits the version bump + t
 Targeting Python 3.12+ (HA's runtime), with current best practices enforced by ruff + mypy in CI:
 
 - **Type hints everywhere** — fully annotated public and internal APIs; `from __future__ import annotations`; `mypy` in strict-ish mode (`disallow_untyped_defs`, `warn_return_any`). No `Any` without justification.
-- **Dataclasses & immutability** — `@dataclass(frozen=True, slots=True)` for value objects (`DeviceState`, `DeviceCommand`, `MpcInput`, `ComfortReading`, `Band`, `AdapterCapabilities`). Frozen by default; mutable runtime state lives only in the coordinator.
-- **Enums over magic strings** — `StrEnum` for `CalibrationMode`, demand states, adapter kinds; named constants in `const.py`, never inline literals.
-- **Protocols for interfaces** — `typing.Protocol` for `DeviceAdapter` (structural typing, easy to fake in tests) rather than ABC inheritance.
-- **Pure functions for logic** — control math (`feels_like`, `dew_point`, hysteresis transitions, MPC steps) is side-effect-free and dependency-injected, keeping I/O at the edges (coordinator/adapters).
+- **Dataclasses & immutability** — `@dataclass(frozen=True, slots=True)` for value objects (`SmartClimateData`, `DeviceReading`, `Band`, `DeviceState`, `DeviceCommand`, `AdapterCapabilities`, `Writes`, `DeviceInput`/`GlobalInput`/`DeviceDecision`, `Sample`/`ThermalParams`/`KalmanState`). Frozen by default; mutable runtime state lives only in the coordinator.
+- **Enums over magic strings** — `StrEnum` for `Demand`, `DeviceKind`, `Mode`, and `Status`; calibration modes and other fixed strings are named constants in `const.py`, never inline literals.
+- **Capability-aware adapter** — a single concrete `ClimateAdapter` wraps any HA `climate` entity, reading its `AdapterCapabilities` (can-heat/cool/dry, min/max, step) and translating a pure `DeviceCommand` into the right services; pure logic stays out of it and it's easy to drive with mocked services in tests.
+- **Pure functions for logic** — control math (apparent temperature, dew point, hysteresis transitions, MPC steps) is side-effect-free and dependency-injected, keeping I/O at the edges (coordinator/adapter).
 - **Modern syntax** — `X | None` unions (PEP 604), `match` where it clarifies, `pathlib`, f-strings, comprehensions over manual loops, `functools.cached_property` where apt.
 - **Async correctness** — no blocking calls in the event loop; `async`/`await` throughout; `asyncio.gather` for parallel device commands; HA's `async_*` APIs only.
 - **Errors & logging** — narrow exception handling (no bare `except`), typed custom exceptions, structured `_LOGGER` messages with lazy `%` formatting.
@@ -419,10 +425,10 @@ Targeting Python 3.12+ (HA's runtime), with current best practices enforced by r
 
 - **Pure-function unit tests** (no HA): comfort index & dew point against reference tables; hysteresis state machine across engage/release/edge sequences; sensor aggregation & fallbacks; MPC sysid/observer/optimizer on synthetic first-order thermal simulations (assert convergence, stability, no windup, bounds respected).
 - **Control-engine tests:** arbitration priority (frost > window > outdoor gating > demand), heat/cool mutual-exclusion invariant, deadband early-out, the worked example from requirements (home avg > 25 OR living room > 25 engages AC; stays on until both ≤ target or room near heat band).
-- **Adapter tests:** correct service calls for TRV valve %, TRV offset, AC setpoint bias + mode, with `midea`/`z2m` quirks; capability gating.
+- **Adapter tests:** the `ClimateAdapter` issues the correct services for TRV valve %, TRV offset, and AC setpoint + mode over a generic HA `climate` entity, honouring `AdapterCapabilities` (capability gating, range/step clamping) with mocked services.
 - **Integration tests (hass fixture):** config flow (device + sensor selection, overrides), entity creation snapshots, options/runtime entity changes re-trigger control, restart restores learned MPC + preset state.
 - **Resilience tests (§6.4):** a TRV or AC going `unavailable` excludes only that device while the home entity stays available and controls the rest; an offline sensor drops out of the home/area average; an area with an offline configured sensor falls back to the home average; one device raising an exception/timeout never aborts the cycle for the others; absent-device learned state is retained across the dropout.
-- **Regression fixtures:** recorded sensor traces replayed through `ControlEngine` to catch behavioural drift.
+- **Regression fixtures:** recorded sensor traces replayed through the control engine (`control/engine.py`) to catch behavioural drift.
 
 A subagent-driven verification pass reviews coverage gaps before sign-off.
 
@@ -431,36 +437,6 @@ A subagent-driven verification pass reviews coverage gaps before sign-off.
 ## 13. Persistence and restore
 
 Coordinator-owned `Store` (versioned) holds: learned MPC parameters/observer state per device, preset values, latched demand/hysteresis state, and the self-tuning AC bias. Restored on startup with safe priors; schema-migrated on version bumps.
-
----
-
-## 14. Resolved decisions
-
-1. **Preset bands:** `min`/`max` *are* the band edges (heat below `min`, cool above `max`). Default presets: **Away, Home, Sleep**. (§7)
-2. **Comfort index:** Australian BoM **Apparent Temperature** (humidity-only, wind term = 0 indoors) — one continuous function across heating and cooling. (§5.3)
-3. **Whole-home target:** single global target/band; per-area logic only decides *which devices actuate*. No per-area targets in v1 (would be a future extension).
-4. **Dew-point guard → AC `dry` (how it works):** compute dew point from the area temp+humidity; if it exceeds the threshold **and there is no active cooling demand**, command the AC to `dry` to dehumidify without overcooling. If there **is** cooling demand, `cool` takes priority (it already dehumidifies). Always raise `binary_sensor.climate_orchestrator_dew_point_alert` so you can layer your own automations. A `switch` toggles the auto-`dry` behaviour independently of the alert.
-5. **scipy dependency:** accepted.
-6. **Frost protection:** **per-area** — force heating in any area below its frost threshold, overriding mode/preset.
-
-Other feedback folded in: HA **area-registry sensors** as the source of truth for area temp/humidity (fallback = home average); **outdoor source** = user-selected sensor → weather forecast only; **fan/swing passthrough** from capable ACs; optional **AC heating assist**; **update minimization** (§6.3).
-
----
-
-## 15. Implementation roadmap (phased)
-
-1. **Phase 0 — scaffold & tooling** ✅ — repo, uv/ruff/mypy/pytest, manifest, GitHub Actions CI, loading skeleton.
-2. **Phase 1 — sensors & entity surface** ✅ — SensorRegistry (area resolution + aggregates), whole-home climate entity, diagnostic sensors, config + options flow.
-3. **Phase 2 — control core** ✅ — comfort (apparent temp + dew point), asymmetric hysteresis, arbitration engine + guards. Pure, fully unit-tested incl. the worked example.
-4. **Phase 3 — device control** ✅ — capability-aware `ClimateAdapter`, decision→command, update-minimised + resilient actuation.
-5. **Phase 4 — MPC** ✅ — thermal model/sysid/observer/optimizer with scipy, controller + persistence. Synthetic-sim tested.
-6. **Phase 5a — runtime tuning entities** ✅ — number/switch settings wired into the engine.
-7. **Phase 5b — MPC/offset calibration** ✅ — `calibration_mode` select, per-TRV controllers, valve/offset writes with discovery + fallback, `Store` persistence.
-8. **Post-Phase 5 — two-setpoint band + fan/swing passthrough** ✅ (this revision).
-
-**Testing:** pure unit tests for every control/device/MPC module; HA-fixture tests for the entities, config/options flow, actuation, fan/swing, presets, window detection, and the window-open grace delay; **end-to-end integration tests** (`test_integration.py` — heating, cooling-with-bias, the home-average OR-trigger, window suppression, frost-overrides-window); and **golden-trace regression tests** (`test_regression.py`) pinning the hysteresis/engine sequences and comfort/optimizer values.
-
-**Remaining / real-world:** validate the Z2M valve/offset entity discovery on real hardware; per-room target support (currently one whole-home band); the §8 "future" entities; HACS/hassfest CI gates green.
 
 ---
 

@@ -35,16 +35,30 @@ and what every control is for. For the architecture and the maths, see
   crosses an edge, and disengages only when *both* are back at target.
 - **Comfort index.** Control runs off a humidity-adjusted "feels-like" (apparent)
   temperature, with a dew-point guard that can run the AC's dry mode.
+- **Per-area offset.** A per-area number can run one room warmer or cooler than
+  the rest, biasing only that area without changing the whole-home band.
 - **Coordinated heat/cool.** A neutral band between the two setpoints keeps
-  heating and cooling from fighting; frost protection, window-open, and
-  outdoor-temp gating are layered guards.
-- **AC offset.** ACs are commanded a setpoint biased below the real target so the
-  AC's own sensor doesn't satisfy before the room does. Fan/swing controls are
-  surfaced and forwarded when the AC supports them.
-- **MPC calibration (opt-in).** TRVs can be driven by an MPC valve controller or
-  a local-temperature offset; learned thermal parameters persist across restarts.
+  heating and cooling from fighting; frost protection, window-open (with a grace
+  delay), and outdoor-temp gating are layered guards.
+- **AC drive.** ACs are commanded a setpoint biased below the real target so the
+  AC's own sensor doesn't satisfy before the room does — and that bias
+  **self-tunes** with integral feedback so it lands the room on target over time.
+  Fan/swing controls are surfaced and forwarded when the AC supports them.
+- **Adaptive cooling comfort (opt-in).** When it's genuinely hot outside, the
+  cooling setpoint is allowed to drift gently upward (the heat edge never moves),
+  saving energy on extreme days without chasing a setpoint you wouldn't pick
+  anyway. Needs an outdoor sensor.
+- **MPC calibration (opt-in).** TRVs can be driven by a learning MPC valve
+  controller or a local-temperature offset; learned thermal parameters persist
+  across restarts. With a weather entity, **forecast preconditioning** feeds the
+  hourly forecast into the optimiser so a radiator pre-heats a room ahead of a
+  cold spell.
+- **Observability.** Per-device diagnostics (action, runtime, cycles, valve %,
+  learned MPC model), a whole-home **status** sensor (`initializing`/`ok`/
+  `degraded`), and Repairs notices that flag silent misconfigurations.
 - **Resilient.** One device or sensor going offline never takes the whole-home
-  entity down.
+  entity down, and a frozen ("stale") sensor is detected and dropped rather than
+  trusted.
 
 ## Requirements
 
@@ -154,6 +168,13 @@ setpoint plus the **Switching tolerance** (0.3 °C by default) — and stops.
 Cooling mirrors it: down to just past the cool setpoint. Rooms settle at the
 efficient end of the band: the cool end in winter, the warm end in summer. The
 small overshoot past the edge also gives the anti-short-cycling its margin.
+
+One band still doesn't suit every room equally, so each managed area gets a
+**`<area>` band offset** number. A positive value shifts that area's whole band
+up — the room heats sooner and stops cooling later, so it runs **warmer**;
+negative runs it cooler. The offset biases only that area's own reading, never
+the home average, so nudging the bathroom warmer doesn't drag the rest of the
+house with it. Default 0 (no change).
 
 ### Feels-like, not just the number (Comfort index)
 
@@ -489,24 +510,11 @@ So commit messages drive the version; non-conventional commits (e.g. `chore:`,
 `docs:`) don't trigger a release. (Versions are PEP 440, so the branch name
 can't appear in the version string itself.)
 
-### Definition of done
+Contributions are expected to keep docs and tests in step with behaviour: user-facing changes update this **README** (especially *Controls & settings reference* and *How it works*), design changes update **`DESIGN.md`**, and every change ships with tests (pure unit tests for logic, `pytest-homeassistant-custom-component` for HA-facing glue) with `ruff` and `pytest` green.
 
-Every change ships with its documentation and tests in the same commit. A change
-is done only when:
+## Project status
 
-- Behaviour, entities, and settings are reflected in this **README** (especially
-  the *Controls & settings reference* and *How it works* sections).
-- Architectural or design decisions are reflected in **`DESIGN.md`**.
-- It has **tests** (pure unit tests for logic, `pytest-homeassistant-custom-component`
-  tests for HA-facing glue), and `ruff` + `pytest` are green.
-
-## Status
-
-Feature-complete against the design (`DESIGN.md`), heavily unit- and
-integration-tested. Hardware-specific bits (the TRV valve/offset writes) are
-**unvalidated on real devices** — `target` calibration mode is the safe baseline.
-This is early software; keep a fallback thermostat until it has proven itself on
-your system.
+The integration is feature-complete against the [design](./DESIGN.md) and heavily unit- and integration-tested. The hardware-specific TRV valve/offset writes are **not yet validated on real devices**, so `target` calibration mode is the safe baseline. As with any early-stage thermostat replacement, keep an independent fallback for heating/cooling until it has proven itself in your setup.
 
 ## License
 
