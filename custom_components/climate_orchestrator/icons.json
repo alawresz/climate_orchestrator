@@ -46,6 +46,7 @@
       "adaptive_heat_setpoint": { "default": "mdi:thermometer-chevron-up" },
       "adaptive_cool_setpoint": { "default": "mdi:thermometer-chevron-down" },
       "running_mean_outdoor_temperature": { "default": "mdi:sun-thermometer" },
+      "status": { "default": "mdi:heart-pulse" },
       "hvac_action_reason": { "default": "mdi:help-circle-outline" },
       "mpc_heating_gain": { "default": "mdi:radiator" },
       "mpc_heat_loss": { "default": "mdi:home-thermometer-outline" },
@@ -59,8 +60,7 @@
     "binary_sensor": {
       "window_open": { "default": "mdi:window-open-variant" },
       "frost_active": { "default": "mdi:snowflake-alert" },
-      "dew_point_active": { "default": "mdi:water-percent" },
-      "degraded": { "default": "mdi:alert-circle-outline" }
+      "dew_point_active": { "default": "mdi:water-percent" }
     }
   }
 }

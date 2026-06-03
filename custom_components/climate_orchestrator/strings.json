@@ -43,10 +43,15 @@
   "entity": {
     "sensor": {
       "home_avg_temperature": { "name": "Home average temperature" },
-      "home_avg_humidity": { "name": "Home average humidity" }
-    },
-    "binary_sensor": {
-      "degraded": { "name": "Degraded" }
+      "home_avg_humidity": { "name": "Home average humidity" },
+      "status": {
+        "name": "Status",
+        "state": {
+          "initializing": "Initializing",
+          "ok": "OK",
+          "degraded": "Degraded"
+        }
+      }
     },
     "number": {
       "release_offset": { "name": "Heat/cool release offset" },

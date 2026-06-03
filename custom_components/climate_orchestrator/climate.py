@@ -79,7 +79,7 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
     """The single whole-home climate control surface (two setpoints)."""
 
     _attr_name = None  # use the hub device name
-    _attr_icon = "mdi:home-thermostat"
+    _attr_icon = "mdi:thermostat"  # mdi:home-thermostat is not a real MDI name
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_preset_modes = PRESET_MODES
     _attr_target_temperature_step = TARGET_TEMP_STEP

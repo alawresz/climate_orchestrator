@@ -3,6 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
+
+
+class Status(StrEnum):
+    """Operational status of the orchestrator as a whole.
+
+    ``INITIALIZING`` covers the warm-up window right after a restart, before
+    any managed device has reported a usable temperature — transient gaps that
+    would otherwise raise alarming repairs are held back until we leave it.
+    """
+
+    INITIALIZING = "initializing"
+    OK = "ok"
+    DEGRADED = "degraded"
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,11 +44,21 @@ class SmartClimateData:
     readings: dict[str, DeviceReading]
     tracked_entities: frozenset[str]
     stale_sensors: frozenset[str] = frozenset()
+    status: Status = Status.OK
+
+    @property
+    def initializing(self) -> bool:
+        """Whether the orchestrator is still in its post-restart warm-up."""
+        return self.status is Status.INITIALIZING
 
     @property
     def degraded(self) -> bool:
-        """Whether at least one managed device is currently unavailable."""
-        return bool(self.unavailable_devices)
+        """Whether a managed device is unavailable *after* warm-up.
+
+        Suppressed while ``INITIALIZING`` so a restart doesn't briefly flash a
+        degraded state before sensors and devices have reported in.
+        """
+        return self.status is Status.DEGRADED
 
     @property
     def any_window_open(self) -> bool:

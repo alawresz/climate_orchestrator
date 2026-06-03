@@ -62,6 +62,7 @@ from .const import (
     RMOT_TAU_SECONDS,
     RUNTIME_WINDOW_SECONDS,
     SENSOR_MAX_AGE_DEFAULT,
+    STARTUP_GRACE_SECONDS,
     UPDATE_INTERVAL_SECONDS,
     VALVE_MAINTENANCE_DWELL_SECONDS,
 )
@@ -92,7 +93,7 @@ from .devices.trv import (
     find_related_number,
     local_offset,
 )
-from .models import Band, DeviceReading, SmartClimateData
+from .models import Band, DeviceReading, SmartClimateData, Status
 from .sensing.registry import build_snapshot
 from .settings import RuntimeSettings, number_value, resolve_settings
 
@@ -122,6 +123,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self.entry = entry
         self._unsub_state: CALLBACK_TYPE | None = None
         self._tracked: frozenset[str] = frozenset()
+        # Post-restart warm-up bookkeeping: when we started, and whether we've
+        # yet seen a usable home temperature. Drives the tri-state status so
+        # transient startup gaps don't raise repairs (DESIGN.md §6.4).
+        self._started = time.monotonic()
+        self._ever_ready = False
         # Latched per-device demand (for hysteresis) and the latest decisions.
         self._last_demand: dict[str, Demand] = {}
         self.last_decisions: dict[str, DeviceDecision] = {}
@@ -257,6 +263,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             outdoor_sensor=self.outdoor_sensor,
             max_age_seconds=max_age_min * 60.0,
         )
+        data = replace(data, status=self._compute_status(data))
         self._update_temp_slope(data.home_avg_temperature)
         self._ensure_subscription(data.tracked_entities)
         # Actuation must never break the read-only snapshot/update.
@@ -476,6 +483,26 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         return []
 
     @callback
+    def _compute_status(self, data: SmartClimateData) -> Status:
+        """Classify the orchestrator as initializing / ok / degraded.
+
+        With nothing managed there's nothing to warm up (``OK``). Once a usable
+        home temperature is ever seen the warm-up is over for good: ``OK``, or
+        ``DEGRADED`` if a managed device is unavailable. Before that first
+        reading we're ``INITIALIZING`` until the grace window elapses — after
+        which a persistent lack of any reading is a real fault (``DEGRADED``).
+        """
+        if not self.device_ids:
+            return Status.OK
+        if data.home_avg_temperature is not None:
+            self._ever_ready = True
+        if self._ever_ready:
+            return Status.DEGRADED if data.unavailable_devices else Status.OK
+        if time.monotonic() - self._started < STARTUP_GRACE_SECONDS:
+            return Status.INITIALIZING
+        return Status.DEGRADED
+
+    @callback
     def _calibration_issue(self, entity_id: str, mode: str, *, missing: bool) -> None:
         """Raise/clear a repair issue when a TRV lacks its calibration number."""
         issue_id = f"missing_calibration_number_{entity_id}"
@@ -527,14 +554,18 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             settings.adaptive_comfort and self.outdoor_sensor is None,
             "outdoor_sensor_missing",
         )
+        # These two are transient right after a restart (sensors haven't
+        # reported in yet), so hold them back while still initializing — only
+        # raise once warm-up is over and the gap is therefore real.
+        settled = not data.initializing
         self._toggle_issue(
             "no_temperature_source",
-            bool(self.device_ids) and data.home_avg_temperature is None,
+            settled and bool(self.device_ids) and data.home_avg_temperature is None,
             "no_temperature_source",
         )
         self._toggle_issue(
             "stale_sensor",
-            bool(data.stale_sensors),
+            settled and bool(data.stale_sensors),
             "stale_sensor",
         )
 

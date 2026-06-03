@@ -2,7 +2,9 @@
 
 * **Operational state** (window open, frost protection active, dehumidifying) —
   handy on dashboards and in automations.
-* **Degraded** (diagnostic) — a managed device is unavailable.
+
+Overall health (initializing / ok / degraded) lives on the `status` *sensor*
+instead, which also carries the `unavailable_devices` attribute.
 """
 
 from __future__ import annotations
@@ -16,7 +18,6 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
-from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -41,10 +42,6 @@ def _open_areas(coordinator: SmartClimateCoordinator) -> dict[str, Any]:
     }
 
 
-def _unavailable(coordinator: SmartClimateCoordinator) -> dict[str, Any]:
-    return {"unavailable_devices": sorted(coordinator.data.unavailable_devices)}
-
-
 BINARY_SENSORS: tuple[SmartClimateBinaryDescription, ...] = (
     SmartClimateBinaryDescription(
         key="window_open",
@@ -65,14 +62,6 @@ BINARY_SENSORS: tuple[SmartClimateBinaryDescription, ...] = (
         device_class=BinarySensorDeviceClass.RUNNING,
         is_on_fn=lambda c: c.dew_point_active(),
     ),
-    SmartClimateBinaryDescription(
-        key="degraded",
-        translation_key="degraded",
-        device_class=BinarySensorDeviceClass.PROBLEM,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        is_on_fn=lambda c: c.data.degraded,
-        attrs_fn=_unavailable,
-    ),
 )
 
 
@@ -81,7 +70,7 @@ async def async_setup_entry(
     entry: SmartClimateConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the operational and degraded binary sensors."""
+    """Set up the operational binary sensors."""
     coordinator = entry.runtime_data
     async_add_entities(
         SmartClimateBinarySensor(coordinator, description)

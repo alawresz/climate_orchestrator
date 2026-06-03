@@ -51,6 +51,14 @@
       "running_mean_outdoor_temperature": {
         "name": "Running mean outdoor temperature"
       },
+      "status": {
+        "name": "Status",
+        "state": {
+          "initializing": "Initializing",
+          "ok": "OK",
+          "degraded": "Degraded"
+        }
+      },
       "hvac_action_reason": {
         "name": "HVAC action reason",
         "state": {
@@ -95,8 +103,7 @@
     "binary_sensor": {
       "window_open": { "name": "Window open" },
       "frost_active": { "name": "Frost protection active" },
-      "dew_point_active": { "name": "Dehumidifying" },
-      "degraded": { "name": "Degraded" }
+      "dew_point_active": { "name": "Dehumidifying" }
     },
     "number": {
       "release_offset": { "name": "Heat/cool release offset" },

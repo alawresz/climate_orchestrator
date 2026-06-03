@@ -18,10 +18,13 @@ async def test_setup_creates_entities(
     assert init_integration.state is ConfigEntryState.LOADED
     cid = init_integration.entry_id
 
-    assert hass.states.get(entity_id_for("climate", cid)) is not None
+    climate = hass.states.get(entity_id_for("climate", cid))
+    assert climate is not None
+    # A valid MDI icon name, so the frontend actually renders one.
+    assert climate.attributes.get("icon") == "mdi:thermostat"
     assert hass.states.get(entity_id_for("sensor", f"{cid}_home_avg_temperature"))
     assert hass.states.get(entity_id_for("sensor", f"{cid}_home_avg_humidity"))
-    assert hass.states.get(entity_id_for("binary_sensor", f"{cid}_degraded"))
+    assert hass.states.get(entity_id_for("sensor", f"{cid}_status"))
 
 
 async def test_unload_entry(
