@@ -585,9 +585,12 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             outdoor=ambient,
             dt=ctx.dt_min,
         )
+        # Plan from the Kalman-filtered estimate (smooths sensor noise); raw
+        # reading as a guard, though observe() always seeds an estimate.
+        estimate = runtime.mpc.estimated_temperature
         pct = preconditioned_valve_pct(
             runtime.mpc,
-            temp=area_temp,
+            temp=area_temp if estimate is None else estimate,
             target=ctx.band.heat_target(ctx.settings.tolerance),
             outdoor=ambient,
             series=self._precondition_series(ctx.dt_min, ctx.settings),

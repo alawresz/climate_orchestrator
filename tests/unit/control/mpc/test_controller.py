@@ -161,3 +161,45 @@ def test_precondition_warm_forecast_never_lowers_valve() -> None:
         )
         == 100.0
     )
+
+
+# --- Kalman wiring: observe() maintains the filtered planning estimate ------
+
+
+def test_estimate_is_none_until_first_observation() -> None:
+    assert _params_controller().estimated_temperature is None
+
+
+def test_first_measurement_seeds_the_estimate() -> None:
+    ctrl = _params_controller()
+    ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=5.0)
+    assert ctrl.estimated_temperature == 20.0
+
+
+def test_estimate_damps_a_measurement_spike() -> None:
+    """A +2K sensor spike is heavily damped in the planning estimate."""
+    ctrl = _params_controller()
+    ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=5.0)
+    ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=5.0)
+    steady = ctrl.estimated_temperature
+    assert steady == pytest.approx(19.8838559814, abs=1e-9)
+    ctrl.observe(temp=22.0, valve=0.5, outdoor=10.0, dt=5.0)
+    spiked = ctrl.estimated_temperature
+    assert spiked == pytest.approx(20.6381782514, abs=1e-9)
+    # Strictly between the model's expectation and the spiky reading.
+    assert steady < spiked < 22.0
+
+
+def test_kalman_state_survives_persistence_roundtrip() -> None:
+    ctrl = _params_controller()
+    ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=5.0)
+    ctrl.observe(temp=21.0, valve=0.5, outdoor=10.0, dt=5.0)
+    clone = MpcController.from_dict(ctrl.to_dict())
+    assert clone.kalman == ctrl.kalman
+
+
+def test_legacy_payload_without_kalman_restores_unfiltered() -> None:
+    """Stores written before the observer wiring load cleanly."""
+    legacy = MpcController.from_dict({"gain": 0.1, "loss": 0.01})
+    assert legacy.kalman is None
+    assert legacy.estimated_temperature is None

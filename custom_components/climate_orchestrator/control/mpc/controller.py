@@ -19,6 +19,7 @@ from .model import (
     ThermalParams,
     identify_parameters,
 )
+from .observer import MEASUREMENT_VAR, KalmanState, predict, update
 from .optimizer import DEFAULT_HORIZON, optimize_valve
 
 if TYPE_CHECKING:
@@ -40,9 +41,16 @@ class MpcController:
         self.params = params
         self.history: deque[Sample] = deque(maxlen=max_history)
         self._last: tuple[float, float, float] | None = None
+        self.kalman: KalmanState | None = None
 
     def observe(self, *, temp: float, valve: float, outdoor: float, dt: float) -> None:
-        """Record the latest transition and re-identify parameters."""
+        """Record the latest transition, re-identify, and refresh the estimate.
+
+        System identification deliberately consumes *raw* transitions — fitting
+        the model to its own Kalman-smoothed output would be circular. The
+        filter only shapes what the optimiser plans from
+        (:attr:`estimated_temperature`).
+        """
         if self._last is not None and dt > 0:
             last_temp, last_valve, last_outdoor = self._last
             self.history.append(
@@ -56,7 +64,24 @@ class MpcController:
             )
             if len(self.history) >= MIN_SAMPLES:
                 self.params = identify_parameters(list(self.history), self.params)
+        # Kalman: project the previous estimate across the transition that just
+        # elapsed (the *previous* valve/outdoor held for dt), then correct with
+        # the new measurement. The first measurement seeds the state.
+        if self.kalman is None:
+            self.kalman = KalmanState(temp=temp, variance=MEASUREMENT_VAR)
+        else:
+            if self._last is not None and dt > 0:
+                _, last_valve, last_outdoor = self._last
+                self.kalman = predict(
+                    self.kalman, last_valve, last_outdoor, self.params, dt
+                )
+            self.kalman = update(self.kalman, temp)
         self._last = (temp, valve, outdoor)
+
+    @property
+    def estimated_temperature(self) -> float | None:
+        """Kalman-filtered room temperature (``None`` before any observation)."""
+        return self.kalman.temp if self.kalman is not None else None
 
     def compute_valve_pct(
         self,
@@ -103,11 +128,14 @@ class MpcController:
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise learned parameters and history for persistence."""
-        return {
+        payload: dict[str, Any] = {
             "gain": self.params.gain,
             "loss": self.params.loss,
             "history": [asdict(sample) for sample in self.history],
         }
+        if self.kalman is not None:
+            payload["kalman"] = asdict(self.kalman)
+        return payload
 
     @classmethod
     def from_dict(
@@ -120,6 +148,8 @@ class MpcController:
         )
         for sample in data.get("history", []):
             controller.history.append(Sample(**sample))
+        if (kalman := data.get("kalman")) is not None:
+            controller.kalman = KalmanState(**kalman)
         return controller
 
 
