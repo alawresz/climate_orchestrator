@@ -16,7 +16,7 @@ dev = [
   "pytest-asyncio>=0.23",
   "pytest-cov>=5.0",
   "pytest-homeassistant-custom-component>=0.13",
-  "syrupy>=4.6",
+  "syrupy>=5.3.1",
   "ruff==0.15.15",
   "mypy>=1.11",
   "hypothesis>=6.0",
