@@ -215,15 +215,15 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         """
         heat, cool = self._base_band_edges()
         settings = resolve_settings(self.hass, self.coordinator.entry.entry_id)
-        if not settings.adaptive_comfort:
+        if not settings.adaptive_cooling_comfort:
             return heat, cool
         return adaptive_band(
             heat,
             cool,
             self.coordinator.running_mean_outdoor,
-            settings.adaptive_comfort_max_shift,
-            bias=settings.adaptive_comfort_bias,
-            response=settings.adaptive_comfort_response,
+            settings.adaptive_cooling_comfort_max_shift,
+            bias=settings.adaptive_cooling_comfort_onset_bias,
+            response=settings.adaptive_cooling_comfort_response,
         )
 
     @property

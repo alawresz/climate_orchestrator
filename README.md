@@ -99,7 +99,7 @@ A single hub device exposes:
 | `sensor.*_home_average_temperature` / `_humidity` | Home-wide aggregates. |
 | `sensor.*_home_feels_like_temperature` | Humidity-adjusted apparent temperature of the home. |
 | `sensor.*_temperature_slope` | Home temperature rate of change (K/min). |
-| `sensor.*_adaptive_heat_setpoint` / `_adaptive_cool_setpoint` | Comfort band after the adaptive-comfort shift. |
+| `sensor.*_adaptive_cool_setpoint` | The cool edge after the adaptive cooling-comfort shift (the heat edge never moves). |
 | `sensor.*_running_mean_outdoor_temperature` | Running-mean outdoor temperature driving adaptive comfort (diagnostic). |
 | `sensor.*_<trv>_mpc_*` | Per-TRV MPC diagnostics: heating power, heat loss, learning status, model error (diagnostic). |
 | `sensor.*_<device>_*` | Per-device diagnostics: action (+ last command), runtime %, cycles/hour, valve % (TRV) (diagnostic). |
@@ -165,9 +165,9 @@ then engages a little earlier in humid weather and a little later in dry weather
 it, `1` = full feels-like, `>1` = amplify). A separate **dew-point guard** can put
 the AC in dry mode when humidity is high.
 
-### Relaxing the cooling when it's hot out (Adaptive comfort)
+### Relaxing the cooling when it's hot out (Adaptive cooling comfort)
 
-With **Adaptive comfort** on (optional, off by default), the **cool setpoint, and
+With **Adaptive cooling comfort** on (optional, off by default), the **cool setpoint, and
 only the cool setpoint**, relaxes upward once it's hotter outside than you'd cool
 for anyway. It tracks a slow running mean of the outdoor temperature:
 
@@ -290,7 +290,7 @@ reads. So when cooling is wanted, the commanded setpoint is the lower of:
 
 1. **Room-referenced:** `cool target − bias`. The **AC cooling setpoint bias**
    pushes below the real target so the AC's sensor doesn't satisfy before the
-   room. With **Adaptive AC bias** on (default), an integral controller grows the
+   room. With **Self-tuning AC bias** on (default), an integral controller grows the
    bias (up to **Max AC cooling setpoint bias**) while the room stays above target
    and cools too slowly, then decays it back once satisfied.
 2. **Compressor-referenced (proportional):** below the AC's *own* reported
@@ -342,8 +342,8 @@ within 7–35 °C.
 | Outdoor temperature gating | On | Suppress heating when it's mild out (≥ **Heating off above outdoor temperature**) and cooling when it's cool out (≤ **Cooling off below outdoor temperature**). Needs an outdoor sensor. |
 | Frost protection | On | Force heat in any area below **Frost protection temperature**, overriding mode, preset, and window-open. |
 | AC heating assist | Off | Allow an AC that supports `heat` to participate in heating (radiators own heating by default). On an AC-only setup this also turns the thermostat into a full heat/cool one. |
-| Adaptive AC bias | On | Auto-tune the AC cooling setpoint bias with integral feedback (grows up to **Max AC cooling setpoint bias**, decays when satisfied). The **AC cooling setpoint bias** becomes the floor. |
-| Adaptive comfort | Off | Relax the cool setpoint upward when it's hot outside (see *Relaxing the cooling when it's hot out*). Needs an outdoor sensor. |
+| Self-tuning AC bias | On | Auto-tune the AC cooling setpoint bias with integral feedback (grows up to **Max AC cooling setpoint bias**, decays when satisfied). The **AC cooling setpoint bias** becomes the floor. |
+| Adaptive cooling comfort | Off | Relax the cool setpoint upward when it's hot outside (see *Relaxing the cooling when it's hot out*). Needs an outdoor sensor. |
 | Automatic valve maintenance | Off | Periodically exercise the TRV valves (full open → closed) every **Valve maintenance interval** days. Skipped while a room is actively heating. |
 
 ### Tuning numbers (`number`)
@@ -358,11 +358,11 @@ within 7–35 °C.
 | Heating off above outdoor temperature | 20 °C | 5–30 | Outdoor cut-off above which heating is suppressed. |
 | Cooling off below outdoor temperature | 16 °C | 0–25 | Outdoor cut-off below which cooling is suppressed. |
 | Frost protection temperature | 7 °C | 3–12 | Safety floor that forces heat. |
-| AC cooling setpoint bias | 1.5 °C | 0–5 | How far below the real target the AC's setpoint is pushed. The floor when Adaptive AC bias is on. |
+| AC cooling setpoint bias | 1.5 °C | 0–5 | How far below the real target the AC's setpoint is pushed. The floor when Self-tuning AC bias is on. |
 | Max AC cooling setpoint bias | 4 °C | 0.5–8 | Ceiling for the adaptive AC bias (anti-windup). |
-| Adaptive comfort max shift | 2 °C | 0–5 | The most the cool edge may rise under adaptive comfort; the curve approaches but never exceeds it. |
-| Adaptive comfort onset bias | +1 °C | −3–3 | Slides the relaxation onset vs the cool edge. `+1` waits until 1° hotter than the cool setpoint; `−1` starts a degree earlier. |
-| Adaptive comfort response | 5 °C | 1–10 | How gently the cool edge ramps — the degrees of outdoor excess for ~63% of the cap. Larger = gentler. |
+| Adaptive cooling comfort max shift | 2 °C | 0–5 | The most the cool edge may rise under adaptive cooling comfort; the curve approaches but never exceeds it. |
+| Adaptive cooling comfort onset bias | +1 °C | −3–3 | Slides the relaxation onset vs the cool edge. `+1` waits until 1° hotter than the cool setpoint; `−1` starts a degree earlier. |
+| Adaptive cooling comfort response | 5 °C | 1–10 | How gently the cool edge ramps — the degrees of outdoor excess for ~63% of the cap. Larger = gentler. |
 | Window open delay | 0 min | 0–30 | Grace period an open window may stay open before its area stops. `0` stops immediately. Frost protection ignores it. |
 | Valve maintenance interval | 30 days | 1–60 | Days between automatic valve-exercise runs (when Automatic valve maintenance is on). |
 | Sensor staleness timeout | 6 h | 0–12 h | Treat an area sensor that hasn't reported for longer than this as missing (falls back to the home average) and raise a repair. `0` disables the guard. |
@@ -377,7 +377,7 @@ its step, so a large bias can never ask for a temperature the AC won't accept.
 | Home average temperature / humidity | The home-wide aggregates used as the second trigger input (primary measurements). |
 | Home feels-like temperature | The home comfort index — apparent temperature of the home average scaled by **Comfort humidity influence** (equals the raw apparent temperature at the default 1.0). What Comfort index targeting judges against. |
 | Temperature slope (K/min) | Rate the home average is rising or falling (least-squares over a trailing window). |
-| Adaptive heat setpoint / Adaptive cool setpoint | The band edges after the adaptive-comfort shift (only the cool edge moves). Always computed, so you can preview the effect before enabling it. |
+| Adaptive cool setpoint | The cool edge after the adaptive cooling-comfort shift (the heat edge never moves). Always computed, so you can preview the effect before enabling it. |
 
 ### Diagnostics
 
@@ -423,7 +423,7 @@ Developer Tools → Actions (target the whole-home `climate` entity):
 - **Repairs:** a notice is raised (and auto-cleared) for silent misconfigurations:
   a TRV in `mpc`/`offset` mode whose `valve_opening_degree` /
   `local_temperature_calibration` number can't be found (falls back to `target`);
-  **Adaptive comfort** enabled with no outdoor sensor; an area sensor that has
+  **Adaptive cooling comfort** enabled with no outdoor sensor; an area sensor that has
   gone stale (stopped reporting past the staleness timeout); an inverted comfort
   band (cool setpoint below the heat setpoint, leaving no neutral zone); and no
   usable temperature source for any managed device. The last two (stale sensor,

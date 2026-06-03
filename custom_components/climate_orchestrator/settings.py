@@ -96,13 +96,25 @@ NUMBER_SETTINGS: tuple[NumberSetting, ...] = (
     NumberSetting("ac_setpoint_bias", AC_SETPOINT_BIAS_DEFAULT, 0.0, 5.0, 0.5),
     NumberSetting("ac_setpoint_bias_max", AC_SETPOINT_BIAS_MAX_DEFAULT, 0.5, 8.0, 0.5),
     NumberSetting(
-        "adaptive_comfort_max_shift", ADAPTIVE_COMFORT_MAX_SHIFT_DEFAULT, 0.0, 5.0, 0.5
+        "adaptive_cooling_comfort_max_shift",
+        ADAPTIVE_COMFORT_MAX_SHIFT_DEFAULT,
+        0.0,
+        5.0,
+        0.5,
     ),
     NumberSetting(
-        "adaptive_comfort_bias", ADAPTIVE_COMFORT_BIAS_DEFAULT, -3.0, 3.0, 0.5
+        "adaptive_cooling_comfort_onset_bias",
+        ADAPTIVE_COMFORT_BIAS_DEFAULT,
+        -3.0,
+        3.0,
+        0.5,
     ),
     NumberSetting(
-        "adaptive_comfort_response", ADAPTIVE_COMFORT_RESPONSE_DEFAULT, 1.0, 10.0, 0.5
+        "adaptive_cooling_comfort_response",
+        ADAPTIVE_COMFORT_RESPONSE_DEFAULT,
+        1.0,
+        10.0,
+        0.5,
     ),
     NumberSetting(
         "window_open_delay",
@@ -151,9 +163,9 @@ SWITCH_SETTINGS: tuple[SwitchSetting, ...] = (
     SwitchSetting("outdoor_temp_gating", True),
     SwitchSetting("frost_protection", True),
     SwitchSetting("ac_heating_assist", False),
-    SwitchSetting("adaptive_ac_bias", True),
+    SwitchSetting("self_tuning_ac_bias", True),
     SwitchSetting("auto_valve_maintenance", False),
-    SwitchSetting("adaptive_comfort", False),
+    SwitchSetting("adaptive_cooling_comfort", False),
 )
 
 
@@ -170,9 +182,9 @@ class RuntimeSettings:
     cool_off_outdoor: float
     ac_setpoint_bias: float
     ac_setpoint_bias_max: float
-    adaptive_comfort_max_shift: float
-    adaptive_comfort_bias: float
-    adaptive_comfort_response: float
+    adaptive_cooling_comfort_max_shift: float
+    adaptive_cooling_comfort_onset_bias: float
+    adaptive_cooling_comfort_response: float
     window_open_delay: float
     valve_maintenance_interval: float
     sensor_max_age: float
@@ -183,9 +195,9 @@ class RuntimeSettings:
     outdoor_temp_gating: bool
     frost_protection: bool
     ac_heating_assist: bool
-    adaptive_ac_bias: bool
+    self_tuning_ac_bias: bool
     auto_valve_maintenance: bool
-    adaptive_comfort: bool
+    adaptive_cooling_comfort: bool
     calibration_mode: str
 
 
@@ -269,9 +281,13 @@ def resolve_settings(hass: HomeAssistant, entry_id: str) -> RuntimeSettings:
         cool_off_outdoor=numbers["cool_off_outdoor"],
         ac_setpoint_bias=numbers["ac_setpoint_bias"],
         ac_setpoint_bias_max=numbers["ac_setpoint_bias_max"],
-        adaptive_comfort_max_shift=numbers["adaptive_comfort_max_shift"],
-        adaptive_comfort_bias=numbers["adaptive_comfort_bias"],
-        adaptive_comfort_response=numbers["adaptive_comfort_response"],
+        adaptive_cooling_comfort_max_shift=numbers[
+            "adaptive_cooling_comfort_max_shift"
+        ],
+        adaptive_cooling_comfort_onset_bias=numbers[
+            "adaptive_cooling_comfort_onset_bias"
+        ],
+        adaptive_cooling_comfort_response=numbers["adaptive_cooling_comfort_response"],
         window_open_delay=numbers["window_open_delay"],
         valve_maintenance_interval=numbers["valve_maintenance_interval"],
         sensor_max_age=numbers["sensor_max_age"],
@@ -282,8 +298,8 @@ def resolve_settings(hass: HomeAssistant, entry_id: str) -> RuntimeSettings:
         outdoor_temp_gating=switches["outdoor_temp_gating"],
         frost_protection=switches["frost_protection"],
         ac_heating_assist=switches["ac_heating_assist"],
-        adaptive_ac_bias=switches["adaptive_ac_bias"],
+        self_tuning_ac_bias=switches["self_tuning_ac_bias"],
         auto_valve_maintenance=switches["auto_valve_maintenance"],
-        adaptive_comfort=switches["adaptive_comfort"],
+        adaptive_cooling_comfort=switches["adaptive_cooling_comfort"],
         calibration_mode=_calibration_mode(hass, entry_id),
     )

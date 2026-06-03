@@ -11,9 +11,9 @@
       "cool_off_outdoor": { "default": "mdi:snowflake-thermometer" },
       "ac_setpoint_bias": { "default": "mdi:air-conditioner" },
       "ac_setpoint_bias_max": { "default": "mdi:speedometer" },
-      "adaptive_comfort_max_shift": { "default": "mdi:arrow-expand-vertical" },
-      "adaptive_comfort_bias": { "default": "mdi:tune-vertical" },
-      "adaptive_comfort_response": { "default": "mdi:chart-bell-curve" },
+      "adaptive_cooling_comfort_max_shift": { "default": "mdi:arrow-expand-vertical" },
+      "adaptive_cooling_comfort_onset_bias": { "default": "mdi:tune-vertical" },
+      "adaptive_cooling_comfort_response": { "default": "mdi:chart-bell-curve" },
       "window_open_delay": { "default": "mdi:window-open-variant" },
       "valve_maintenance_interval": { "default": "mdi:calendar-refresh" },
       "sensor_max_age": { "default": "mdi:timer-sand" },
@@ -32,9 +32,9 @@
       "outdoor_temp_gating": { "default": "mdi:sun-thermometer-outline" },
       "frost_protection": { "default": "mdi:snowflake-alert" },
       "ac_heating_assist": { "default": "mdi:fire" },
-      "adaptive_ac_bias": { "default": "mdi:air-conditioner" },
+      "self_tuning_ac_bias": { "default": "mdi:air-conditioner" },
       "auto_valve_maintenance": { "default": "mdi:wrench-clock" },
-      "adaptive_comfort": { "default": "mdi:thermometer-auto" }
+      "adaptive_cooling_comfort": { "default": "mdi:thermometer-auto" }
     },
     "select": {
       "calibration_mode": { "default": "mdi:tune-variant" }
@@ -44,7 +44,6 @@
       "home_avg_humidity": { "default": "mdi:water-percent" },
       "home_feels_like_temperature": { "default": "mdi:thermometer-lines" },
       "temperature_slope": { "default": "mdi:chart-line-variant" },
-      "adaptive_heat_setpoint": { "default": "mdi:thermometer-chevron-up" },
       "adaptive_cool_setpoint": { "default": "mdi:thermometer-chevron-down" },
       "running_mean_outdoor_temperature": { "default": "mdi:sun-thermometer" },
       "status": { "default": "mdi:heart-pulse" },

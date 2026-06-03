@@ -285,7 +285,7 @@ async def test_window_open_delay_defers_then_stops_heating(
     assert not _commanded(set_hvac, TRV_ENTITY, ATTR_HVAC_MODE, "heat")
 
 
-async def test_adaptive_ac_bias_lowers_the_setpoint(
+async def test_self_tuning_ac_bias_lowers_the_setpoint(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
     living_area: str,

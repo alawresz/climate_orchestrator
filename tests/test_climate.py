@@ -93,7 +93,7 @@ async def test_adaptive_comfort_relaxes_displayed_cool_edge(
     await hass.services.async_call(
         "switch",
         "turn_on",
-        {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_adaptive_comfort")},
+        {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_adaptive_cooling_comfort")},
         blocking=True,
     )
     await coordinator.async_refresh()
