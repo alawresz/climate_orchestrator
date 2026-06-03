@@ -28,3 +28,4 @@ test-results/
 
 # mutmut work dir
 mutants/
+junit.xml

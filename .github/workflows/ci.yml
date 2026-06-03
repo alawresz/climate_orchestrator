@@ -29,16 +29,28 @@ jobs:
         run: uvx pre-commit run codespell --all-files --show-diff-on-failure
       - name: mypy
         run: uv run mypy custom_components/climate_orchestrator
-      - name: pytest (with coverage)
+      - name: pytest (with coverage + JUnit results)
         run: >-
           uv run pytest
           --cov=custom_components/climate_orchestrator
           --cov-report=xml --cov-report=term-missing
+          --junitxml=junit.xml -o junit_family=legacy
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6
         with:
           files: coverage.xml
           # Public repos upload tokenless; add the secret if uploads start failing.
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+      - name: Upload test results to Codecov (Test Analytics)
+        # Runs even when pytest fails — failure rates are the point. The
+        # dedicated test-results-action is deprecated; the main action handles
+        # JUnit uploads via report_type since v5.
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@v6
+        with:
+          report_type: test_results
+          files: junit.xml
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
