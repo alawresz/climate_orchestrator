@@ -55,6 +55,7 @@
     },
     "number": {
       "release_offset": { "name": "Heat/cool release offset" },
+      "area_band_offset": { "name": "{area} band offset" },
       "frost_protection_temp": { "name": "Frost protection temperature" },
       "dew_point_threshold": { "name": "Dew point threshold" },
       "heat_off_outdoor": { "name": "Heating off above outdoor temperature" },

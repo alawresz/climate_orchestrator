@@ -95,7 +95,12 @@ from .devices.trv import (
 )
 from .models import Band, DeviceReading, SmartClimateData, Status
 from .sensing.registry import build_snapshot
-from .settings import RuntimeSettings, number_value, resolve_settings
+from .settings import (
+    RuntimeSettings,
+    area_band_offset,
+    number_value,
+    resolve_settings,
+)
 
 _MPC_STORE_VERSION = 1
 _MPC_SAVE_DELAY = 30.0
@@ -903,6 +908,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                     window_open=window_state.get(entity_id, False),
                     other_window_open=any(a != reading.area_id for a in open_areas),
                     previous=self._last_demand.get(entity_id, Demand.IDLE),
+                    offset=area_band_offset(
+                        self.hass, self.entry.entry_id, reading.area_id
+                    ),
                 ),
                 global_input,
             )

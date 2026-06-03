@@ -38,6 +38,13 @@ TARGET_TEMP_STEP: Final = 0.5
 MIN_TEMP: Final = 7.0
 MAX_TEMP: Final = 35.0
 
+# Per-area comfort band offset (°C). A positive value shifts that area's whole
+# band up — it heats sooner and releases later, so the room runs warmer; a
+# negative value runs it cooler. Default 0 = no shift. Bounded so a single area
+# can't be nudged absurdly far from the home band.
+AREA_BAND_OFFSET_DEFAULT: Final = 0.0
+AREA_BAND_OFFSET_LIMIT: Final = 5.0
+
 # How often to re-evaluate even with no state changes (keepalive).
 UPDATE_INTERVAL_SECONDS: Final = 60
 

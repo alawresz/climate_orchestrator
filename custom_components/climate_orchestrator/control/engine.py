@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from ..const import MAX_TEMP, MIN_TEMP
 from ..models import Band
 from .comfort import dew_point, effective_temperature
 from .hysteresis import Demand, evaluate_demand
@@ -59,6 +60,8 @@ class DeviceInput:
     window_open: bool = False
     other_window_open: bool = False
     previous: Demand = Demand.IDLE
+    # Per-area comfort band offset (°C); positive runs the room warmer.
+    offset: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,12 +106,23 @@ def decide(device: DeviceInput, g: GlobalInput) -> DeviceDecision:
         return _decision(device, Demand.IDLE, "window_open")
 
     # Comfort-adjusted readings, with cross-fallback between local and home.
+    # The per-area offset biases only the *local* reading (not the home
+    # average): a positive offset subtracts from the room's perceived
+    # temperature, so it engages sooner and releases later — i.e. runs warmer.
+    # Clamped so the shifted reading can't escape the usable temperature range.
     local_eff = (
-        effective_temperature(
-            device.local_temp,
-            device.local_humidity,
-            use_comfort=g.use_comfort,
-            influence=g.comfort_influence,
+        min(
+            MAX_TEMP,
+            max(
+                MIN_TEMP,
+                effective_temperature(
+                    device.local_temp,
+                    device.local_humidity,
+                    use_comfort=g.use_comfort,
+                    influence=g.comfort_influence,
+                )
+                - device.offset,
+            ),
         )
         if device.local_temp is not None
         else None

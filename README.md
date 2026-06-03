@@ -108,7 +108,7 @@ A single hub device exposes:
 | `binary_sensor.*_window_open` / `_frost_active` / `_dew_point_active` | Operational state for dashboards/automations. |
 | `select.*_calibration_mode` | `target` (default) / `mpc` / `offset`. |
 | `switch.*` | The feature toggles (see *Controls & settings reference*). |
-| `number.*` | The tuning numbers and per-preset band edges (see *Controls & settings reference*). |
+| `number.*` | The tuning numbers, per-preset band edges, and a per-area band offset (see *Controls & settings reference*). |
 
 All tunables persist across restarts and re-run control when changed.
 
@@ -351,6 +351,7 @@ within 7–35 °C.
 | Number | Default | Range | Description |
 |--------|:-------:|:-----:|-------------|
 | Heat/cool release offset | 0.5 °C | 0–3 | How far the room must swing back toward the opposite edge before a device stops. Larger = longer runs, fewer cycles. |
+| `<area>` band offset | 0 °C | −5–5 | Per-area comfort nudge: a positive value shifts that area's whole band up so the room runs **warmer** (heats sooner, cools later); negative runs it cooler. One number per managed area; biases only that area's local reading, not the home average. |
 | Switching tolerance | 0.3 °C | 0–2 | How far past the trigger edge a device drives, which is also the target (`heat setpoint + tolerance`, `cool setpoint − tolerance`, each capped at the band midpoint). |
 | Comfort humidity influence | 1.0 | 0–2 | How strongly humidity shifts the comfort index: `effective = dry-bulb + influence × (apparent − dry-bulb)`. `0` ignores humidity (pure dry-bulb), `1` is the full feels-like temperature, `>1` amplifies it. Only matters when Comfort index targeting is on. |
 | Dew point threshold | 16 °C | 10–22 | Dew point above which the Dew point guard runs dry mode. |
