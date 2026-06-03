@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v0.19.2 (2026-06-03)
+
+### Bug Fixes
+
+- Extract per-device control flow and cycle context, compute AC bias error against the current
+  cycle's home average
+  ([`aa54c52`](https://github.com/alawresz/climate_orchestrator/commit/aa54c5213a89b780c981663c83f62c2867e0cb51))
+
+### Continuous Integration
+
+- Remove advisory "continue-on-error" for hassfest validation
+  ([`8726404`](https://github.com/alawresz/climate_orchestrator/commit/8726404647f3816713fa908f678a3a0921cf1783))
+
+
 ## v0.19.1 (2026-06-03)
 
 ### Bug Fixes
