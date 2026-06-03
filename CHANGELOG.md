@@ -1,4 +1,38 @@
-# Changelog
+# CHANGELOG
 
-<!-- Releases are generated automatically by python-semantic-release from
-     Conventional Commit messages. Do not edit below this line by hand. -->
+
+## v0.12.0 (2026-06-03)
+
+### Chores
+
+- Update ruff version, fix type hint, and adjust manifest formatting
+  ([`07b2fcd`](https://github.com/alawresz/climate_orchestrator/commit/07b2fcd42e8848985e64fe62658df2f182fd3b19))
+
+### Continuous Integration
+
+- Add semantic release configuration and workflow for automated versioning
+  ([`c954162`](https://github.com/alawresz/climate_orchestrator/commit/c95416296f18c424b2ef8b77583600e406abd633))
+
+- Integrate Codecov for test coverage reporting and add badge to README
+  ([`19beacb`](https://github.com/alawresz/climate_orchestrator/commit/19beacb438781208fb49208692c03285ebda8b3a))
+
+- Update workflow to set read-only permissions
+  ([`db8776e`](https://github.com/alawresz/climate_orchestrator/commit/db8776ea49a607d1f55175db6ef489bb2fcd6bb9))
+
+### Documentation
+
+- Add badges to README and improve HACS installation instructions
+  ([`534f991`](https://github.com/alawresz/climate_orchestrator/commit/534f9914e4341c6a1d05c52cd0500936b61bb6b7))
+
+### Features
+
+- Throttle AC setpoint writes to reduce radio spam and improve efficiency
+  ([`8af8c95`](https://github.com/alawresz/climate_orchestrator/commit/8af8c95e7ef647015b43433d379b97f77daac51c))
+
+
+## v0.11.0 (2026-06-03)
+
+### Chores
+
+- Init commit
+  ([`3407209`](https://github.com/alawresz/climate_orchestrator/commit/3407209458ae2c75082db43e266e620cd1e0a77c))
