@@ -59,6 +59,10 @@ def build_command(
             drive = max(room_above, AC_COOL_KICK)
             target = min(target, device_current_temp - drive)
         return DeviceCommand(Mode.COOL, _clamp(target, caps))
+    # Heating assist: the engine only yields HEAT for a cooler when assist is on.
+    # Drive to the heat target like a TRV; the room sensor ends the call.
+    if decision.demand is Demand.HEAT and caps.can_heat:
+        return DeviceCommand(Mode.HEAT, _clamp(band.heat_target(tolerance), caps))
     if decision.dry_mode and caps.can_dry:
         return DeviceCommand(Mode.DRY, None)
     return DeviceCommand(Mode.OFF, None)

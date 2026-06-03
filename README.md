@@ -130,7 +130,9 @@ pair of these setpoints, editable live.
 
 If you've configured only one kind of device the thermostat adapts: TRVs with no
 AC become a plain **heat / off** thermostat with a single setpoint, and an AC
-with no TRVs becomes **cool / off** — no inert second handle.
+with no TRVs becomes **cool / off** — no inert second handle. (Turning on **AC
+heating assist** makes an AC count as heat-capable, so an AC-only setup then
+presents the full heat/cool band — a reversible heat pump.)
 
 ### Two temperatures, asymmetric trigger
 
@@ -339,7 +341,7 @@ within 7–35 °C.
 | AC ignores open windows | Off | Let **coolers** ignore a window open in their *own* room — for a portable/exhaust-hose split that *needs* its window open to vent. The AC still stops if a window is open in *another* room, and heaters always stop. Only matters when Window open detection is on. |
 | Outdoor temperature gating | On | Suppress heating when it's mild out (≥ **Heating off above outdoor temperature**) and cooling when it's cool out (≤ **Cooling off below outdoor temperature**). Needs an outdoor sensor. |
 | Frost protection | On | Force heat in any area below **Frost protection temperature**, overriding mode, preset, and window-open. |
-| AC heating assist | Off | Allow an AC that supports `heat` to participate in heating (radiators own heating by default). |
+| AC heating assist | Off | Allow an AC that supports `heat` to participate in heating (radiators own heating by default). On an AC-only setup this also turns the thermostat into a full heat/cool one. |
 | Adaptive AC bias | On | Auto-tune the AC cooling setpoint bias with integral feedback (grows up to **Max AC cooling setpoint bias**, decays when satisfied). The **AC cooling setpoint bias** becomes the floor. |
 | Adaptive comfort | Off | Relax the cool setpoint upward when it's hot outside (see *Relaxing the cooling when it's hot out*). Needs an outdoor sensor. |
 | Automatic valve maintenance | Off | Periodically exercise the TRV valves (full open → closed) every **Valve maintenance interval** days. Skipped while a room is actively heating. |
