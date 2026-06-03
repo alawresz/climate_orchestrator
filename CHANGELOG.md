@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.15.0 (2026-06-03)
+
+### Features
+
+- Rename "Adaptive comfort" to "Adaptive cooling comfort" and "Adaptive AC bias" to "Self-tuning AC
+  bias" for clarity; update references, docs, and tests accordingly
+  ([`a764205`](https://github.com/alawresz/climate_orchestrator/commit/a764205ff38fa437b6a18abad329702d7e657e95))
+
+
 ## v0.14.0 (2026-06-03)
 
 ### Features
