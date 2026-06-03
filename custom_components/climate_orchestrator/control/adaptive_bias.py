@@ -16,6 +16,8 @@ to ``[0, max_add]``). Pure functions — the coordinator owns the per-AC state.
 
 from __future__ import annotations
 
+from .numeric import clamp
+
 
 def update_bias_integral(
     integral: float,
@@ -41,7 +43,7 @@ def update_bias_integral(
         integral += ki * error * dt_min
     else:
         integral *= decay
-    return max(0.0, min(integral, max_add))
+    return clamp(integral, 0.0, max_add)
 
 
 def effective_bias(base: float, integral: float, max_total: float) -> float:

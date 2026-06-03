@@ -12,6 +12,7 @@ from collections.abc import Sequence
 
 from scipy.optimize import minimize_scalar
 
+from ..numeric import clamp
 from .model import ThermalParams, predict_step
 
 DEFAULT_HORIZON = 6
@@ -74,4 +75,4 @@ def optimize_valve(
         bounds=(0.0, max_opening),
         method="bounded",
     )
-    return float(min(max(result.x, 0.0), max_opening))
+    return float(clamp(result.x, 0.0, max_opening))

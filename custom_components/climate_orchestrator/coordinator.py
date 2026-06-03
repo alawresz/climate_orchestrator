@@ -84,6 +84,7 @@ from .control.engine import (
 from .control.forecast import expand_forecast
 from .control.hysteresis import Demand
 from .control.mpc.controller import MpcController
+from .control.numeric import clamp
 from .control.slope import temperature_slope_per_min
 from .control.throttle import throttle_setpoint
 from .control.window import window_suppresses
@@ -848,7 +849,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             seg_end = pts[i + 1][0] if i + 1 < len(pts) else now
             if running and seg_end > seg_start:
                 running_time += seg_end - seg_start
-        return max(0.0, min(1.0, running_time / span))
+        return clamp(running_time / span, 0.0, 1.0)
 
     @callback
     def device_cycles_per_hour(self, entity_id: str) -> float | None:

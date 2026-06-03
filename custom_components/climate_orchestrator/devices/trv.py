@@ -11,6 +11,8 @@ from __future__ import annotations
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 
+from ..control.numeric import clamp
+
 VALVE_OPENING_HINTS = ("valve_opening_degree", "valve_opening", "valve_position")
 LOCAL_CALIBRATION_HINTS = (
     "local_temperature_calibration",
@@ -51,4 +53,4 @@ def local_offset(
     if area_temp is None or trv_internal_temp is None:
         return None
     offset = area_temp - trv_internal_temp
-    return round(max(-_MAX_OFFSET, min(_MAX_OFFSET, offset)), 1)
+    return round(clamp(offset, -_MAX_OFFSET, _MAX_OFFSET), 1)

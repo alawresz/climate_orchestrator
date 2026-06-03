@@ -344,6 +344,7 @@ climate_orchestrator/
 │       │   ├── slope.py           # least-squares home temperature slope (pure)
 │       │   ├── throttle.py        # AC setpoint write throttling (pure)
 │       │   ├── forecast.py        # hourly→per-step forecast expansion for preconditioning (pure)
+│       │   ├── numeric.py         # shared clamp() helper (pure)
 │       │   └── mpc/
 │       │       ├── model.py       # first-order thermal model + system ID (scipy)
 │       │       ├── observer.py    # Kalman state estimate

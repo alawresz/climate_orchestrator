@@ -6,6 +6,7 @@ any Python without the full HA stack.
 
 from __future__ import annotations
 
+from statistics import fmean
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -21,4 +22,4 @@ def mean_or_none(values: Iterable[float | None]) -> float | None:
     present = [value for value in values if value is not None]
     if not present:
         return None
-    return sum(present) / len(present)
+    return fmean(present)

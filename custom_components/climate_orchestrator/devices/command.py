@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from ..const import AC_COOL_KICK
 from ..control.engine import DeviceDecision, DeviceKind
 from ..control.hysteresis import Demand
+from ..control.numeric import clamp
 from .model import AdapterCapabilities, DeviceCommand, Mode
 
 if TYPE_CHECKING:
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
 def _clamp(value: float, caps: AdapterCapabilities) -> float:
     """Snap to the device's step and clamp to its allowed range."""
     stepped = round(value / caps.target_step) * caps.target_step
-    return max(caps.min_temp, min(caps.max_temp, stepped))
+    return clamp(stepped, caps.min_temp, caps.max_temp)
 
 
 def build_command(

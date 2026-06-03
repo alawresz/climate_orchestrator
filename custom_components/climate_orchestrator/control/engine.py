@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from ..const import MAX_TEMP, MIN_TEMP
 from .comfort import dew_point, effective_temperature
 from .hysteresis import Demand, evaluate_demand
+from .numeric import clamp
 
 if TYPE_CHECKING:
     from ..models import Band
@@ -114,18 +115,16 @@ def decide(device: DeviceInput, g: GlobalInput) -> DeviceDecision:
     # temperature, so it engages sooner and releases later — i.e. runs warmer.
     # Clamped so the shifted reading can't escape the usable temperature range.
     local_eff = (
-        min(
+        clamp(
+            effective_temperature(
+                device.local_temp,
+                device.local_humidity,
+                use_comfort=g.use_comfort,
+                influence=g.comfort_influence,
+            )
+            - device.offset,
+            MIN_TEMP,
             MAX_TEMP,
-            max(
-                MIN_TEMP,
-                effective_temperature(
-                    device.local_temp,
-                    device.local_humidity,
-                    use_comfort=g.use_comfort,
-                    influence=g.comfort_influence,
-                )
-                - device.offset,
-            ),
         )
         if device.local_temp is not None
         else None
