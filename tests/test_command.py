@@ -66,6 +66,40 @@ def test_cooler_cools_below_edge_target_by_bias() -> None:
     assert cmd.target_temp == 22.0  # cool_target (24 - 0.5) - bias 1.5
 
 
+def test_cooler_heats_to_edge_when_assist_yields_heat() -> None:
+    """An AC told to HEAT (assist) drives to the heat target like a TRV."""
+    cmd = build_command(
+        _decision(Demand.HEAT),
+        DeviceKind.COOLER,
+        band=BAND,
+        ac_setpoint_bias=1.5,
+        caps=CAPS,
+        tolerance=0.5,
+    )
+    assert cmd.hvac_mode is Mode.HEAT
+    assert cmd.target_temp == 20.5  # heat_edge 20 + tolerance 0.5
+
+
+def test_cooler_heat_off_without_capability() -> None:
+    """An AC that can't heat stays off even on a HEAT demand."""
+    caps = AdapterCapabilities(
+        can_heat=False,
+        can_cool=True,
+        can_dry=True,
+        min_temp=16.0,
+        max_temp=30.0,
+        target_step=0.5,
+    )
+    cmd = build_command(
+        _decision(Demand.HEAT),
+        DeviceKind.COOLER,
+        band=BAND,
+        ac_setpoint_bias=1.5,
+        caps=caps,
+    )
+    assert cmd.hvac_mode is Mode.OFF
+
+
 def test_cooler_runs_dry_under_guard() -> None:
     cmd = build_command(
         _decision(Demand.IDLE, dry=True),

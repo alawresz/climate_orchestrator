@@ -121,3 +121,61 @@ async def test_cooling_only_is_a_single_setpoint_cool_thermostat(
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert hass.states.get(climate).attributes["hvac_action"] == "idle"
+
+
+async def test_ac_only_with_heating_assist_becomes_dual(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Enabling AC heating assist turns an AC-only setup into heat/cool, and the
+    AC actually heats a cold room."""
+    register_entity_in_area(AC_ENTITY, living_area)
+    hass.states.async_set(
+        AC_ENTITY,
+        "off",
+        {"hvac_modes": ["off", "cool", "heat"], "current_temperature": 21.0},
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=DEFAULT_TITLE,
+        data={CONF_ACS: [AC_ENTITY]},  # no TRVs
+        entry_id="sc_ac_assist",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    cid = entry.entry_id
+    climate = entity_id_for("climate", cid)
+    coordinator: SmartClimateCoordinator = entry.runtime_data
+
+    # Assist off by default -> cool-only single setpoint.
+    assert hass.states.get(climate).attributes["hvac_modes"] == ["off", "cool"]
+
+    # Enable AC heating assist -> a full dual heat/cool thermostat.
+    await hass.services.async_call(
+        "switch",
+        "turn_on",
+        {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_ac_heating_assist")},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    state = hass.states.get(climate)
+    assert state.attributes["hvac_modes"] == ["off", "heat_cool"]
+    features = state.attributes["supported_features"]
+    assert features & ClimateEntityFeature.TARGET_TEMPERATURE_RANGE
+    assert not features & ClimateEntityFeature.TARGET_TEMPERATURE
+
+    # And it now actually heats a cold room.
+    await hass.services.async_call(
+        "climate",
+        "set_hvac_mode",
+        {ATTR_ENTITY_ID: climate, "hvac_mode": "heat_cool"},
+        blocking=True,
+    )
+    hass.states.async_set(AREA_TEMP_SENSOR, "17.0", {"device_class": "temperature"})
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(climate).attributes["hvac_action"] == "heating"

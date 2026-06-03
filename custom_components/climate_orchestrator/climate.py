@@ -102,8 +102,19 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
 
     @property
     def _can_heat(self) -> bool:
-        """Whether any heating device (a TRV) is configured."""
-        return bool(self.coordinator.trv_ids)
+        """Heating-capable: a TRV is configured, or an AC with heating assist on.
+
+        So an AC-only setup becomes a full heat/cool thermostat once **AC heating
+        assist** is enabled (a reversible heat pump), instead of a cool-only one
+        whose heat edge could never be reached.
+        """
+        if self.coordinator.trv_ids:
+            return True
+        if not self.coordinator.ac_ids:
+            return False
+        return resolve_settings(
+            self.hass, self.coordinator.entry.entry_id
+        ).ac_heating_assist
 
     @property
     def _can_cool(self) -> bool:
@@ -133,6 +144,14 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         an inert second setpoint.
         """
         return [HVACMode.OFF, self._on_mode]
+
+    @property
+    def hvac_mode(self) -> HVACMode:
+        """Report OFF, or the current on-mode — so the value stays valid even if
+        the supported modes change (e.g. AC heating assist toggled on/off)."""
+        if self._attr_hvac_mode == HVACMode.OFF:
+            return HVACMode.OFF
+        return self._on_mode
 
     async def async_added_to_hass(self) -> None:
         """Restore the mode, preset, and manual band across restarts."""
