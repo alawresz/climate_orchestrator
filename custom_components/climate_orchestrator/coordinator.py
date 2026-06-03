@@ -692,12 +692,21 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         except Exception:
             _LOGGER.debug("climate_orchestrator: forecast fetch failed", exc_info=True)
             return
-        entries = (response or {}).get(self.weather_entity, {}).get("forecast", [])
-        temps = [
-            float(e["temperature"])
-            for e in entries
-            if isinstance(e, dict) and e.get("temperature") is not None
-        ]
+        # The service response is loosely typed JSON; narrow every step.
+        if not isinstance(response, dict):
+            return
+        device_block = response.get(self.weather_entity)
+        if not isinstance(device_block, dict):
+            return
+        entries = device_block.get("forecast")
+        if not isinstance(entries, list):
+            return
+        temps: list[float] = []
+        for entry in entries:
+            if isinstance(entry, dict):
+                temp = entry.get("temperature")
+                if isinstance(temp, int | float) and not isinstance(temp, bool):
+                    temps.append(float(temp))
         if temps:
             self._forecast_hourly = temps
             self._forecast_fetched_at = now
