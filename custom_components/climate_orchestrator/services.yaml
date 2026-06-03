@@ -1,0 +1,27 @@
+reset_mpc_learning:
+  target:
+    entity:
+      integration: climate_orchestrator
+      domain: climate
+  fields:
+    trvs:
+      example: "[climate.trv_1]"
+      required: false
+      selector:
+        entity:
+          domain: climate
+          multiple: true
+
+run_valve_maintenance:
+  target:
+    entity:
+      integration: climate_orchestrator
+      domain: climate
+  fields:
+    trvs:
+      example: "[climate.trv_1]"
+      required: false
+      selector:
+        entity:
+          domain: climate
+          multiple: true

@@ -1,0 +1,66 @@
+{
+  "entity": {
+    "number": {
+      "release_offset": { "default": "mdi:swap-vertical" },
+      "tolerance": { "default": "mdi:plus-minus-variant" },
+      "comfort_humidity_influence": { "default": "mdi:water-percent" },
+      "frost_protection_temp": { "default": "mdi:snowflake-thermometer" },
+      "dew_point_threshold": { "default": "mdi:water-thermometer" },
+      "heat_off_outdoor": { "default": "mdi:sun-thermometer" },
+      "cool_off_outdoor": { "default": "mdi:snowflake-thermometer" },
+      "ac_setpoint_bias": { "default": "mdi:air-conditioner" },
+      "ac_setpoint_bias_max": { "default": "mdi:speedometer" },
+      "adaptive_comfort_max_shift": { "default": "mdi:arrow-expand-vertical" },
+      "adaptive_comfort_bias": { "default": "mdi:tune-vertical" },
+      "adaptive_comfort_response": { "default": "mdi:chart-bell-curve" },
+      "window_open_delay": { "default": "mdi:window-open-variant" },
+      "valve_maintenance_interval": { "default": "mdi:calendar-refresh" },
+      "sensor_max_age": { "default": "mdi:timer-sand" },
+      "preset_away_heat": { "default": "mdi:fire" },
+      "preset_away_cool": { "default": "mdi:snowflake" },
+      "preset_home_heat": { "default": "mdi:fire" },
+      "preset_home_cool": { "default": "mdi:snowflake" },
+      "preset_sleep_heat": { "default": "mdi:fire" },
+      "preset_sleep_cool": { "default": "mdi:snowflake" }
+    },
+    "switch": {
+      "comfort_index_targeting": { "default": "mdi:emoticon-happy-outline" },
+      "dew_point_guard": { "default": "mdi:water-percent-alert" },
+      "window_open_detection": { "default": "mdi:window-open-variant" },
+      "ac_ignore_window": { "default": "mdi:window-open" },
+      "outdoor_temp_gating": { "default": "mdi:sun-thermometer-outline" },
+      "frost_protection": { "default": "mdi:snowflake-alert" },
+      "ac_heating_assist": { "default": "mdi:fire" },
+      "adaptive_ac_bias": { "default": "mdi:air-conditioner" },
+      "auto_valve_maintenance": { "default": "mdi:wrench-clock" },
+      "adaptive_comfort": { "default": "mdi:thermometer-auto" }
+    },
+    "select": {
+      "calibration_mode": { "default": "mdi:tune-variant" }
+    },
+    "sensor": {
+      "home_avg_temperature": { "default": "mdi:home-thermometer" },
+      "home_avg_humidity": { "default": "mdi:water-percent" },
+      "home_feels_like_temperature": { "default": "mdi:thermometer-lines" },
+      "temperature_slope": { "default": "mdi:chart-line-variant" },
+      "adaptive_heat_setpoint": { "default": "mdi:thermometer-chevron-up" },
+      "adaptive_cool_setpoint": { "default": "mdi:thermometer-chevron-down" },
+      "running_mean_outdoor_temperature": { "default": "mdi:sun-thermometer" },
+      "hvac_action_reason": { "default": "mdi:help-circle-outline" },
+      "mpc_heating_gain": { "default": "mdi:radiator" },
+      "mpc_heat_loss": { "default": "mdi:home-thermometer-outline" },
+      "mpc_learning_status": { "default": "mdi:school-outline" },
+      "mpc_model_error": { "default": "mdi:sigma" },
+      "device_action": { "default": "mdi:hvac" },
+      "device_runtime": { "default": "mdi:timer-outline" },
+      "device_cycles_per_hour": { "default": "mdi:sync" },
+      "valve_position": { "default": "mdi:valve" }
+    },
+    "binary_sensor": {
+      "window_open": { "default": "mdi:window-open-variant" },
+      "frost_active": { "default": "mdi:snowflake-alert" },
+      "dew_point_active": { "default": "mdi:water-percent" },
+      "degraded": { "default": "mdi:alert-circle-outline" }
+    }
+  }
+}

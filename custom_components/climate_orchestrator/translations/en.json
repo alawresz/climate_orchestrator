@@ -1,0 +1,191 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Climate Orchestrator",
+        "description": "Select the radiator valves (TRVs) and air conditioners to orchestrate. Sensors are matched automatically from each device's Home Assistant area.",
+        "data": {
+          "trvs": "Radiator valves (TRVs)",
+          "acs": "Air conditioners",
+          "outdoor_sensor": "Outdoor temperature sensor (optional)",
+          "weather_entity": "Weather entity (optional, fallback outdoor source)",
+          "valve_opening_hints": "TRV valve-opening number name hints (comma-separated)",
+          "calibration_hints": "TRV local-calibration number name hints (comma-separated)"
+        }
+      }
+    },
+    "error": {
+      "no_devices": "Select at least one radiator valve or air conditioner."
+    },
+    "abort": {
+      "single_instance_allowed": "Climate Orchestrator is already configured. Only a single instance is allowed."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Climate Orchestrator",
+        "description": "Update the orchestrated devices and outdoor sources.",
+        "data": {
+          "trvs": "Radiator valves (TRVs)",
+          "acs": "Air conditioners",
+          "outdoor_sensor": "Outdoor temperature sensor (optional)",
+          "weather_entity": "Weather entity (optional, fallback outdoor source)",
+          "valve_opening_hints": "TRV valve-opening number name hints (comma-separated)",
+          "calibration_hints": "TRV local-calibration number name hints (comma-separated)"
+        }
+      }
+    },
+    "error": {
+      "no_devices": "Select at least one radiator valve or air conditioner."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "home_avg_temperature": { "name": "Home average temperature" },
+      "home_avg_humidity": { "name": "Home average humidity" },
+      "home_feels_like_temperature": { "name": "Home feels-like temperature" },
+      "temperature_slope": { "name": "Temperature slope" },
+      "adaptive_heat_setpoint": { "name": "Adaptive heat setpoint" },
+      "adaptive_cool_setpoint": { "name": "Adaptive cool setpoint" },
+      "running_mean_outdoor_temperature": {
+        "name": "Running mean outdoor temperature"
+      },
+      "hvac_action_reason": {
+        "name": "HVAC action reason",
+        "state": {
+          "off": "Off",
+          "idle": "Idle (in comfort range)",
+          "heating": "Heating",
+          "cooling": "Cooling",
+          "dehumidifying": "Dehumidifying (dry mode)",
+          "frost_protection": "Frost protection",
+          "window_open": "Paused — window open",
+          "outdoor_gating": "Paused — outdoor temperature",
+          "unavailable": "Device unavailable",
+          "no_data": "No sensor data"
+        }
+      },
+      "mpc_heating_gain": { "name": "{trv} MPC heating power" },
+      "mpc_heat_loss": { "name": "{trv} MPC heat loss" },
+      "mpc_learning_status": {
+        "name": "{trv} MPC learning status",
+        "state": {
+          "idle": "Idle",
+          "learning": "Learning",
+          "ready": "Ready"
+        }
+      },
+      "mpc_model_error": { "name": "{trv} MPC model error" },
+      "device_action": {
+        "name": "{device} action",
+        "state": {
+          "idle": "Idle",
+          "heating": "Heating",
+          "cooling": "Cooling",
+          "drying": "Dehumidifying",
+          "off": "Off",
+          "unavailable": "Unavailable"
+        }
+      },
+      "device_runtime": { "name": "{device} runtime" },
+      "device_cycles_per_hour": { "name": "{device} cycles per hour" },
+      "valve_position": { "name": "{device} valve position" }
+    },
+    "binary_sensor": {
+      "window_open": { "name": "Window open" },
+      "frost_active": { "name": "Frost protection active" },
+      "dew_point_active": { "name": "Dehumidifying" },
+      "degraded": { "name": "Degraded" }
+    },
+    "number": {
+      "release_offset": { "name": "Heat/cool release offset" },
+      "tolerance": { "name": "Switching tolerance" },
+      "comfort_humidity_influence": { "name": "Comfort humidity influence" },
+      "frost_protection_temp": { "name": "Frost protection temperature" },
+      "dew_point_threshold": { "name": "Dew point threshold" },
+      "heat_off_outdoor": { "name": "Heating off above outdoor temperature" },
+      "cool_off_outdoor": { "name": "Cooling off below outdoor temperature" },
+      "ac_setpoint_bias": { "name": "AC cooling setpoint bias" },
+      "ac_setpoint_bias_max": { "name": "Max AC cooling setpoint bias" },
+      "adaptive_comfort_max_shift": { "name": "Adaptive comfort max shift" },
+      "adaptive_comfort_bias": { "name": "Adaptive comfort onset bias" },
+      "adaptive_comfort_response": { "name": "Adaptive comfort response" },
+      "window_open_delay": { "name": "Window open delay" },
+      "valve_maintenance_interval": { "name": "Valve maintenance interval" },
+      "sensor_max_age": { "name": "Sensor staleness timeout" },
+      "preset_away_heat": { "name": "Preset Away heat setpoint" },
+      "preset_away_cool": { "name": "Preset Away cool setpoint" },
+      "preset_home_heat": { "name": "Preset Home heat setpoint" },
+      "preset_home_cool": { "name": "Preset Home cool setpoint" },
+      "preset_sleep_heat": { "name": "Preset Sleep heat setpoint" },
+      "preset_sleep_cool": { "name": "Preset Sleep cool setpoint" }
+    },
+    "switch": {
+      "comfort_index_targeting": { "name": "Comfort index targeting" },
+      "dew_point_guard": { "name": "Dew point guard" },
+      "window_open_detection": { "name": "Window open detection" },
+      "ac_ignore_window": { "name": "AC ignores open windows" },
+      "outdoor_temp_gating": { "name": "Outdoor temperature gating" },
+      "frost_protection": { "name": "Frost protection" },
+      "ac_heating_assist": { "name": "AC heating assist" },
+      "adaptive_ac_bias": { "name": "Adaptive AC bias" },
+      "auto_valve_maintenance": { "name": "Automatic valve maintenance" },
+      "adaptive_comfort": { "name": "Adaptive comfort" }
+    },
+    "select": {
+      "calibration_mode": {
+        "name": "TRV calibration mode",
+        "state": {
+          "target": "Target setpoint",
+          "mpc": "Model predictive (MPC)",
+          "offset": "Local offset"
+        }
+      }
+    }
+  },
+  "issues": {
+    "missing_calibration_number": {
+      "title": "Climate Orchestrator: TRV calibration number not found",
+      "description": "The radiator valve `{entity_id}` is set to `{mode}` calibration mode, but Climate Orchestrator couldn't find its `valve_opening_degree` / `local_temperature_calibration` number entity. That mode can't act, so the valve falls back to plain target control. Either switch the TRV calibration mode back to `target`, or check that the valve exposes the expected number (Zigbee2MQTT naming)."
+    },
+    "outdoor_sensor_missing": {
+      "title": "Climate Orchestrator: outdoor sensor needed",
+      "description": "Adaptive comfort and/or outdoor temperature gating are enabled, but no outdoor temperature sensor is configured, so those features do nothing. Add an outdoor sensor (or weather entity) in the integration's Configure dialog, or turn the features off."
+    },
+    "no_temperature_source": {
+      "title": "Climate Orchestrator: no temperature source",
+      "description": "Climate Orchestrator has no usable temperature reading for any managed device, so it can't decide whether to heat or cool. Assign a temperature sensor to each device's area under Settings → Areas → Related sensors."
+    },
+    "stale_sensor": {
+      "title": "Climate Orchestrator: stale sensor reading",
+      "description": "One or more area sensors have stopped updating for longer than the configured staleness timeout, so Climate Orchestrator is ignoring their values and falling back to the home average. Check the affected sensor's battery/connection, or raise the **Sensor staleness timeout** number if your sensors legitimately report slowly."
+    },
+    "inverted_band": {
+      "title": "Climate Orchestrator: comfort band inverted",
+      "description": "The active comfort band has its cool setpoint *below* its heat setpoint, leaving no neutral zone — the system will heat below the cool edge and cool above it, running almost constantly. Check the active preset's heat/cool setpoints (the heat setpoint should be the lower of the two)."
+    }
+  },
+  "services": {
+    "reset_mpc_learning": {
+      "name": "Reset MPC learning",
+      "description": "Forget the learned MPC thermal model (heating power / heat loss) for some or all radiator valves, so they re-learn from scratch.",
+      "fields": {
+        "trvs": {
+          "name": "Radiator valves",
+          "description": "Which TRV climate entities to reset. Leave empty to reset all."
+        }
+      }
+    },
+    "run_valve_maintenance": {
+      "name": "Run valve maintenance",
+      "description": "Exercise the radiator valves by driving them fully open and then closed, which prevents them seizing or scaling when held at one position for a long time.",
+      "fields": {
+        "trvs": {
+          "name": "Radiator valves",
+          "description": "Which TRV climate entities to exercise. Leave empty for all."
+        }
+      }
+    }
+  }
+}

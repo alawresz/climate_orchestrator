@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# Virtual envs / uv
+.venv/
+uv.lock
+
+# Test / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# HA test artifacts
+test-results/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.iml

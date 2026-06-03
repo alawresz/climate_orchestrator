@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  lint-and-test:
+    name: Lint, type-check, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv (with Python 3.13, HA's runtime)
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: uv sync --dev
+      - name: Ruff lint + format check
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+      - name: mypy
+        run: uv run mypy custom_components/climate_orchestrator
+      - name: pytest (with coverage)
+        run: uv run pytest --cov-report=xml
+
+  hassfest:
+    name: hassfest (HA manifest/structure validation)
+    runs-on: ubuntu-latest
+    # Advisory until a green run is confirmed: hassfest treats strings.json as
+    # the translation source, while we ship translations/en.json.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # Skip the brands check until the logo is submitted to
+          # home-assistant/brands.
+          ignore: brands
