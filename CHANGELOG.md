@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v0.19.1 (2026-06-03)
+
+### Bug Fixes
+
+- Update strings.json, enforce strings.json and translations/en.json sync in pre-commit and CI
+  ([`abb4b39`](https://github.com/alawresz/climate_orchestrator/commit/abb4b390b72b46763e45ed4bcd392c7f1a5aa2c6))
+
+### Continuous Integration
+
+- Restore changelog generation under PSR v10
+  ([`687910a`](https://github.com/alawresz/climate_orchestrator/commit/687910abbd8e48850bfd36550fa9e1f48270ccca))
+
+- Upload JUnit test results to Codecov Test Analytics
+  ([`27eba16`](https://github.com/alawresz/climate_orchestrator/commit/27eba1626825488528c2e4521aafbbd66a543129))
+
+
 ## v0.19.0 (2026-06-03)
 
 ### Features
