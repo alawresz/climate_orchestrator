@@ -31,7 +31,7 @@ from .control.mpc.controller import MpcController
 from .control.mpc.model import MIN_SAMPLES
 from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 from .entity import SmartClimateBaseEntity
-from .models import SmartClimateData
+from .models import SmartClimateData, Status
 
 _KELVIN_PER_MINUTE = "K/min"
 _PER_MINUTE = "1/min"
@@ -54,6 +54,8 @@ _LEARNING_LEARNING = "learning"
 _LEARNING_READY = "ready"
 _LEARNING_OPTIONS = [_LEARNING_IDLE, _LEARNING_LEARNING, _LEARNING_READY]
 
+_STATUS_OPTIONS = [s.value for s in Status]
+
 _PER_HOUR = "/h"
 _ACTION_OPTIONS = [
     "idle",
@@ -69,7 +71,10 @@ _ACTION_OPTIONS = [
 class SmartClimateSensorDescription(SensorEntityDescription):
     """Describes a home-wide Climate Orchestrator sensor."""
 
-    value_fn: Callable[[SmartClimateCoordinator, SmartClimateData], float | None]
+    value_fn: Callable[[SmartClimateCoordinator, SmartClimateData], float | str | None]
+    attrs_fn: (
+        Callable[[SmartClimateCoordinator, SmartClimateData], dict[str, Any]] | None
+    ) = None
 
 
 def _home_feels_like(
@@ -142,6 +147,17 @@ SENSORS: tuple[SmartClimateSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         suggested_display_precision=1,
         value_fn=lambda coord, _data: coord.adaptive_band_high,
+    ),
+    SmartClimateSensorDescription(
+        key="status",
+        translation_key="status",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.ENUM,
+        options=_STATUS_OPTIONS,
+        value_fn=lambda _coord, data: data.status.value,
+        attrs_fn=lambda _coord, data: {
+            "unavailable_devices": sorted(data.unavailable_devices)
+        },
     ),
     SmartClimateSensorDescription(
         key="running_mean_outdoor_temperature",
@@ -315,9 +331,16 @@ class SmartClimateSensor(SmartClimateBaseEntity, SensorEntity):
         self._attr_unique_id = f"{coordinator.entry.entry_id}_{description.key}"
 
     @property
-    def native_value(self) -> float | None:
+    def native_value(self) -> float | str | None:
         """Return the current value."""
         return self.entity_description.value_fn(self.coordinator, self.coordinator.data)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Optional supporting attributes."""
+        if self.entity_description.attrs_fn is None:
+            return None
+        return self.entity_description.attrs_fn(self.coordinator, self.coordinator.data)
 
 
 class SmartClimateMpcSensor(SmartClimateBaseEntity, SensorEntity):

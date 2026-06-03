@@ -104,8 +104,8 @@ A single hub device exposes:
 | `sensor.*_<trv>_mpc_*` | Per-TRV MPC diagnostics: heating power, heat loss, learning status, model error (diagnostic). |
 | `sensor.*_<device>_*` | Per-device diagnostics: action (+ last command), runtime %, cycles/hour, valve % (TRV) (diagnostic). |
 | `sensor.*_hvac_action_reason` | Why it's heating/cooling/idle, with per-device reasons (diagnostic). |
+| `sensor.*_status` | `initializing` / `ok` / `degraded`, with offline devices in `unavailable_devices` (diagnostic). |
 | `binary_sensor.*_window_open` / `_frost_active` / `_dew_point_active` | Operational state for dashboards/automations. |
-| `binary_sensor.*_degraded` | On when a managed device is unavailable (diagnostic). |
 | `select.*_calibration_mode` | `target` (default) / `mpc` / `offset`. |
 | `switch.*` | The feature toggles (see *Controls & settings reference*). |
 | `number.*` | The tuning numbers and per-preset band edges (see *Controls & settings reference*). |
@@ -390,6 +390,7 @@ its step, so a large bias can never ask for a temperature the AC won't accept.
 | {device} cycles per hour | Off→on starts per hour over the last hour — surfaces short-cycling. |
 | {TRV} valve position | The last commanded valve opening % (in `mpc` mode). |
 | Running mean outdoor temperature | The slow exponential running mean of the outdoor temperature driving adaptive comfort. |
+| Status (diagnostic) | `initializing` during the post-restart warm-up, then `ok`, or `degraded` once a managed device is unavailable or no temperature source can be found. Any offline devices are listed in its `unavailable_devices` attribute. |
 | HVAC action reason | Plain-language headline of why the home is heating/cooling/idle/paused (e.g. `Heating`, `Frost protection`, `Paused — window open`), with a per-device breakdown in its attributes. |
 
 ### Binary sensors
@@ -399,7 +400,6 @@ its step, so a large bias can never ask for a temperature the AC won't accept.
 | Window open | On when any managed area reports a window/door open (open areas listed in attributes). |
 | Frost protection active | On when any device is in forced frost-protection heating. |
 | Dehumidifying | On when an AC is running dry mode for the dew-point guard. |
-| Degraded (diagnostic) | On when a managed device is unavailable (lists which); the rest keep working. |
 
 ## Services
 
@@ -425,7 +425,10 @@ Developer Tools → Actions (target the whole-home `climate` entity):
   **Adaptive comfort** enabled with no outdoor sensor; an area sensor that has
   gone stale (stopped reporting past the staleness timeout); an inverted comfort
   band (cool setpoint below the heat setpoint, leaving no neutral zone); and no
-  usable temperature source for any managed device.
+  usable temperature source for any managed device. The last two (stale sensor,
+  no temperature source) are transient right after a Home Assistant restart, so
+  while the **Status** sensor reads `initializing` they're held back — they only
+  surface once the warm-up window has elapsed and the gap is therefore real.
 - Learned state (MPC models, the adaptive bias, the running-mean outdoor
   temperature, and the per-device demand latch) is persisted, so a restart resumes
   where it left off.

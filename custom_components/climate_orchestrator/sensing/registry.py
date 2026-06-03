@@ -24,7 +24,7 @@ from homeassistant.helpers import (
 )
 from homeassistant.util import dt as dt_util
 
-from ..models import DeviceReading, SmartClimateData
+from ..models import DeviceReading, SmartClimateData, Status
 from .aggregate import mean_or_none
 
 # binary_sensor device classes that count as a window/door being open.
@@ -202,4 +202,7 @@ def build_snapshot(
         readings=readings,
         tracked_entities=frozenset(tracked),
         stale_sensors=frozenset(stale),
+        # A warm-up-unaware best effort; the coordinator refines this to
+        # ``INITIALIZING`` during the post-restart grace window.
+        status=Status.DEGRADED if unavailable else Status.OK,
     )

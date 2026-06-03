@@ -41,6 +41,13 @@ MAX_TEMP: Final = 35.0
 # How often to re-evaluate even with no state changes (keepalive).
 UPDATE_INTERVAL_SECONDS: Final = 60
 
+# Post-restart warm-up window. Until a managed device first reports a usable
+# temperature, the orchestrator reports ``initializing`` for this long and holds
+# back transient repairs (no temperature source, stale sensor) — sensors often
+# take tens of seconds to report in after a Home Assistant restart. Once the
+# window elapses with still no reading, the missing-source repair is genuine.
+STARTUP_GRACE_SECONDS: Final = 120.0
+
 # --- Presets -----------------------------------------------------------------
 # Each preset is a comfort band defined by its two edges: heat below `min`,
 # cool above `max` (see DESIGN.md §7). These are Phase 1 defaults; they become

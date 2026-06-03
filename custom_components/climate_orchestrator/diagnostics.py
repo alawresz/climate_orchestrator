@@ -30,6 +30,7 @@ async def async_get_config_entry_diagnostics(
         "snapshot": {
             "home_avg_temperature": data.home_avg_temperature,
             "home_avg_humidity": data.home_avg_humidity,
+            "status": data.status.value,
             "degraded": data.degraded,
             "available_devices": sorted(data.available_devices),
             "unavailable_devices": sorted(data.unavailable_devices),
