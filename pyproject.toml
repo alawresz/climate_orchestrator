@@ -10,17 +10,17 @@ dependencies = []
 
 [dependency-groups]
 dev = [
-  "homeassistant>=2024.12",
-  "scipy>=1.11",
-  "pytest>=8.0",
-  "pytest-asyncio>=0.23",
-  "pytest-cov>=5.0",
+  # pytest-homeassistant-custom-component pins the exact HA-compatible test
+  # stack transitively (pytest, pytest-asyncio, pytest-cov, syrupy, homeassistant,
+  # numpy, ...). Do NOT pin those separately here — our floors would collide with
+  # its exact pins. Bumping PHACC moves the whole stack together, coherently.
   "pytest-homeassistant-custom-component>=0.13",
-  "syrupy>=4.6",
-  "ruff==0.15.15",
-  "mypy>=1.11",
-  "hypothesis>=6.0",
-  "python-semantic-release>=10.5,<11",
+  # Not provided by PHACC, so declared explicitly:
+  "scipy>=1.11",            # also the integration's runtime requirement
+  "hypothesis>=6.0",        # property-based tests
+  "ruff==0.15.15",          # linter/formatter (exact, matches CI + pre-commit)
+  "mypy>=1.11",             # type checker
+  "python-semantic-release>=10.5,<11",  # local release tooling (CI uses the action)
 ]
 
 [tool.ruff]
