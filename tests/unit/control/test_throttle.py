@@ -32,3 +32,26 @@ def test_meaningful_change_after_interval_is_written() -> None:
 def test_keepalive_forces_a_reassert() -> None:
     """Past the keep-alive, even an unchanged value is re-asserted (new ts)."""
     assert throttle_setpoint(22.0, 100.0, 22.0, 1001.0, **_KW) == (22.0, 1001.0)
+
+
+# --- mutation-hardening: boundary/exact-value pins (mutmut survivors) ---
+
+
+_THROTTLE = {"min_change": 0.5, "min_interval_s": 180.0, "keepalive_s": 900.0}
+
+
+def test_throttle_keepalive_fires_exactly_at_interval() -> None:
+    assert throttle_setpoint(22.0, 0.0, 22.1, 900.0, **_THROTTLE) == (22.1, 900.0)
+    assert throttle_setpoint(22.0, 0.0, 22.1, 899.9, **_THROTTLE) == (22.0, 0.0)
+
+
+def test_throttle_writes_exactly_at_min_change_and_interval() -> None:
+    assert throttle_setpoint(22.0, 0.0, 22.5, 200.0, **_THROTTLE) == (22.5, 200.0)
+    assert throttle_setpoint(22.0, 0.0, 23.0, 180.0, **_THROTTLE) == (23.0, 180.0)
+    assert throttle_setpoint(22.0, 0.0, 23.0, 179.9, **_THROTTLE) == (22.0, 0.0)
+
+
+def test_throttle_writes_through_on_partial_state() -> None:
+    """Either half of (prev, prev_ts) missing means write-through."""
+    assert throttle_setpoint(None, 50.0, 23.0, 60.0, **_THROTTLE) == (23.0, 60.0)
+    assert throttle_setpoint(22.0, None, 23.0, 60.0, **_THROTTLE) == (23.0, 60.0)

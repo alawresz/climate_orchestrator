@@ -362,7 +362,7 @@ climate_orchestrator/
 │       ├── sensor.py / binary_sensor.py / switch.py / number.py / select.py
 │       ├── icons.json / strings.json
 │       └── translations/en.json
-├── tests/                         # ~45 test modules — see §12
+├── tests/                         # unit/ (mirrors the package) + ha/ (hass fixtures) — see §12
 ├── pyproject.toml                 # uv-managed, ruff + mypy + pytest config
 ├── .github/workflows/ci.yml       # ruff, mypy, pytest+coverage, hassfest, HACS (GitHub Actions)
 ├── .github/workflows/release.yml  # python-semantic-release on green CI
@@ -423,12 +423,14 @@ Targeting Python 3.12+ (HA's runtime), with current best practices enforced by r
 
 ## 12. Test plan (test-first)
 
+**Layout.** `tests/unit/` mirrors the package (`control/`, `control/mpc/`, `devices/`, `sensing/`) and holds every pure test, including the cross-module property/regression/snapshot suites; `tests/ha/` holds the hass-fixture tests, with the Home Assistant fixtures scoped to `tests/ha/conftest.py` (the root `tests/conftest.py` carries only shared constants). Mutation testing targets `tests/unit/` alone (`[tool.mutmut] tests_dir`), since those are the tests that kill `control/` mutants.
+
 - **Pure-function unit tests** (no HA): comfort index & dew point against reference tables; hysteresis state machine across engage/release/edge sequences; sensor aggregation & fallbacks; MPC sysid/observer/optimizer on synthetic first-order thermal simulations (assert convergence, stability, no windup, bounds respected).
 - **Control-engine tests:** arbitration priority (frost > window > outdoor gating > demand), heat/cool mutual-exclusion invariant, deadband early-out, the worked example from requirements (home avg > 25 OR living room > 25 engages AC; stays on until both ≤ target or room near heat band).
 - **Adapter tests:** the `ClimateAdapter` issues the correct services for TRV valve %, TRV offset, and AC setpoint + mode over a generic HA `climate` entity, honouring `AdapterCapabilities` (capability gating, range/step clamping) with mocked services.
 - **Integration tests (hass fixture):** config flow (device + sensor selection, overrides), entity creation snapshots, options/runtime entity changes re-trigger control, restart restores learned MPC + preset state.
 - **Resilience tests (§6.4):** a TRV or AC going `unavailable` excludes only that device while the home entity stays available and controls the rest; an offline sensor drops out of the home/area average; an area with an offline configured sensor falls back to the home average; one device raising an exception/timeout never aborts the cycle for the others; absent-device learned state is retained across the dropout.
-- **Regression fixtures:** recorded sensor traces replayed through the control engine (`control/engine.py`) to catch behavioural drift, plus **syrupy snapshots** (`test_snapshot_regression.py`, `tests/__snapshots__/`) pinning the exact comfort-curve and adaptive-cooling-comfort outputs — regenerate intentionally with `pytest --snapshot-update`.
+- **Regression fixtures:** recorded sensor traces replayed through the control engine (`control/engine.py`) to catch behavioural drift, plus **syrupy snapshots** (`tests/unit/test_snapshot_regression.py`, `tests/unit/__snapshots__/`) pinning the exact comfort-curve and adaptive-cooling-comfort outputs — regenerate intentionally with `pytest --snapshot-update`.
 - **Mutation testing** (`mutmut`, scoped to `control/` via `[tool.mutmut]`): line/branch coverage and Hypothesis invariants don't prove the *math* is right — a flipped sign or mis-scaled `dt` in the thermal model, optimizer, or comfort curves can still pass. `uv run mutmut run` mutates the pure control modules and surfaces any mutant the suite fails to kill; run it in the HA dev env (Python 3.13).
 
 A subagent-driven verification pass reviews coverage gaps before sign-off.

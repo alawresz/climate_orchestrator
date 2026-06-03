@@ -36,3 +36,13 @@ def test_regression_smooths_jitter() -> None:
     slope = temperature_slope_per_min(samples)
     assert slope is not None
     assert 0.3 < slope < 0.7
+
+
+# --- mutation-hardening: boundary/exact-value pins (mutmut survivors) ---
+
+
+def test_slope_with_subsecond_time_variance() -> None:
+    """Two samples 1 s apart (time variance 0.5) still produce a slope."""
+    assert temperature_slope_per_min([(0.0, 20.0), (1.0, 20.6)]) == pytest.approx(
+        36.0, abs=1e-6
+    )

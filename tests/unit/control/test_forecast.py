@@ -47,3 +47,21 @@ def test_colder_forecast_opens_the_valve_more() -> None:
     cooling = [20.0 - k for k in range(12)]  # drops 1 K per step
     colder = optimize_valve(19.0, 21.0, cooling, _PARAMS, dt=5.0, horizon=12)
     assert colder > warm
+
+
+# --- mutation-hardening: boundary/exact-value pins (mutmut survivors) ---
+
+
+def test_expand_forecast_single_step() -> None:
+    assert expand_forecast([10.0, 20.0], 60.0, 1) == [10.0]
+
+
+def test_expand_forecast_interpolates_across_later_hours() -> None:
+    """Interpolation must work past the first hourly segment."""
+    assert expand_forecast([10.0, 20.0, 30.0], 30.0, 5) == [
+        10.0,
+        15.0,
+        20.0,
+        25.0,
+        30.0,
+    ]

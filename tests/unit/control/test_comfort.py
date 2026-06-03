@@ -65,3 +65,19 @@ def test_influence_blends_between_drybulb_and_apparent() -> None:
     )
     # >1 amplifies the humidity push beyond the raw apparent temperature.
     assert effective_temperature(dry, 80, influence=2.0) > apparent
+
+
+# --- mutation-hardening: boundary/exact-value pins (mutmut survivors) ---
+
+
+def test_effective_temperature_defaults_are_full_comfort() -> None:
+    """No-kwargs call equals use_comfort=True, influence=1.0 exactly."""
+    assert effective_temperature(24.0, 90.0) == effective_temperature(
+        24.0, 90.0, use_comfort=True, influence=1.0
+    )
+    assert effective_temperature(24.0, 90.0) == pytest.approx(28.8364, abs=1e-3)
+
+
+def test_dew_point_at_very_low_humidity() -> None:
+    """The log guard floor is tiny; 0.5% RH still yields a deep dew point."""
+    assert dew_point(20.0, 0.5) == pytest.approx(-44.3196, abs=0.01)

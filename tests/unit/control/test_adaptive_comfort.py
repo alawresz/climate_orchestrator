@@ -79,3 +79,29 @@ def test_no_running_mean_leaves_band_unchanged() -> None:
         20.5,
         24.5,
     )
+
+
+# --- mutation-hardening: boundary/exact-value pins (mutmut survivors) ---
+
+
+def test_running_mean_guards_and_blend() -> None:
+    # tau == 0 / dt == 0 -> reseed with the sample, exactly.
+    assert running_mean_update(10.0, 20.0, dt_seconds=60.0, tau_seconds=0.0) == 20.0
+    assert running_mean_update(10.0, 20.0, dt_seconds=0.0, tau_seconds=600.0) == 20.0
+    # Small-but-positive tau and dt still blend (not reseed).
+    assert running_mean_update(
+        10.0, 20.0, dt_seconds=0.1, tau_seconds=0.5
+    ) == pytest.approx(11.8127, abs=1e-3)
+    assert running_mean_update(
+        10.0, 20.0, dt_seconds=0.5, tau_seconds=600.0
+    ) == pytest.approx(10.008330, abs=1e-5)
+    # Exact blend value pins the alpha * (sample - previous) form.
+    assert running_mean_update(
+        10.0, 20.0, dt_seconds=60.0, tau_seconds=600.0
+    ) == pytest.approx(10.9516258, abs=1e-6)
+
+
+def test_cool_edge_shift_small_caps_and_response() -> None:
+    """Caps/response in (0, 1] are honoured, not treated as disabled."""
+    assert cool_edge_shift(1.0, 0.5, 5.0) == pytest.approx(0.0906346, abs=1e-6)
+    assert cool_edge_shift(1.0, 2.0, 0.5) == pytest.approx(1.7293294, abs=1e-6)

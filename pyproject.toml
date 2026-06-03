@@ -119,7 +119,9 @@ skip = "*.lock,*.ambr,./.git,./htmlcov,./mutants"
 # thermal model / optimizer / comfort curves would still pass. Run in the HA dev
 # env (Python 3.13) with `uv run mutmut run`, then `uv run mutmut results`.
 paths_to_mutate = ["custom_components/climate_orchestrator/control/"]
-tests_dir = ["tests/"]
+# The pure unit tests are what kill control/ mutants; skipping the hass-fixture
+# suites makes mutation runs far faster and avoids the heavy HA harness.
+tests_dir = ["tests/unit/"]
 # mutmut copies only `paths_to_mutate` into its mutants/ work dir, but control/
 # (and conftest.py) import the rest of the package (const, models, coordinator,
 # ...). Copy the whole package so imports resolve; only control/ is mutated.

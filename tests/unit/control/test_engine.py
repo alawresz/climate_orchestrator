@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from custom_components.climate_orchestrator.control.comfort import dew_point
 from custom_components.climate_orchestrator.control.engine import (
     DeviceInput,
     DeviceKind,
@@ -215,3 +216,80 @@ def test_window_open_ignored_when_detection_disabled() -> None:
         _global(window_detection=False),
     )
     assert decision.demand is Demand.HEAT
+
+
+# --- mutation-hardening: boundary/exact-value pins (mutmut survivors) ---
+
+
+def test_frost_triggers_strictly_below_threshold() -> None:
+    """At exactly the frost temperature the reason is plain heating, not frost."""
+    decision = decide(_heater(local_temp=7.0), _global(frost_temp=7.0))
+    assert decision.demand is Demand.HEAT
+    assert decision.reason == "heat"
+    assert decision.key == "trv"
+    assert decision.dry_mode is False
+
+
+def test_comfort_humidity_drives_local_decision() -> None:
+    """A humid room at the cool edge feels hotter and engages cooling."""
+    device = _cooler(local_temp=24.0, local_humidity=90.0)
+    assert decide(device, _global(use_comfort=True)).demand is Demand.COOL
+
+
+def test_comfort_influence_zero_neutralises_local_humidity() -> None:
+    device = _cooler(local_temp=24.0, local_humidity=90.0)
+    g = _global(use_comfort=True, comfort_influence=0.0)
+    assert decide(device, g).demand is Demand.IDLE
+
+
+def test_comfort_humidity_drives_home_fallback_decision() -> None:
+    g = _global(use_comfort=True, home_temp=24.0, home_humidity=90.0)
+    assert decide(_cooler(local_temp=None), g).demand is Demand.COOL
+
+
+def test_comfort_influence_zero_neutralises_home_humidity() -> None:
+    g = _global(
+        use_comfort=True, home_temp=24.0, home_humidity=90.0, comfort_influence=0.0
+    )
+    assert decide(_cooler(local_temp=None), g).demand is Demand.IDLE
+
+
+def test_no_data_decision_fields() -> None:
+    decision = decide(_heater(local_temp=None), _global(home_temp=None))
+    assert decision.demand is Demand.IDLE
+    assert decision.reason == "no_data"
+    assert decision.key == "trv"
+    assert decision.dry_mode is False
+
+
+def test_hot_day_cooling_is_not_outdoor_gated() -> None:
+    """Heat gating must never suppress a cooling call on a hot day."""
+    g = _global(outdoor_temp=25.0, heat_off_outdoor=20.0, cool_off_outdoor=16.0)
+    decision = decide(_cooler(local_temp=26.0), g)
+    assert decision.demand is Demand.COOL
+    assert decision.reason == "cool"
+
+
+def test_heat_gating_engages_exactly_at_cutoff() -> None:
+    g = _global(outdoor_temp=20.0, heat_off_outdoor=20.0)
+    decision = decide(_heater(local_temp=18.0), g)
+    assert decision.demand is Demand.IDLE
+    assert decision.reason == "outdoor_gating"
+
+
+def test_cool_gating_engages_exactly_at_cutoff() -> None:
+    g = _global(outdoor_temp=16.0, cool_off_outdoor=16.0)
+    decision = decide(_cooler(local_temp=26.0), g)
+    assert decision.demand is Demand.IDLE
+    assert decision.reason == "outdoor_gating"
+
+
+def test_dew_point_guard_is_strictly_above_threshold() -> None:
+    """Dew point exactly equal to the threshold does NOT trigger dry mode."""
+    threshold = dew_point(22.0, 60.0)
+    device = _cooler(local_temp=22.0, local_humidity=60.0)
+    assert decide(device, _global(dew_point_threshold=threshold)).dry_mode is False
+
+    decision = decide(device, _global(dew_point_threshold=threshold - 1.0))
+    assert decision.dry_mode is True
+    assert decision.key == "ac"

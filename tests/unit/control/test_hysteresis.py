@@ -81,3 +81,82 @@ def test_cooling_early_out_on_undershoot() -> None:
     """Cooling stops early if the room nears the heating edge."""
     # heat_edge + release_offset = 20.5
     assert _demand(20.4, 23.0, previous=Demand.COOL) is Demand.IDLE
+
+
+# --- mutation-hardening: boundary/exact-value pins (mutmut survivors) ---
+
+
+def test_heat_release_needs_both_at_target_exactly() -> None:
+    """Release at local==home==target; either one short keeps heating."""
+    kw = {"band": BAND, "release_offset": 0.5, "tolerance": 0.5}
+    assert (
+        evaluate_demand(local=20.5, home=20.5, previous=Demand.HEAT, **kw)
+        is Demand.IDLE
+    )
+    assert (
+        evaluate_demand(local=20.5, home=20.4, previous=Demand.HEAT, **kw)
+        is Demand.HEAT
+    )
+    assert (
+        evaluate_demand(local=20.4, home=20.5, previous=Demand.HEAT, **kw)
+        is Demand.HEAT
+    )
+
+
+def test_heat_overshoot_releases_exactly_at_threshold() -> None:
+    """Overshoot fires at exactly cool_edge - release_offset (home in-band)."""
+    kw = {"band": BAND, "release_offset": 0.5, "tolerance": 0.5}
+    assert (
+        evaluate_demand(local=23.5, home=20.4, previous=Demand.HEAT, **kw)
+        is Demand.IDLE
+    )
+    assert (
+        evaluate_demand(local=23.4, home=20.4, previous=Demand.HEAT, **kw)
+        is Demand.HEAT
+    )
+
+
+def test_cool_release_needs_both_at_target_exactly() -> None:
+    kw = {"band": BAND, "release_offset": 0.5, "tolerance": 0.5}
+    assert (
+        evaluate_demand(local=23.5, home=23.5, previous=Demand.COOL, **kw)
+        is Demand.IDLE
+    )
+    assert (
+        evaluate_demand(local=23.5, home=23.6, previous=Demand.COOL, **kw)
+        is Demand.COOL
+    )
+    assert (
+        evaluate_demand(local=23.6, home=23.5, previous=Demand.COOL, **kw)
+        is Demand.COOL
+    )
+
+
+def test_cool_overshoot_releases_exactly_at_threshold() -> None:
+    """Overshoot fires at exactly heat_edge + release_offset (home in-band)."""
+    kw = {"band": BAND, "release_offset": 0.5, "tolerance": 0.5}
+    assert (
+        evaluate_demand(local=20.5, home=23.7, previous=Demand.COOL, **kw)
+        is Demand.IDLE
+    )
+    assert (
+        evaluate_demand(local=20.6, home=23.7, previous=Demand.COOL, **kw)
+        is Demand.COOL
+    )
+
+
+def test_engage_is_strictly_below_edge() -> None:
+    """Sitting exactly ON the heat edge does not engage (strict <)."""
+    kw = {"band": BAND, "release_offset": 0.5, "previous": Demand.IDLE}
+    assert evaluate_demand(local=20.0, home=22.0, **kw) is Demand.IDLE
+    assert evaluate_demand(local=22.0, home=20.0, **kw) is Demand.IDLE
+
+
+def test_default_tolerance_is_zero() -> None:
+    """Without tolerance the heat target IS the edge: 20/20 releases."""
+    assert (
+        evaluate_demand(
+            local=20.0, home=20.0, band=BAND, release_offset=0.5, previous=Demand.HEAT
+        )
+        is Demand.IDLE
+    )

@@ -44,3 +44,15 @@ def test_open_without_timestamp_waits() -> None:
     assert window_suppresses(True, opened_at=None, now=100.0, delay_seconds=60.0) is (
         False
     )
+
+
+# --- mutation-hardening: boundary/exact-value pins (mutmut survivors) ---
+
+
+def test_window_subsecond_delay_still_debounces() -> None:
+    assert (
+        window_suppresses(True, opened_at=100.0, now=100.0, delay_seconds=0.5) is False
+    )
+    assert (
+        window_suppresses(True, opened_at=100.0, now=101.0, delay_seconds=0.5) is True
+    )
