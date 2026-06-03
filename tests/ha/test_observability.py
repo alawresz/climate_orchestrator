@@ -13,6 +13,7 @@ import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
+from custom_components.climate_orchestrator.models import RuntimeSample
 from tests.conftest import (
     AC_ENTITY,
     AREA_HUMIDITY_SENSOR,
@@ -99,10 +100,10 @@ async def test_runtime_and_cycle_counters(
     # Over the last hour: off, on@-1800s, off@-900s, on@-600s.
     coordinator._run_samples[TRV_ENTITY] = deque(
         [
-            (now - 3600.0, False),
-            (now - 1800.0, True),
-            (now - 900.0, False),
-            (now - 600.0, True),
+            RuntimeSample(at=now - 3600.0, running=False),
+            RuntimeSample(at=now - 1800.0, running=True),
+            RuntimeSample(at=now - 900.0, running=False),
+            RuntimeSample(at=now - 600.0, running=True),
         ]
     )
     # ~900s + ~600s running out of ~3600s.

@@ -67,6 +67,26 @@ class SmartClimateData:
 
 
 @dataclass(frozen=True, slots=True)
+class AcSetpoint:
+    """The last AC cooling setpoint written, and when (monotonic seconds).
+
+    Feeds the write throttle: a new cooling command may have its setpoint
+    replaced with ``value`` until enough time or temperature delta has passed.
+    """
+
+    value: float
+    written_at: float
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeSample:
+    """One (monotonic time, was-running) sample for the cycle/runtime counters."""
+
+    at: float
+    running: bool
+
+
+@dataclass(frozen=True, slots=True)
 class Band:
     """A comfort band: heat below ``heat_edge``, cool above ``cool_edge``."""
 

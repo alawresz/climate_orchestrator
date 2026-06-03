@@ -97,7 +97,14 @@ from .devices.trv import (
     find_related_number,
     local_offset,
 )
-from .models import Band, DeviceReading, SmartClimateData, Status
+from .models import (
+    AcSetpoint,
+    Band,
+    DeviceReading,
+    RuntimeSample,
+    SmartClimateData,
+    Status,
+)
 from .sensing.registry import build_snapshot
 from .settings import (
     RuntimeSettings,
@@ -146,9 +153,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         # Last command actually sent per device (for the diagnostics sensors).
         self._last_command: dict[str, DeviceCommand] = {}
         # Last written AC cooling setpoint + monotonic timestamp, for throttling.
-        self._ac_setpoint: dict[str, tuple[float, float]] = {}
+        self._ac_setpoint: dict[str, AcSetpoint] = {}
         # Trailing (monotonic, running?) samples per device for cycle/runtime.
-        self._run_samples: dict[str, deque[tuple[float, bool]]] = {}
+        self._run_samples: dict[str, deque[RuntimeSample]] = {}
         # Per-TRV MPC controllers, last commanded valve fraction, and timing.
         self._mpc: dict[str, MpcController] = {}
         self._last_valve: dict[str, float] = {}
@@ -791,9 +798,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         for entity_id, decision in decisions.items():
             running = decision.demand in (Demand.HEAT, Demand.COOL)
             samples = self._run_samples.setdefault(entity_id, deque())
-            samples.append((now, running))
+            samples.append(RuntimeSample(at=now, running=running))
             # Keep one sample before the cutoff so the integral spans the edge.
-            while len(samples) > 1 and samples[1][0] < cutoff:
+            while len(samples) > 1 and samples[1].at < cutoff:
                 samples.popleft()
 
     @callback
@@ -838,16 +845,16 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if not samples:
             return None
         now = time.monotonic()
-        start = max(samples[0][0], now - RUNTIME_WINDOW_SECONDS)
+        start = max(samples[0].at, now - RUNTIME_WINDOW_SECONDS)
         span = now - start
         if span <= 0.0:
             return None
         pts = list(samples)
         running_time = 0.0
-        for i, (t, running) in enumerate(pts):
-            seg_start = max(t, start)
-            seg_end = pts[i + 1][0] if i + 1 < len(pts) else now
-            if running and seg_end > seg_start:
+        for i, sample in enumerate(pts):
+            seg_start = max(sample.at, start)
+            seg_end = pts[i + 1].at if i + 1 < len(pts) else now
+            if sample.running and seg_end > seg_start:
                 running_time += seg_end - seg_start
         return clamp(running_time / span, 0.0, 1.0)
 
@@ -858,16 +865,16 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if not samples or len(samples) < 2:
             return None
         now = time.monotonic()
-        start = max(samples[0][0], now - RUNTIME_WINDOW_SECONDS)
+        start = max(samples[0].at, now - RUNTIME_WINDOW_SECONDS)
         span = now - start
         if span <= 0.0:
             return None
         transitions = 0
         prev: bool | None = None
-        for t, running in samples:
-            if prev is not None and not prev and running and t >= start:
+        for sample in samples:
+            if prev is not None and not prev and sample.running and sample.at >= start:
                 transitions += 1
-            prev = running
+            prev = sample.running
         return transitions * 3600.0 / span
 
     @callback
@@ -935,15 +942,15 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             return command
         prev = self._ac_setpoint.get(entity_id)
         value, ts = throttle_setpoint(
-            prev[0] if prev else None,
-            prev[1] if prev else None,
+            prev.value if prev else None,
+            prev.written_at if prev else None,
             command.target_temp,
             time.monotonic(),
             min_change=AC_SETPOINT_MIN_CHANGE,
             min_interval_s=AC_SETPOINT_MIN_INTERVAL_SECONDS,
             keepalive_s=AC_SETPOINT_KEEPALIVE_SECONDS,
         )
-        self._ac_setpoint[entity_id] = (value, ts)
+        self._ac_setpoint[entity_id] = AcSetpoint(value=value, written_at=ts)
         if value != command.target_temp:
             return replace(command, target_temp=value)
         return command
