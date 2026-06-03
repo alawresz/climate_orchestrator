@@ -386,7 +386,17 @@ CI is GitHub Actions (`.github/workflows/ci.yml`), which also unlocks HACS distr
 
 uv (with Python 3.13, HA's runtime) is installed via `astral-sh/setup-uv`.
 
-## 11b. Coding standards (idiomatic, modern Python)
+### 11c. Releases (semantic-release)
+
+Versioning is automated with **python-semantic-release** driven by Conventional Commits (`feat:` → minor, `fix:` → patch, `feat!:`/`BREAKING CHANGE:` → major). The version is the single tag; `[tool.semantic_release]` keeps both `pyproject.toml` (`version_toml`) and `custom_components/climate_orchestrator/manifest.json` (`version_variables`) in lock-step with it.
+
+Prereleases are **branch-based** (PSR's native model — it releases from the branch it runs on). `[tool.semantic_release.branches]` marks `main` as stable and any `feat/*` or `fix/*` branch as prerelease (`prerelease_token = "rc"`). A single workflow handles both:
+
+- **`release.yml`** — triggered by a *successful* CI run on `main`, `feat/**`, or `fix/**` (`workflow_run`), so we never tag a red commit. It checks out whichever branch CI ran on and runs PSR, which reads the branch config to decide stable vs prerelease, bumps `pyproject.toml` + `manifest.json`, updates `CHANGELOG.md`, commits (`chore(release): … [skip ci]`), tags, and publishes the GitHub Release.
+  - Push to a **`feat/*` / `fix/*`** branch → `X.Y.Z-rc.N` prerelease (testers enable *Show beta versions* in HACS).
+  - Merge that branch into **`main`** → the stable `X.Y.Z` release HACS serves by default.
+
+Two consequences of feature-branch prereleases: PSR commits the version bump + tag *onto the feature branch* (the `[skip ci]` in the commit message stops a re-trigger loop), and the **version is PEP 440** (`rcN`), so the branch name can't appear in it. One-time bootstrap: tag the current commit `v0.11.0` so PSR continues from that baseline rather than recomputing from zero.
 
 Targeting Python 3.12+ (HA's runtime), with current best practices enforced by ruff + mypy in CI:
 

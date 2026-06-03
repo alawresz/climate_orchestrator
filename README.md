@@ -431,6 +431,24 @@ The repo is laid out as a standalone project (`pyproject.toml`, `.venv`,
 `custom_components/`, `tests/`); deploy by copying
 `custom_components/climate_orchestrator/` into your HA config (see Installation).
 
+### Releases
+
+Versioning is automated by [python-semantic-release](https://python-semantic-release.readthedocs.io/)
+from [Conventional Commits](https://www.conventionalcommits.org/): `fix:` → patch,
+`feat:` → minor, `feat!:` / `BREAKING CHANGE:` → major. The version is kept in
+lock-step across `pyproject.toml` and the integration `manifest.json`.
+
+Prereleases are branch-based (semantic-release's native model):
+
+- **Push to a `feat/*` or `fix/*` branch** (after CI is green) cuts a
+  `X.Y.Z-rc.N` **prerelease** — enable *Show beta versions* on the integration in
+  HACS to test it.
+- **Merge that branch into `main`** cuts the stable `vX.Y.Z` release HACS serves.
+
+So commit messages drive the version; non-conventional commits (e.g. `chore:`,
+`docs:`) don't trigger a release. (Versions are PEP 440, so the branch name
+can't appear in the version string itself.)
+
 ### Definition of done
 
 Every change ships with its documentation and tests in the same commit. A change
