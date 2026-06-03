@@ -7,7 +7,7 @@ readme = "README.md"
 # (2026.6 needs >=3.14.2). A looser floor makes uv keep extra lockfile
 # resolution forks for hypothetical old interpreters, pinned to ancient HA
 # releases full of known CVEs. Source compatibility is governed separately
-# by the ruff/mypy targets below.
+# by ruff's target-version below.
 requires-python = ">=3.14.2"
 license = { text = "MIT" }
 authors = [{ name = "Aleksander Ławresz" }]
@@ -76,7 +76,10 @@ known-first-party = ["custom_components"]
 force-sort-within-sections = true
 
 [tool.mypy]
-python_version = "3.13"
+# Must match the dev env's HA: mypy parses homeassistant's installed sources,
+# which use 3.14-only syntax. The py313 source-compat floor is enforced by
+# ruff's target-version instead (ruff never parses site-packages).
+python_version = "3.14"
 strict = true
 warn_unreachable = true
 warn_return_any = true
