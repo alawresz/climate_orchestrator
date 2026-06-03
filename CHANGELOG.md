@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.12.1 (2026-06-03)
+
+### Bug Fixes
+
+- Ac heating assist to allow AC-only setups to function as full heat/cool thermostats, update docs
+  and tests accordingly
+  ([`b325422`](https://github.com/alawresz/climate_orchestrator/commit/b325422efa656cf5940b58248ccf4d90d0780745))
+
+
 ## v0.12.0 (2026-06-03)
 
 ### Chores
