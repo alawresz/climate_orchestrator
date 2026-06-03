@@ -1,5 +1,30 @@
 # CHANGELOG
 
+<!-- version list -->
+
+## v0.19.0 (2026-06-03)
+
+### Features
+
+- Home-average trigger switch for fully independent rooms
+  ([`86903ea`](https://github.com/alawresz/climate_orchestrator/commit/86903eaaf714a883da951b9ff1e07f6e66f068b6))
+
+
+## v0.18.0 (2026-06-03)
+
+### Features
+
+- User-provided whole-home average sensors with source diagnostic
+  ([`f203b30`](https://github.com/alawresz/climate_orchestrator/commit/f203b3005d366430b65ba6dcc8907c7616f5a69d))
+
+
+## v0.17.0 (2026-06-03)
+
+### Features
+
+- Raise a repair when the control cycle keeps failing
+  ([`10434fb`](https://github.com/alawresz/climate_orchestrator/commit/10434fb94418e23642e0133a51d09e385668c075))
+
 
 ## v0.16.0 (2026-06-03)
 
