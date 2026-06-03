@@ -73,6 +73,27 @@ def test_cooler_heats_only_with_assist() -> None:
     assert decide(cold, _global(ac_heating_assist=True)).demand is Demand.HEAT
 
 
+def test_positive_area_offset_runs_room_warmer() -> None:
+    """A positive offset makes the area heat sooner and cool later."""
+    # Local 20.5 sits just inside the band -> idle without an offset.
+    assert decide(_heater(local_temp=20.5), _global()).demand is Demand.IDLE
+    # +1 offset drops the perceived reading to 19.5 (< heat_edge 20) -> heat.
+    assert decide(_heater(local_temp=20.5, offset=1.0), _global()).demand is Demand.HEAT
+
+    # Local 24.5 is over the cool edge -> the AC would cool...
+    assert decide(_cooler(local_temp=24.5), _global()).demand is Demand.COOL
+    # ...but a +1 offset (warmer) pulls it to 23.5, back inside the band -> idle.
+    assert decide(_cooler(local_temp=24.5, offset=1.0), _global()).demand is Demand.IDLE
+
+
+def test_area_offset_does_not_touch_home_branch() -> None:
+    """The offset biases only the local reading; the home fallback is untouched."""
+    # No local reading -> the engine falls back to the home average (22, in band).
+    # Even a large offset must not synthesize a demand from the home branch.
+    no_local = _heater(local_temp=None, offset=5.0)
+    assert decide(no_local, _global()).demand is Demand.IDLE
+
+
 def test_frost_protection_overrides_everything() -> None:
     """Below the frost temperature, a heater heats even with a window open."""
     decision = decide(

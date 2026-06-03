@@ -107,6 +107,7 @@
     },
     "number": {
       "release_offset": { "name": "Heat/cool release offset" },
+      "area_band_offset": { "name": "{area} band offset" },
       "tolerance": { "name": "Switching tolerance" },
       "comfort_humidity_influence": { "name": "Comfort humidity influence" },
       "frost_protection_temp": { "name": "Frost protection temperature" },

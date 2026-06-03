@@ -2,6 +2,7 @@
   "entity": {
     "number": {
       "release_offset": { "default": "mdi:swap-vertical" },
+      "area_band_offset": { "default": "mdi:home-thermometer" },
       "tolerance": { "default": "mdi:plus-minus-variant" },
       "comfort_humidity_influence": { "default": "mdi:water-percent" },
       "frost_protection_temp": { "default": "mdi:snowflake-thermometer" },

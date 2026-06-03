@@ -25,6 +25,7 @@ from .const import (
     ADAPTIVE_COMFORT_BIAS_DEFAULT,
     ADAPTIVE_COMFORT_MAX_SHIFT_DEFAULT,
     ADAPTIVE_COMFORT_RESPONSE_DEFAULT,
+    AREA_BAND_OFFSET_DEFAULT,
     CALIBRATION_MODES,
     COMFORT_HUMIDITY_INFLUENCE_DEFAULT,
     COOL_OFF_OUTDOOR_DEFAULT,
@@ -50,6 +51,11 @@ _CALIBRATION_MODE_KEY = "calibration_mode"
 def preset_number_key(preset: str, edge: str) -> str:
     """Number key for a preset's edge, e.g. ``preset_home_heat``."""
     return f"preset_{preset}_{edge}"
+
+
+def area_offset_key(area_id: str) -> str:
+    """Number key for an area's comfort band offset, e.g. ``area_offset_kitchen``."""
+    return f"area_offset_{area_id}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -225,6 +231,16 @@ def preset_band(
     low = number_value(hass, entry_id, preset_number_key(preset, "heat"), edges[0])
     high = number_value(hass, entry_id, preset_number_key(preset, "cool"), edges[1])
     return (low, high)
+
+
+@callback
+def area_band_offset(hass: HomeAssistant, entry_id: str, area_id: str | None) -> float:
+    """Live comfort band offset (°C) for an area, ``0`` when none is set."""
+    if area_id is None:
+        return AREA_BAND_OFFSET_DEFAULT
+    return number_value(
+        hass, entry_id, area_offset_key(area_id), AREA_BAND_OFFSET_DEFAULT
+    )
 
 
 @callback
