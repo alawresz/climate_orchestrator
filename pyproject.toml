@@ -20,6 +20,7 @@ dev = [
   "ruff==0.15.15",
   "mypy>=1.11",
   "hypothesis>=6.0",
+  "python-semantic-release>=9.15,<10",
 ]
 
 [tool.ruff]
@@ -87,3 +88,27 @@ fail_under = 90
 [tool.uv]
 # This is a Home Assistant custom-component layout, not an installable package.
 package = false
+
+[tool.semantic_release]
+# Version lives in two places; keep both in lock-step with the release tag.
+version_toml = ["pyproject.toml:project.version"]
+version_variables = [
+  "custom_components/climate_orchestrator/manifest.json:version",
+]
+tag_format = "v{version}"
+commit_message = "chore(release): {version} [skip ci]"
+# No build artifact: HACS installs from the source tree / release zip.
+build_command = ""
+allow_zero_version = true
+
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease = false
+
+# Pushing to a feature/fix branch cuts a prerelease (e.g. 0.12.0rc1); merging
+# it into main promotes to the stable version. The version is PEP 440 (`rcN`),
+# so the branch name itself can't appear in it.
+[tool.semantic_release.branches.prerelease]
+match = "(feat|fix)/.+"
+prerelease = true
+prerelease_token = "rc"
