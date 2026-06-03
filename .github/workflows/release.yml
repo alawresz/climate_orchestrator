@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Release from the branch CI ran on (main or dev).
           ref: ${{ github.event.workflow_run.head_branch }}
@@ -32,6 +32,6 @@ jobs:
         # Reads [tool.semantic_release] branch config to decide stable vs
         # prerelease, bumps pyproject.toml + manifest.json, updates the
         # changelog, commits + tags, and publishes the GitHub Release.
-        uses: python-semantic-release/python-semantic-release@v9
+        uses: python-semantic-release/python-semantic-release@v10
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
