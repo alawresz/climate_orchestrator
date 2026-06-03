@@ -12,9 +12,8 @@ Two families:
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -23,15 +22,20 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .control.comfort import effective_temperature
-from .control.mpc.controller import MpcController
 from .control.mpc.model import MIN_SAMPLES
-from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 from .entity import SmartClimateBaseEntity
 from .models import SmartClimateData, Status
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+
+    from .control.mpc.controller import MpcController
+    from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 
 _KELVIN_PER_MINUTE = "K/min"
 _PER_MINUTE = "1/min"
@@ -273,7 +277,7 @@ DEVICE_SENSORS: tuple[DeviceSensorDescription, ...] = (
 
 
 def _trv_label(trv_id: str) -> str:
-    """A human label for a TRV from its entity_id (e.g. ``trv_1`` -> ``Trv 1``)."""
+    """Derive a human label for a TRV from its entity_id (``trv_1`` -> ``Trv 1``)."""
     object_id = trv_id.split(".", 1)[-1]
     return object_id.replace("_", " ").title()
 

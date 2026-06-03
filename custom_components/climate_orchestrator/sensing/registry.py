@@ -9,7 +9,7 @@ area sensors only; offline sensors and devices are handled gracefully
 
 from __future__ import annotations
 
-from datetime import datetime
+from typing import TYPE_CHECKING
 
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, callback
@@ -26,6 +26,9 @@ from homeassistant.util import dt as dt_util
 
 from ..models import DeviceReading, SmartClimateData, Status
 from .aggregate import mean_or_none
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 # binary_sensor device classes that count as a window/door being open.
 _WINDOW_CLASSES = frozenset({"window", "door", "opening", "garage_door"})

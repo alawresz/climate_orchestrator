@@ -7,6 +7,8 @@ commands are applied via the minimal set of service calls (see reconcile).
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from homeassistant.components.climate import (
     ATTR_HVAC_MODE,
     SERVICE_SET_HVAC_MODE,
@@ -21,11 +23,13 @@ from homeassistant.const import (
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
 )
-from homeassistant.core import HomeAssistant
 
 from ..const import MAX_TEMP, MIN_TEMP, TARGET_TEMP_STEP
 from .model import AdapterCapabilities, DeviceCommand, DeviceState
 from .reconcile import reconcile
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 
 class ClimateAdapter:

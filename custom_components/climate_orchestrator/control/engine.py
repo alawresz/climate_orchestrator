@@ -10,11 +10,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from ..const import MAX_TEMP, MIN_TEMP
-from ..models import Band
 from .comfort import dew_point, effective_temperature
 from .hysteresis import Demand, evaluate_demand
+
+if TYPE_CHECKING:
+    from ..models import Band
 
 
 class DeviceKind(StrEnum):

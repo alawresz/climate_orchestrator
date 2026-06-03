@@ -7,11 +7,15 @@ room does (DESIGN.md §6.2); an idle AC under the dew-point guard runs dry mode.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ..const import AC_COOL_KICK
 from ..control.engine import DeviceDecision, DeviceKind
 from ..control.hysteresis import Demand
-from ..models import Band
 from .model import AdapterCapabilities, DeviceCommand, Mode
+
+if TYPE_CHECKING:
+    from ..models import Band
 
 
 def _clamp(value: float, caps: AdapterCapabilities) -> float:

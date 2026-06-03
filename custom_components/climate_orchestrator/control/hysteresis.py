@@ -9,8 +9,10 @@ edge. This OR-to-engage / AND-to-release asymmetry suppresses short-cycling
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
-from ..models import Band
+if TYPE_CHECKING:
+    from ..models import Band
 
 
 class Demand(StrEnum):

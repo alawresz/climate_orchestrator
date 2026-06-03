@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from homeassistant.components.number import NumberMode, RestoreNumber
 from homeassistant.const import EntityCategory, UnitOfTemperature
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import AREA_BAND_OFFSET_DEFAULT, AREA_BAND_OFFSET_LIMIT, TARGET_TEMP_STEP
-from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 from .entity import hub_device_info
 from .sensing.registry import resolve_area_id
 from .settings import (
@@ -18,6 +17,12 @@ from .settings import (
     NumberSetting,
     area_offset_key,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+
+    from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 
 
 def _managed_area_ids(

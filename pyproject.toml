@@ -18,8 +18,10 @@ dev = [
   # Not provided by PHACC, so declared explicitly:
   "scipy>=1.11",            # also the integration's runtime requirement
   "hypothesis>=6.0",        # property-based tests
+  "pytest-randomly>=3.15",  # randomize test order to surface inter-test leakage
   "ruff==0.15.15",          # linter/formatter (exact, matches CI + pre-commit)
   "mypy>=1.11",             # type checker
+  "mutmut>=3.5,<4",         # mutation testing for the pure control/ math
   "python-semantic-release>=10.5,<11",  # local release tooling (CI uses the action)
 ]
 
@@ -40,10 +42,27 @@ select = [
   "SIM",  # flake8-simplify
   "ASYNC",# flake8-async
   "RUF",  # ruff-specific
+  "TC",   # flake8-type-checking (guard type-only imports)
+  "RET",  # flake8-return
+  "PTH",  # flake8-use-pathlib
+  "DTZ",  # flake8-datetimez (no naive datetimes)
+  "LOG",  # flake8-logging
+  "G",    # flake8-logging-format
+  "PERF", # perflint
+  "TRY",  # tryceratops (exception hygiene)
+  "D",    # pydocstyle
 ]
 # RUF012: HA entity `_attr_*` lists are effectively class-level constants;
 # annotating them ClassVar conflicts with the base classes' instance attrs.
 ignore = ["RUF012"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests are dev-only: docstrings aren't required, and TYPE_CHECKING import
+# guards add churn without runtime benefit.
+"tests/**" = ["D", "TC"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["custom_components"]
@@ -75,7 +94,10 @@ implicit_reexport = true
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-q --cov=custom_components/climate_orchestrator --cov-report=term-missing"
+# Coverage is NOT forced here: that breaks single-file runs (fail_under) and
+# mutmut's per-mutant subset runs. CI passes --cov explicitly; run it locally
+# with `uv run pytest --cov=custom_components/climate_orchestrator`.
+addopts = "-q"
 
 [tool.coverage.run]
 branch = true
@@ -84,6 +106,24 @@ source = ["custom_components/climate_orchestrator"]
 [tool.coverage.report]
 show_missing = true
 fail_under = 90
+
+[tool.codespell]
+# Shared by the pre-commit hook and the CI step. `hass` is the Home Assistant
+# fixture/handle, not a misspelt "hash"; skip the lockfile and syrupy snapshots.
+ignore-words-list = "hass"
+skip = "*.lock,*.ambr,./.git,./htmlcov,./mutants"
+
+[tool.mutmut]
+# Mutation-test only the pure control/ math (the highest-value, subtlest code):
+# Hypothesis checks invariants, but a flipped sign or mis-scaled `dt` in the
+# thermal model / optimizer / comfort curves would still pass. Run in the HA dev
+# env (Python 3.13) with `uv run mutmut run`, then `uv run mutmut results`.
+paths_to_mutate = ["custom_components/climate_orchestrator/control/"]
+tests_dir = ["tests/"]
+# mutmut copies only `paths_to_mutate` into its mutants/ work dir, but control/
+# (and conftest.py) import the rest of the package (const, models, coordinator,
+# ...). Copy the whole package so imports resolve; only control/ is mutated.
+also_copy = ["custom_components/"]
 
 [tool.uv]
 # This is a Home Assistant custom-component layout, not an installable package.

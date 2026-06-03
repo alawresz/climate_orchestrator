@@ -428,7 +428,8 @@ Targeting Python 3.12+ (HA's runtime), with current best practices enforced by r
 - **Adapter tests:** the `ClimateAdapter` issues the correct services for TRV valve %, TRV offset, and AC setpoint + mode over a generic HA `climate` entity, honouring `AdapterCapabilities` (capability gating, range/step clamping) with mocked services.
 - **Integration tests (hass fixture):** config flow (device + sensor selection, overrides), entity creation snapshots, options/runtime entity changes re-trigger control, restart restores learned MPC + preset state.
 - **Resilience tests (§6.4):** a TRV or AC going `unavailable` excludes only that device while the home entity stays available and controls the rest; an offline sensor drops out of the home/area average; an area with an offline configured sensor falls back to the home average; one device raising an exception/timeout never aborts the cycle for the others; absent-device learned state is retained across the dropout.
-- **Regression fixtures:** recorded sensor traces replayed through the control engine (`control/engine.py`) to catch behavioural drift.
+- **Regression fixtures:** recorded sensor traces replayed through the control engine (`control/engine.py`) to catch behavioural drift, plus **syrupy snapshots** (`test_snapshot_regression.py`, `tests/__snapshots__/`) pinning the exact comfort-curve and adaptive-cooling-comfort outputs — regenerate intentionally with `pytest --snapshot-update`.
+- **Mutation testing** (`mutmut`, scoped to `control/` via `[tool.mutmut]`): line/branch coverage and Hypothesis invariants don't prove the *math* is right — a flipped sign or mis-scaled `dt` in the thermal model, optimizer, or comfort curves can still pass. `uv run mutmut run` mutates the pure control modules and surfaces any mutant the suite fails to kill; run it in the HA dev env (Python 3.13).
 
 A subagent-driven verification pass reviews coverage gaps before sign-off.
 

@@ -8,12 +8,14 @@ state — so a problem can be understood from the downloaded JSON alone.
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.core import HomeAssistant
-
-from .coordinator import SmartClimateConfigEntry
 from .settings import resolve_settings
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+
+    from .coordinator import SmartClimateConfigEntry
 
 
 async def async_get_config_entry_diagnostics(

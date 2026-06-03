@@ -11,12 +11,11 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
-from collections.abc import Coroutine
 from dataclasses import replace
 from datetime import timedelta
 import logging
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.climate import HVACMode
 from homeassistant.config_entries import ConfigEntry
@@ -105,6 +104,9 @@ from .settings import (
     number_value,
     resolve_settings,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
 
 _MPC_STORE_VERSION = 1
 _MPC_SAVE_DELAY = 30.0
@@ -357,7 +359,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
     @callback
     def mpc_state(self, trv_id: str) -> MpcController | None:
-        """The MPC controller learned for a TRV, if any (diagnostics)."""
+        """Return the MPC controller learned for a TRV, if any (diagnostics)."""
         return self._mpc.get(trv_id)
 
     @callback
@@ -615,7 +617,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     def _room_effective(
         self, reading: DeviceReading, settings: RuntimeSettings, data: SmartClimateData
     ) -> float | None:
-        """The device's comfort-adjusted room temperature (area, else home)."""
+        """Return the device's comfort-adjusted room temperature (area, else home)."""
         comfort = settings.comfort_index_targeting
         influence = settings.comfort_humidity_influence
         area_temp = reading.area_temperature
@@ -754,7 +756,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
     @callback
     def hvac_action_reason(self) -> str:
-        """A single headline reason for the current heat/cool/idle state."""
+        """Return a single headline reason for the current heat/cool/idle state."""
         hvac_mode, _ = self._desired()
         if hvac_mode == HVACMode.OFF:
             return "off"
@@ -813,7 +815,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
     @callback
     def device_command_attrs(self, entity_id: str) -> dict[str, str | float | None]:
-        """The last command sent to a device (mode + setpoint), for attributes."""
+        """Return the last command sent to a device (mode + setpoint)."""
         command = self._last_command.get(entity_id)
         if command is None:
             return {}

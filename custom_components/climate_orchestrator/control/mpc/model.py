@@ -11,11 +11,14 @@ toward a prior so a cold start stays sane (DESIGN.md §9). Pure: numpy/scipy.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.optimize import least_squares
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 # Cold-start priors and fit settings.
 DEFAULT_GAIN = 0.10

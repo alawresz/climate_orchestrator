@@ -6,7 +6,10 @@ any Python without the full HA stack.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 def mean_or_none(values: Iterable[float | None]) -> float | None:

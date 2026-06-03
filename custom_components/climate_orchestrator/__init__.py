@@ -7,10 +7,13 @@ climate entity plus diagnostic sensors. Control logic arrives in later phases.
 
 from __future__ import annotations
 
-from homeassistant.core import HomeAssistant
+from typing import TYPE_CHECKING
 
 from .const import PLATFORMS
 from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 
 async def async_setup_entry(

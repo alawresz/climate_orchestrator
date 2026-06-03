@@ -50,12 +50,12 @@ _CALIBRATION_MODE_KEY = "calibration_mode"
 
 
 def preset_number_key(preset: str, edge: str) -> str:
-    """Number key for a preset's edge, e.g. ``preset_home_heat``."""
+    """Build the number key for a preset's edge, e.g. ``preset_home_heat``."""
     return f"preset_{preset}_{edge}"
 
 
 def area_offset_key(area_id: str) -> str:
-    """Number key for an area's comfort band offset, e.g. ``area_offset_kitchen``."""
+    """Build the area's comfort-band-offset key, e.g. ``area_offset_kitchen``."""
     return f"area_offset_{area_id}"
 
 

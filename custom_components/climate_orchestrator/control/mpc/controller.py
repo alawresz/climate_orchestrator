@@ -8,10 +8,9 @@ learned state is serialisable so it survives restarts (DESIGN.md §9, §13). Pur
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Sequence
 from dataclasses import asdict
 import math
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .model import (
     DEFAULT_PARAMS,
@@ -21,6 +20,9 @@ from .model import (
     identify_parameters,
 )
 from .optimizer import DEFAULT_HORIZON, optimize_valve
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 DEFAULT_MAX_HISTORY = 200
 

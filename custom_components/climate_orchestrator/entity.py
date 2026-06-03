@@ -10,7 +10,7 @@ from .coordinator import SmartClimateCoordinator
 
 
 def hub_device_info(entry_id: str) -> DeviceInfo:
-    """The single whole-home hub device all entities belong to."""
+    """Return the single whole-home hub device all entities belong to."""
     return DeviceInfo(
         identifiers={(DOMAIN, entry_id)},
         name=DEFAULT_TITLE,

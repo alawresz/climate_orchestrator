@@ -7,7 +7,7 @@ When a managed AC exposes fan/swing, those are surfaced here and forwarded.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.climate import (
     ATTR_FAN_MODE,
@@ -25,10 +25,8 @@ from homeassistant.components.climate import (
     DOMAIN as CLIMATE_DOMAIN,
 )
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE, UnitOfTemperature
-from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 import voluptuous as vol
 
@@ -46,9 +44,14 @@ from .const import (
 from .control.adaptive_comfort import adaptive_band
 from .control.comfort import effective_temperature
 from .control.hysteresis import Demand
-from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 from .entity import SmartClimateBaseEntity
 from .settings import preset_band, resolve_settings
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant, State
+    from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+
+    from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 
 _BASE_FEATURES = (
     ClimateEntityFeature.PRESET_MODE
@@ -147,8 +150,11 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
 
     @property
     def hvac_mode(self) -> HVACMode:
-        """Report OFF, or the current on-mode — so the value stays valid even if
-        the supported modes change (e.g. AC heating assist toggled on/off)."""
+        """Report OFF, or the current on-mode.
+
+        Keeps the value valid even if the supported modes change (e.g. AC heating
+        assist toggled on/off).
+        """
         if self._attr_hvac_mode == HVACMode.OFF:
             return HVACMode.OFF
         return self._on_mode
@@ -206,9 +212,10 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         return heat, cool
 
     def _display_band_edges(self) -> tuple[float, float]:
-        """The band as shown and controlled: the base band, with the
-        adaptive-comfort cool-edge relaxation folded in when that feature is on.
+        """Return the band as shown and controlled.
 
+        This is the base band, with the adaptive-comfort cool-edge relaxation
+        folded in when that feature is on.
         Only the cool edge ever moves; the heat edge equals the base. The
         coordinator reads the *base* band back from our attributes, so applying
         the shift here is display-only and never re-applied to itself.
@@ -268,8 +275,11 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
 
     @property
     def supported_features(self) -> ClimateEntityFeature:
-        """A range setpoint for dual setups, a single one otherwise; plus
-        fan/swing when a managed AC supports them."""
+        """Report the supported features.
+
+        A range setpoint for dual setups, a single one otherwise; plus fan/swing
+        when a managed AC supports them.
+        """
         if self._dual:
             features = _BASE_FEATURES | ClimateEntityFeature.TARGET_TEMPERATURE_RANGE
         else:
@@ -318,10 +328,11 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
 
     @property
     def current_temperature(self) -> float | None:
-        """Home-wide temperature; the feels-like value when comfort targeting is
-        on, so the card matches what the control loop actually judges against.
+        """Report the home-wide temperature.
 
-        The raw dry-bulb average is always kept in ``dry_bulb_temperature``.
+        The feels-like value when comfort targeting is on, so the card matches
+        what the control loop actually judges against. The raw dry-bulb average
+        is always kept in ``dry_bulb_temperature``.
         """
         data = self.coordinator.data
         temp = data.home_avg_temperature

@@ -46,7 +46,7 @@ def effective_temperature(
     use_comfort: bool = True,
     influence: float = 1.0,
 ) -> float:
-    """The control temperature: a humidity-adjusted feels-like value.
+    """Return the control temperature: a humidity-adjusted feels-like value.
 
     Blends dry-bulb toward the apparent temperature by ``influence``:
 

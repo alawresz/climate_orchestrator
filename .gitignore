@@ -25,3 +25,6 @@ test-results/
 .idea/
 .vscode/
 *.iml
+
+# mutmut work dir
+mutants/

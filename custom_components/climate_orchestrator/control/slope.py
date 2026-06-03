@@ -9,7 +9,10 @@ the maths trivially testable.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 def temperature_slope_per_min(samples: Sequence[tuple[float, float]]) -> float | None:

@@ -7,7 +7,7 @@ entities, not here. Selections are editable later via the options flow.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import (
     ConfigFlow,
@@ -28,8 +28,10 @@ from .const import (
     DEFAULT_TITLE,
     DOMAIN,
 )
-from .coordinator import SmartClimateConfigEntry
 from .devices.trv import LOCAL_CALIBRATION_HINTS, VALVE_OPENING_HINTS
+
+if TYPE_CHECKING:
+    from .coordinator import SmartClimateConfigEntry
 
 _CLIMATE_SELECTOR = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="climate", multiple=True)
@@ -47,7 +49,7 @@ _DEFAULT_CALIBRATION_HINTS = ", ".join(LOCAL_CALIBRATION_HINTS)
 
 
 def _optional(key: str, suggested: Any | None) -> vol.Optional:
-    """An optional key, pre-filled with a suggested value when present."""
+    """Build an optional key, pre-filled with a suggested value when present."""
     if suggested in (None, ""):
         return vol.Optional(key)
     return vol.Optional(key, description={"suggested_value": suggested})

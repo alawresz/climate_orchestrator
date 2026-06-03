@@ -485,7 +485,9 @@ Uses [uv](https://github.com/astral-sh/uv), [ruff](https://docs.astral.sh/ruff/)
 uv venv --python 3.13 && uv sync --dev   # create env, install deps
 uv run ruff check . && uv run ruff format --check .
 uv run mypy custom_components/climate_orchestrator
-uv run pytest                            # tests + coverage
+uv run pytest                            # fast: tests only
+uv run pytest --cov=custom_components/climate_orchestrator   # with coverage (CI gate: 90%)
+uv run mutmut run                        # mutation-test the control/ math
 ```
 
 The repo is laid out as a standalone project (`pyproject.toml`, `.venv`,

@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from homeassistant.components.select import SelectEntity
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import CALIBRATION_MODES, DEFAULT_CALIBRATION_MODE
-from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 from .entity import hub_device_info
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+
+    from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 
 CALIBRATION_MODE_KEY = "calibration_mode"
 
