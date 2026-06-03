@@ -384,7 +384,7 @@ climate_orchestrator/
 | Snapshots | **syrupy** | Entity-state and diagnostics snapshot tests. |
 | Coverage | **pytest-cov** | Target ≥ 90% line + branch on `control/`, `sensors/`, `devices/`; gate in CI. |
 | Hooks | **pre-commit** | ruff + mypy + end-of-file/whitespace. |
-| CI | **GitHub Actions** (`.github/workflows/ci.yml`) | Installs uv + Python 3.13 via `astral-sh/setup-uv`; jobs for ruff lint+format, mypy, pytest with coverage, plus hassfest and HACS validation. |
+| CI | **GitHub Actions** (`.github/workflows/ci.yml`) | Installs uv + Python 3.14 via `astral-sh/setup-uv`; jobs for ruff lint+format, mypy, pytest with coverage, plus hassfest and HACS validation. |
 | HA validation | **hassfest** + **HACS action** | `home-assistant/actions/hassfest` validates the manifest/structure; `hacs/action` validates HACS packaging. hassfest is advisory until green (it treats `strings.json` as the translation source; we ship `translations/en.json`). |
 
 ### 11a. Continuous integration (GitHub Actions)
@@ -395,7 +395,7 @@ CI is GitHub Actions (`.github/workflows/ci.yml`), which also unlocks HACS distr
 - **hassfest** — `home-assistant/actions/hassfest` (advisory via `continue-on-error` until a green run is confirmed, since hassfest expects `strings.json`).
 - **hacs** — `hacs/action` with `category: integration` (and `ignore: brands` until the logo is submitted to `home-assistant/brands`).
 
-uv (with Python 3.13, HA's runtime) is installed via `astral-sh/setup-uv`.
+uv (with Python 3.14, HA's runtime) is installed via `astral-sh/setup-uv`.
 
 ### 11c. Releases (semantic-release)
 
@@ -430,8 +430,8 @@ Targeting Python 3.12+ (HA's runtime), with current best practices enforced by r
 - **Adapter tests:** the `ClimateAdapter` issues the correct services for TRV valve %, TRV offset, and AC setpoint + mode over a generic HA `climate` entity, honouring `AdapterCapabilities` (capability gating, range/step clamping) with mocked services.
 - **Integration tests (hass fixture):** config flow (device + sensor selection, overrides), entity creation snapshots, options/runtime entity changes re-trigger control, restart restores learned MPC + preset state.
 - **Resilience tests (§6.4):** a TRV or AC going `unavailable` excludes only that device while the home entity stays available and controls the rest; an offline sensor drops out of the home/area average; an area with an offline configured sensor falls back to the home average; one device raising an exception/timeout never aborts the cycle for the others; absent-device learned state is retained across the dropout.
-- **Regression fixtures:** recorded sensor traces replayed through the control engine (`control/engine.py`) to catch behavioural drift, plus **syrupy snapshots** (`tests/unit/test_snapshot_regression.py`, `tests/unit/__snapshots__/`) pinning the exact comfort-curve and adaptive-cooling-comfort outputs — regenerate intentionally with `pytest --snapshot-update`.
-- **Mutation testing** (`mutmut`, scoped to `control/` via `[tool.mutmut]`): line/branch coverage and Hypothesis invariants don't prove the *math* is right — a flipped sign or mis-scaled `dt` in the thermal model, optimizer, or comfort curves can still pass. `uv run mutmut run` mutates the pure control modules and surfaces any mutant the suite fails to kill; run it in the HA dev env (Python 3.13).
+- **Regression fixtures:** recorded sensor traces replayed through the control engine (`control/engine.py`) to catch behavioural drift, plus **syrupy snapshots** (`tests/unit/test_snapshot_regression.py`, `tests/unit/snapshots/`) pinning the exact comfort-curve and adaptive-cooling-comfort outputs — regenerate intentionally with `pytest --snapshot-update`.
+- **Mutation testing** (`mutmut`, scoped to `control/` via `[tool.mutmut]`): line/branch coverage and Hypothesis invariants don't prove the *math* is right — a flipped sign or mis-scaled `dt` in the thermal model, optimizer, or comfort curves can still pass. `uv run mutmut run` mutates the pure control modules and surfaces any mutant the suite fails to kill; run it in the HA dev env (Python 3.14).
 
 A subagent-driven verification pass reviews coverage gaps before sign-off.
 

@@ -3,7 +3,12 @@ name = "climate-orchestrator"
 version = "0.16.0"
 description = "Climate Orchestrator — whole-home climate orchestration for Home Assistant"
 readme = "README.md"
-requires-python = ">=3.13"
+# Dev/test environment floor — tracks current Home Assistant's runtime
+# (2026.6 needs >=3.14.2). A looser floor makes uv keep extra lockfile
+# resolution forks for hypothetical old interpreters, pinned to ancient HA
+# releases full of known CVEs. Source compatibility is governed separately
+# by the ruff/mypy targets below.
+requires-python = ">=3.14.2"
 license = { text = "MIT" }
 authors = [{ name = "Aleksander Ławresz" }]
 dependencies = []
@@ -26,6 +31,8 @@ dev = [
 ]
 
 [tool.ruff]
+# Source still targets py313 (oldest HA install we aim to run on), even though
+# the dev env itself runs 3.14 — see requires-python above.
 target-version = "py313"
 line-length = 88
 src = ["custom_components", "tests"]
@@ -117,7 +124,7 @@ skip = "*.lock,*.ambr,./.git,./htmlcov,./mutants"
 # Mutation-test only the pure control/ math (the highest-value, subtlest code):
 # Hypothesis checks invariants, but a flipped sign or mis-scaled `dt` in the
 # thermal model / optimizer / comfort curves would still pass. Run in the HA dev
-# env (Python 3.13) with `uv run mutmut run`, then `uv run mutmut results`.
+# env (Python 3.14) with `uv run mutmut run`, then `uv run mutmut results`.
 paths_to_mutate = ["custom_components/climate_orchestrator/control/"]
 # The pure unit tests are what kill control/ mutants; skipping the hass-fixture
 # suites makes mutation runs far faster and avoids the heavy HA harness.

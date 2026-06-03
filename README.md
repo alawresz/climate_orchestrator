@@ -482,7 +482,7 @@ Uses [uv](https://github.com/astral-sh/uv), [ruff](https://docs.astral.sh/ruff/)
 [`pytest-homeassistant-custom-component`](https://github.com/MatthewFlamm/pytest-homeassistant-custom-component).
 
 ```bash
-uv venv --python 3.13 && uv sync --dev   # create env, install deps
+uv venv --python 3.14 && uv sync --dev   # create env, install deps
 uv run ruff check . && uv run ruff format --check .
 uv run mypy custom_components/climate_orchestrator
 uv run pytest                            # fast: tests only
