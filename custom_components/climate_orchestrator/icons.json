@@ -17,6 +17,7 @@
       "window_open_delay": { "default": "mdi:window-open-variant" },
       "valve_maintenance_interval": { "default": "mdi:calendar-refresh" },
       "sensor_max_age": { "default": "mdi:timer-sand" },
+      "preconditioning_horizon": { "default": "mdi:clock-fast" },
       "preset_away_heat": { "default": "mdi:fire" },
       "preset_away_cool": { "default": "mdi:snowflake" },
       "preset_home_heat": { "default": "mdi:fire" },
@@ -34,7 +35,8 @@
       "ac_heating_assist": { "default": "mdi:fire" },
       "self_tuning_ac_bias": { "default": "mdi:air-conditioner" },
       "auto_valve_maintenance": { "default": "mdi:wrench-clock" },
-      "adaptive_cooling_comfort": { "default": "mdi:thermometer-auto" }
+      "adaptive_cooling_comfort": { "default": "mdi:thermometer-auto" },
+      "forecast_preconditioning": { "default": "mdi:weather-partly-snowy" }
     },
     "select": {
       "calibration_mode": { "default": "mdi:tune-variant" }

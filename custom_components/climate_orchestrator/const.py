@@ -48,6 +48,15 @@ AREA_BAND_OFFSET_LIMIT: Final = 5.0
 # How often to re-evaluate even with no state changes (keepalive).
 UPDATE_INTERVAL_SECONDS: Final = 60
 
+# Forecast-based preconditioning (MPC TRVs only). When enabled, the weather
+# entity's hourly forecast is fed into the valve optimisation over this look-ahead
+# so a radiator can start warming a room ahead of a cold spell. The forecast is
+# refreshed at most this often; the look-ahead is interpolated to the control
+# step and capped at a safe number of steps.
+PRECONDITION_HORIZON_DEFAULT: Final = 2.0  # hours
+PRECONDITION_FORECAST_REFRESH_SECONDS: Final = 900.0
+PRECONDITION_MAX_STEPS: Final = 600
+
 # Post-restart warm-up window. Until a managed device first reports a usable
 # temperature, the orchestrator reports ``initializing`` for this long and holds
 # back transient repairs (no temperature source, stale sensor) — sensors often

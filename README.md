@@ -193,9 +193,26 @@ With a Home preset of 20.5/24.5 and the defaults (onset 25.5°):
 | 33° | ~26.1° |
 | 45° | ~26.5° |
 
-The adjusted band is *always computed* (the **Adaptive heat/cool setpoint**
-sensors preview it even when the toggle is off) but only *applied* when the toggle
+The adjusted cool edge is *always computed* (the **Adaptive cool setpoint**
+sensor previews it even when the toggle is off) but only *applied* when the toggle
 is on, which requires an outdoor sensor.
+
+### Pre-heating from the forecast (Forecast preconditioning)
+
+With **Forecast preconditioning** on (optional, off by default, **MPC calibration
+mode** only), a radiator can start warming a room *before* a cold spell arrives
+instead of only reacting once the room has already cooled. The MPC valve
+optimiser normally plans against the current outdoor temperature held flat; with
+this on, it instead plans against the configured **weather entity's** hourly
+forecast, interpolated onto the control step over the **Preconditioning look-ahead**
+(default 2 h). If the forecast shows it getting colder, the optimiser opens the
+valve more now to stay ahead of the loss.
+
+To keep comfort safe it only ever *raises* the valve: the commanded opening is the
+larger of the normal (react-to-now) result and the forecast-aware result, so the
+forecast can pre-heat but never under-heat the present. The forecast is refreshed
+about every 15 minutes. Needs a weather entity that provides an hourly forecast;
+without one, a repair notice points you to add it (or turn the feature off).
 
 ### Safety guards
 
@@ -344,6 +361,7 @@ within 7–35 °C.
 | AC heating assist | Off | Allow an AC that supports `heat` to participate in heating (radiators own heating by default). On an AC-only setup this also turns the thermostat into a full heat/cool one. |
 | Self-tuning AC bias | On | Auto-tune the AC cooling setpoint bias with integral feedback (grows up to **Max AC cooling setpoint bias**, decays when satisfied). The **AC cooling setpoint bias** becomes the floor. |
 | Adaptive cooling comfort | Off | Relax the cool setpoint upward when it's hot outside (see *Relaxing the cooling when it's hot out*). Needs an outdoor sensor. |
+| Forecast preconditioning | Off | Feed the weather entity's hourly forecast into the MPC valve optimisation so radiators pre-heat ahead of a cold spell (see *Pre-heating from the forecast*). MPC calibration mode + a weather entity only; can only raise the valve, never under-heat the present. |
 | Automatic valve maintenance | Off | Periodically exercise the TRV valves (full open → closed) every **Valve maintenance interval** days. Skipped while a room is actively heating. |
 
 ### Tuning numbers (`number`)
@@ -352,6 +370,7 @@ within 7–35 °C.
 |--------|:-------:|:-----:|-------------|
 | Heat/cool release offset | 0.5 °C | 0–3 | How far the room must swing back toward the opposite edge before a device stops. Larger = longer runs, fewer cycles. |
 | `<area>` band offset | 0 °C | −5–5 | Per-area comfort nudge: a positive value shifts that area's whole band up so the room runs **warmer** (heats sooner, cools later); negative runs it cooler. One number per managed area; biases only that area's local reading, not the home average. |
+| Preconditioning look-ahead | 2 h | 0.5–8 | How far ahead **Forecast preconditioning** plans against the weather forecast. Longer looks further out to pre-heat sooner before a cold spell. |
 | Switching tolerance | 0.3 °C | 0–2 | How far past the trigger edge a device drives, which is also the target (`heat setpoint + tolerance`, `cool setpoint − tolerance`, each capped at the band midpoint). |
 | Comfort humidity influence | 1.0 | 0–2 | How strongly humidity shifts the comfort index: `effective = dry-bulb + influence × (apparent − dry-bulb)`. `0` ignores humidity (pure dry-bulb), `1` is the full feels-like temperature, `>1` amplifies it. Only matters when Comfort index targeting is on. |
 | Dew point threshold | 16 °C | 10–22 | Dew point above which the Dew point guard runs dry mode. |
@@ -423,7 +442,8 @@ Developer Tools → Actions (target the whole-home `climate` entity):
 - **Repairs:** a notice is raised (and auto-cleared) for silent misconfigurations:
   a TRV in `mpc`/`offset` mode whose `valve_opening_degree` /
   `local_temperature_calibration` number can't be found (falls back to `target`);
-  **Adaptive cooling comfort** enabled with no outdoor sensor; an area sensor that has
+  **Adaptive cooling comfort** enabled with no outdoor sensor; **Forecast
+  preconditioning** enabled with no weather entity; an area sensor that has
   gone stale (stopped reporting past the staleness timeout); an inverted comfort
   band (cool setpoint below the heat setpoint, leaving no neutral zone); and no
   usable temperature source for any managed device. The last two (stale sensor,

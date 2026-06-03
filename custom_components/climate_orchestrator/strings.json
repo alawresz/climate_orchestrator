@@ -8,7 +8,7 @@
           "trvs": "Radiator valves (TRVs)",
           "acs": "Air conditioners",
           "outdoor_sensor": "Outdoor temperature sensor (optional)",
-          "weather_entity": "Weather entity (optional, fallback outdoor source)",
+          "weather_entity": "Weather entity (optional, for forecast preconditioning)",
           "valve_opening_hints": "TRV valve-opening number name hints (comma-separated)",
           "calibration_hints": "TRV local-calibration number name hints (comma-separated)"
         }
@@ -30,7 +30,7 @@
           "trvs": "Radiator valves (TRVs)",
           "acs": "Air conditioners",
           "outdoor_sensor": "Outdoor temperature sensor (optional)",
-          "weather_entity": "Weather entity (optional, fallback outdoor source)",
+          "weather_entity": "Weather entity (optional, for forecast preconditioning)",
           "valve_opening_hints": "TRV valve-opening number name hints (comma-separated)",
           "calibration_hints": "TRV local-calibration number name hints (comma-separated)"
         }
@@ -61,6 +61,7 @@
       "heat_off_outdoor": { "name": "Heating off above outdoor temperature" },
       "cool_off_outdoor": { "name": "Cooling off below outdoor temperature" },
       "ac_setpoint_bias": { "name": "AC cooling setpoint bias" },
+      "preconditioning_horizon": { "name": "Preconditioning look-ahead" },
       "preset_away_heat": { "name": "Away heat setpoint" },
       "preset_away_cool": { "name": "Away cool setpoint" },
       "preset_home_heat": { "name": "Home heat setpoint" },
@@ -75,7 +76,8 @@
       "ac_ignore_window": { "name": "AC ignores open windows" },
       "outdoor_temp_gating": { "name": "Outdoor temperature gating" },
       "frost_protection": { "name": "Frost protection" },
-      "ac_heating_assist": { "name": "AC heating assist" }
+      "ac_heating_assist": { "name": "AC heating assist" },
+      "forecast_preconditioning": { "name": "Forecast preconditioning" }
     },
     "select": {
       "calibration_mode": {

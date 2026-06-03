@@ -37,6 +37,7 @@ from .const import (
     HEAT_OFF_OUTDOOR_DEFAULT,
     MAX_TEMP,
     MIN_TEMP,
+    PRECONDITION_HORIZON_DEFAULT,
     RELEASE_OFFSET_DEFAULT,
     SENSOR_MAX_AGE_DEFAULT,
     TARGET_TEMP_STEP,
@@ -140,6 +141,14 @@ NUMBER_SETTINGS: tuple[NumberSetting, ...] = (
         5.0,
         unit=UnitOfTime.MINUTES,
     ),
+    NumberSetting(
+        "preconditioning_horizon",
+        PRECONDITION_HORIZON_DEFAULT,
+        0.5,
+        8.0,
+        0.5,
+        unit=UnitOfTime.HOURS,
+    ),
 )
 
 # Editable per-preset band edges: heat-below and cool-above for each preset.
@@ -166,6 +175,7 @@ SWITCH_SETTINGS: tuple[SwitchSetting, ...] = (
     SwitchSetting("self_tuning_ac_bias", True),
     SwitchSetting("auto_valve_maintenance", False),
     SwitchSetting("adaptive_cooling_comfort", False),
+    SwitchSetting("forecast_preconditioning", False),
 )
 
 
@@ -188,6 +198,7 @@ class RuntimeSettings:
     window_open_delay: float
     valve_maintenance_interval: float
     sensor_max_age: float
+    preconditioning_horizon: float
     comfort_index_targeting: bool
     dew_point_guard: bool
     window_open_detection: bool
@@ -198,6 +209,7 @@ class RuntimeSettings:
     self_tuning_ac_bias: bool
     auto_valve_maintenance: bool
     adaptive_cooling_comfort: bool
+    forecast_preconditioning: bool
     calibration_mode: str
 
 
@@ -291,6 +303,7 @@ def resolve_settings(hass: HomeAssistant, entry_id: str) -> RuntimeSettings:
         window_open_delay=numbers["window_open_delay"],
         valve_maintenance_interval=numbers["valve_maintenance_interval"],
         sensor_max_age=numbers["sensor_max_age"],
+        preconditioning_horizon=numbers["preconditioning_horizon"],
         comfort_index_targeting=switches["comfort_index_targeting"],
         dew_point_guard=switches["dew_point_guard"],
         window_open_detection=switches["window_open_detection"],
@@ -301,5 +314,6 @@ def resolve_settings(hass: HomeAssistant, entry_id: str) -> RuntimeSettings:
         self_tuning_ac_bias=switches["self_tuning_ac_bias"],
         auto_valve_maintenance=switches["auto_valve_maintenance"],
         adaptive_cooling_comfort=switches["adaptive_cooling_comfort"],
+        forecast_preconditioning=switches["forecast_preconditioning"],
         calibration_mode=_calibration_mode(hass, entry_id),
     )
