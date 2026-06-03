@@ -24,3 +24,14 @@ repos:
       - id: codespell
         # Settings live in [tool.codespell] in pyproject.toml (shared with CI).
         additional_dependencies: [tomli]
+  - repo: local
+    hooks:
+      - id: strings-en-sync
+        name: strings.json matches translations/en.json
+        # HA convention: strings.json is the translation source; en.json is its
+        # verbatim copy. hassfest validates strings.json, HA runtime reads
+        # en.json — they must never drift.
+        entry: diff -u custom_components/climate_orchestrator/strings.json custom_components/climate_orchestrator/translations/en.json
+        language: system
+        files: (strings\.json|translations/en\.json)$
+        pass_filenames: false

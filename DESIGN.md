@@ -388,14 +388,14 @@ climate_orchestrator/
 | Coverage | **pytest-cov** | Target ≥ 90% line + branch on `control/`, `sensors/`, `devices/`; gate in CI. |
 | Hooks | **pre-commit** | ruff + mypy + end-of-file/whitespace. |
 | CI | **GitHub Actions** (`.github/workflows/ci.yml`) | Installs uv + Python 3.14 via `astral-sh/setup-uv`; jobs for ruff lint+format, mypy, pytest with coverage + JUnit results (Codecov coverage and Test Analytics uploads), plus hassfest and HACS validation. |
-| HA validation | **hassfest** + **HACS action** | `home-assistant/actions/hassfest` validates the manifest/structure; `hacs/action` validates HACS packaging. hassfest is advisory until green (it treats `strings.json` as the translation source; we ship `translations/en.json`). |
+| HA validation | **hassfest** + **HACS action** | `home-assistant/actions/hassfest` validates the manifest/structure; `hacs/action` validates HACS packaging. hassfest validates `strings.json`, which is kept byte-identical to `translations/en.json` (sync-checked in CI and pre-commit); advisory until one green run confirms, then it becomes a gate. |
 
 ### 11a. Continuous integration (GitHub Actions)
 
 CI is GitHub Actions (`.github/workflows/ci.yml`), which also unlocks HACS distribution. Jobs:
 
 - **lint-and-test** — `uv sync --dev`, then `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy custom_components/climate_orchestrator`, and `uv run pytest --cov-report=xml --junitxml=junit.xml`; coverage goes to Codecov, and the JUnit file feeds **Codecov Test Analytics** (per-test run times, failure rates, flake detection — uploaded with `report_type: test_results`, even when pytest fails, since failure data is the point).
-- **hassfest** — `home-assistant/actions/hassfest` (advisory via `continue-on-error` until a green run is confirmed, since hassfest expects `strings.json`).
+- **hassfest** — `home-assistant/actions/hassfest` (advisory via `continue-on-error` until one green run with the synced `strings.json` is confirmed).
 - **hacs** — `hacs/action` with `category: integration` (and `ignore: brands` until the logo is submitted to `home-assistant/brands`).
 
 uv (with Python 3.14, HA's runtime) is installed via `astral-sh/setup-uv`.

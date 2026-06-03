@@ -27,6 +27,12 @@ jobs:
       - name: Spell check (codespell)
         # Same pinned hook + [tool.codespell] settings as local pre-commit.
         run: uvx pre-commit run codespell --all-files --show-diff-on-failure
+      - name: strings.json in sync with translations/en.json
+        # strings.json is the hassfest-validated translation source; en.json is
+        # what HA serves at runtime. They are byte-identical copies by policy.
+        run: >-
+          diff -u custom_components/climate_orchestrator/strings.json
+          custom_components/climate_orchestrator/translations/en.json
       - name: mypy
         run: uv run mypy custom_components/climate_orchestrator
       - name: pytest (with coverage + JUnit results)
@@ -57,8 +63,9 @@ jobs:
   hassfest:
     name: hassfest (HA manifest/structure validation)
     runs-on: ubuntu-latest
-    # Advisory until a green run is confirmed: hassfest treats strings.json as
-    # the translation source, while we ship translations/en.json.
+    # strings.json is now maintained in lock-step with translations/en.json
+    # (sync-checked in lint-and-test). Advisory until one green run confirms
+    # hassfest passes — then drop this line to make it a real gate.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6
