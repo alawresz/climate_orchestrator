@@ -1,5 +1,11 @@
 # Climate Orchestrator
 
+[![CI](https://github.com/alawresz/climate_orchestrator/actions/workflows/ci.yml/badge.svg)](https://github.com/alawresz/climate_orchestrator/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/alawresz/climate_orchestrator?include_prereleases&sort=semver)](https://github.com/alawresz/climate_orchestrator/releases)
+[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![License: MIT](https://img.shields.io/github/license/alawresz/climate_orchestrator)](./LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 One thermostat for the whole house. Instead of controlling each radiator valve
 and air conditioner separately, you set a comfortable temperature range once and
 Climate Orchestrator drives every device to keep each room inside it — heating cold
@@ -52,9 +58,11 @@ and what every control is for. For the architecture and the maths, see
 
 ### Via HACS (recommended)
 
-1. In HACS → **⋮ → Custom repositories**, add
-   `https://github.com/alawresz/climate_orchestrator` with category
-   **Integration**.
+[![Open your Home Assistant instance and add this repository to HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=alawresz&repository=climate_orchestrator&category=integration)
+
+1. Click the button above (it opens HACS with this repository pre-filled), or add
+   it manually in HACS → **⋮ → Custom repositories**:
+   `https://github.com/alawresz/climate_orchestrator`, category **Integration**.
 2. Search for **Climate Orchestrator** in HACS, download it, then **fully
    restart** Home Assistant.
 3. **Settings → Devices & Services → Add Integration → "Climate Orchestrator"**.
