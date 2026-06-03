@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v0.13.0 (2026-06-03)
+
+### Features
+
+- Replace degraded binary sensor with status sensor for improved diagnostics and post-restart
+  warm-up handling
+  ([`129b962`](https://github.com/alawresz/climate_orchestrator/commit/129b962497fc951fe5a745c456b449a04ba038b1))
+
+### Testing
+
+- Add unit tests for status sensor behavior during warm-up and degraded states
+  ([`7651565`](https://github.com/alawresz/climate_orchestrator/commit/76515654c567b092888c2aa25afa93b713e7fb0c))
+
+
 ## v0.12.1 (2026-06-03)
 
 ### Bug Fixes
