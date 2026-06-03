@@ -158,7 +158,7 @@ async def test_mpc_learning_status_ready_with_enough_history(
         controller.history.append(
             Sample(dt=1.0, temp=20.0, next_temp=20.1, valve=0.5, outdoor=5.0)
         )
-    coordinator._mpc[TRV_ENTITY] = controller
+    coordinator._runtime(TRV_ENTITY).mpc = controller
 
     await coordinator.async_refresh()
     await hass.async_block_till_done()

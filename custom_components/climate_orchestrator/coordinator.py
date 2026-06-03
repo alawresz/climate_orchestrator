@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
-from dataclasses import replace
+from dataclasses import dataclass, field, replace
 from datetime import timedelta
 import logging
 import time
@@ -128,6 +128,37 @@ _LOGGER = logging.getLogger(__name__)
 type SmartClimateConfigEntry = ConfigEntry["SmartClimateCoordinator"]
 
 
+@dataclass(slots=True)
+class DeviceRuntime:
+    """All mutable runtime state of one managed device, in one place.
+
+    One instance per managed entity, created on first touch via
+    ``SmartClimateCoordinator._runtime`` — so per-device init and cleanup are
+    atomic instead of being scattered across parallel dicts.
+    """
+
+    demand: Demand = Demand.IDLE
+    """Latched hysteresis demand (persisted across restarts)."""
+
+    command: DeviceCommand | None = None
+    """Last command actually sent (diagnostics sensors)."""
+
+    ac_setpoint: AcSetpoint | None = None
+    """Last written AC cooling setpoint, for write throttling."""
+
+    run_samples: deque[RuntimeSample] = field(default_factory=deque)
+    """Trailing (monotonic, running?) samples for the cycle/runtime counters."""
+
+    mpc: MpcController | None = None
+    """Learned MPC controller (TRVs in mpc calibration mode)."""
+
+    valve: float | None = None
+    """Last commanded valve fraction (0..1) in MPC mode."""
+
+    ac_bias_integral: float = 0.0
+    """Integral accumulator for the self-tuning AC setpoint bias."""
+
+
 class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     """Coordinate sensor resolution and (later) control for the whole home."""
 
@@ -147,18 +178,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         # transient startup gaps don't raise repairs (DESIGN.md §6.4).
         self._started = time.monotonic()
         self._ever_ready = False
-        # Latched per-device demand (for hysteresis) and the latest decisions.
-        self._last_demand: dict[str, Demand] = {}
+        # All mutable per-device state, one DeviceRuntime per managed entity.
+        self._devices: dict[str, DeviceRuntime] = {}
+        # The last cycle's decisions, replaced wholesale every control run (so
+        # a removed device's decision doesn't linger in reasons/diagnostics).
         self.last_decisions: dict[str, DeviceDecision] = {}
-        # Last command actually sent per device (for the diagnostics sensors).
-        self._last_command: dict[str, DeviceCommand] = {}
-        # Last written AC cooling setpoint + monotonic timestamp, for throttling.
-        self._ac_setpoint: dict[str, AcSetpoint] = {}
-        # Trailing (monotonic, running?) samples per device for cycle/runtime.
-        self._run_samples: dict[str, deque[RuntimeSample]] = {}
-        # Per-TRV MPC controllers, last commanded valve fraction, and timing.
-        self._mpc: dict[str, MpcController] = {}
-        self._last_valve: dict[str, float] = {}
         self._last_cycle: float | None = None
         # Per-area monotonic timestamp of when its window most recently opened,
         # plus a one-shot timer to re-run control when the grace delay expires.
@@ -167,8 +191,6 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         # Trailing (time, home-avg-temp) samples and the latest slope (K/min).
         self._temp_samples: deque[tuple[float, float]] = deque()
         self._temp_slope: float | None = None
-        # Per-AC integral accumulator for the adaptive setpoint bias.
-        self._ac_bias_integral: dict[str, float] = {}
         # Valve-maintenance bookkeeping (wall-clock epoch of the last run).
         self._maintenance_running = False
         self._last_maintenance: float | None = None
@@ -186,12 +208,17 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             hass, _MPC_STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.maintenance"
         )
 
+    @callback
+    def _runtime(self, entity_id: str) -> DeviceRuntime:
+        """Return the device's mutable runtime state, created on first touch."""
+        return self._devices.setdefault(entity_id, DeviceRuntime())
+
     async def async_load_mpc(self) -> None:
         """Restore persisted MPC + maintenance state (call before first refresh)."""
         data = await self._mpc_store.async_load()
         if data:
             for trv_id, payload in data.items():
-                self._mpc[trv_id] = MpcController.from_dict(payload)
+                self._runtime(trv_id).mpc = MpcController.from_dict(payload)
         maint = await self._maint_store.async_load()
         if maint:
             if isinstance(maint.get("last"), int | float):
@@ -199,30 +226,32 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             if isinstance(maint.get("rmot"), int | float):
                 self._rmot = float(maint["rmot"])
             if isinstance(integral := maint.get("ac_bias_integral"), dict):
-                self._ac_bias_integral = {
-                    k: float(v)
-                    for k, v in integral.items()
-                    if isinstance(v, int | float)
-                }
+                for k, v in integral.items():
+                    if isinstance(v, int | float):
+                        self._runtime(k).ac_bias_integral = float(v)
             if isinstance(demand := maint.get("last_demand"), dict):
                 valid = {d.value for d in Demand}
-                self._last_demand = {
-                    k: Demand(v) for k, v in demand.items() if v in valid
-                }
+                for k, v in demand.items():
+                    if v in valid:
+                        self._runtime(k).demand = Demand(v)
 
     @callback
     def _state_persist_data(self) -> dict[str, Any]:
         return {
             "last": self._last_maintenance,
             "rmot": self._rmot,
-            "ac_bias_integral": dict(self._ac_bias_integral),
-            "last_demand": {k: d.value for k, d in self._last_demand.items()},
+            "ac_bias_integral": {
+                k: rt.ac_bias_integral for k, rt in self._devices.items()
+            },
+            "last_demand": {k: rt.demand.value for k, rt in self._devices.items()},
         }
 
     @callback
     def _mpc_persist_data(self) -> dict[str, Any]:
         return {
-            trv_id: controller.to_dict() for trv_id, controller in self._mpc.items()
+            trv_id: controller.to_dict()
+            for trv_id, rt in self._devices.items()
+            if (controller := rt.mpc) is not None
         }
 
     @property
@@ -368,7 +397,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     @callback
     def mpc_state(self, trv_id: str) -> MpcController | None:
         """Return the MPC controller learned for a TRV, if any (diagnostics)."""
-        return self._mpc.get(trv_id)
+        runtime = self._devices.get(trv_id)
+        return runtime.mpc if runtime else None
 
     @callback
     def mpc_diagnostics(self) -> dict[str, dict[str, float | int]]:
@@ -379,7 +409,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                 "loss": controller.params.loss,
                 "samples": len(controller.history),
             }
-            for trv_id, controller in self._mpc.items()
+            for trv_id, rt in self._devices.items()
+            if (controller := rt.mpc) is not None
         }
 
     @callback
@@ -475,7 +506,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             if settings.calibration_mode == CALIBRATION_MPC:
                 number = find_related_number(self.hass, entity_id, self.valve_hints)
                 if number is not None:
-                    self._last_valve[entity_id] = 0.0
+                    self._runtime(entity_id).valve = 0.0
                     return [self._set_number(number, 0.0)]
             return []
 
@@ -485,10 +516,13 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             if number is None or area_temp is None:
                 return []
             ambient = outdoor if outdoor is not None else area_temp
-            controller = self._mpc.setdefault(entity_id, MpcController())
+            runtime = self._runtime(entity_id)
+            if runtime.mpc is None:
+                runtime.mpc = MpcController()
+            controller = runtime.mpc
             controller.observe(
                 temp=area_temp,
-                valve=self._last_valve.get(entity_id, 0.0),
+                valve=0.0 if runtime.valve is None else runtime.valve,
                 outdoor=ambient,
                 dt=dt_min,
             )
@@ -515,7 +549,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                         horizon=len(series),
                     ),
                 )
-            self._last_valve[entity_id] = pct / 100.0
+            runtime.valve = pct / 100.0
             return [self._set_number(number, pct)]
 
         if settings.calibration_mode == CALIBRATION_OFFSET:
@@ -797,7 +831,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         cutoff = now - RUNTIME_WINDOW_SECONDS
         for entity_id, decision in decisions.items():
             running = decision.demand in (Demand.HEAT, Demand.COOL)
-            samples = self._run_samples.setdefault(entity_id, deque())
+            samples = self._runtime(entity_id).run_samples
             samples.append(RuntimeSample(at=now, running=running))
             # Keep one sample before the cutoff so the integral spans the edge.
             while len(samples) > 1 and samples[1].at < cutoff:
@@ -824,7 +858,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     @callback
     def device_command_attrs(self, entity_id: str) -> dict[str, str | float | None]:
         """Return the last command sent to a device (mode + setpoint)."""
-        command = self._last_command.get(entity_id)
+        runtime = self._devices.get(entity_id)
+        command = runtime.command if runtime else None
         if command is None:
             return {}
         return {
@@ -835,13 +870,15 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     @callback
     def valve_position(self, entity_id: str) -> float | None:
         """Last commanded valve opening (%) for a TRV in MPC mode, else None."""
-        valve = self._last_valve.get(entity_id)
+        runtime = self._devices.get(entity_id)
+        valve = runtime.valve if runtime else None
         return None if valve is None else round(valve * 100.0, 1)
 
     @callback
     def device_runtime_fraction(self, entity_id: str) -> float | None:
         """Fraction of the trailing window the device was running (0..1)."""
-        samples = self._run_samples.get(entity_id)
+        runtime = self._devices.get(entity_id)
+        samples = runtime.run_samples if runtime else None
         if not samples:
             return None
         now = time.monotonic()
@@ -861,7 +898,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     @callback
     def device_cycles_per_hour(self, entity_id: str) -> float | None:
         """Off->on starts per hour over the trailing window."""
-        samples = self._run_samples.get(entity_id)
+        runtime = self._devices.get(entity_id)
+        samples = runtime.run_samples if runtime else None
         if not samples or len(samples) < 2:
             return None
         now = time.monotonic()
@@ -908,7 +946,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if kind is not DeviceKind.COOLER or not settings.self_tuning_ac_bias:
             return base
 
-        integral = self._ac_bias_integral.get(entity_id, 0.0)
+        runtime = self._runtime(entity_id)
+        integral = runtime.ac_bias_integral
         max_add = max(0.0, settings.ac_setpoint_bias_max - base)
         bias = effective_bias(base, integral, settings.ac_setpoint_bias_max)
 
@@ -916,7 +955,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if room is None:
             room = self.data.home_avg_temperature if self.data else None
         if room is not None:
-            self._ac_bias_integral[entity_id] = update_bias_integral(
+            runtime.ac_bias_integral = update_bias_integral(
                 integral,
                 error=room - band.cool_target(settings.tolerance),
                 dt_min=dt_min,
@@ -937,10 +976,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         cooling run writes fresh). A cooling command may have its setpoint
         replaced with the previously written value per ``throttle_setpoint``.
         """
+        runtime = self._runtime(entity_id)
         if command.hvac_mode is not Mode.COOL or command.target_temp is None:
-            self._ac_setpoint.pop(entity_id, None)
+            runtime.ac_setpoint = None
             return command
-        prev = self._ac_setpoint.get(entity_id)
+        prev = runtime.ac_setpoint
         value, ts = throttle_setpoint(
             prev.value if prev else None,
             prev.written_at if prev else None,
@@ -950,7 +990,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             min_interval_s=AC_SETPOINT_MIN_INTERVAL_SECONDS,
             keepalive_s=AC_SETPOINT_KEEPALIVE_SECONDS,
         )
-        self._ac_setpoint[entity_id] = AcSetpoint(value=value, written_at=ts)
+        runtime.ac_setpoint = AcSetpoint(value=value, written_at=ts)
         if value != command.target_temp:
             return replace(command, target_temp=value)
         return command
@@ -1008,6 +1048,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             if reading is None:
                 continue
             kind = DeviceKind.HEATER if entity_id in trvs else DeviceKind.COOLER
+            runtime = self._runtime(entity_id)
             decision = decide(
                 DeviceInput(
                     key=entity_id,
@@ -1017,7 +1058,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                     local_humidity=reading.area_humidity,
                     window_open=window_state.get(entity_id, False),
                     other_window_open=any(a != reading.area_id for a in open_areas),
-                    previous=self._last_demand.get(entity_id, Demand.IDLE),
+                    previous=runtime.demand,
                     offset=area_band_offset(
                         self.hass, self.entry.entry_id, reading.area_id
                     ),
@@ -1025,7 +1066,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                 global_input,
             )
             decisions[entity_id] = decision
-            self._last_demand[entity_id] = decision.demand
+            runtime.demand = decision.demand
             if not reading.available:
                 continue  # excluded this cycle, but its latch is preserved
             adapter = ClimateAdapter(self.hass, entity_id)
@@ -1042,7 +1083,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                 room_temp=self._room_effective(reading, settings, data),
             )
             command = self._throttle_ac_setpoint(entity_id, command)
-            self._last_command[entity_id] = command
+            runtime.command = command
             tasks.append(adapter.apply(command))
             commanded.append(entity_id)
 
@@ -1073,7 +1114,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                         entity_id,
                         result,
                     )
-        if self._mpc:
+        if any(rt.mpc is not None for rt in self._devices.values()):
             self._mpc_store.async_delay_save(self._mpc_persist_data, _MPC_SAVE_DELAY)
         self._maint_store.async_delay_save(self._state_persist_data, _MPC_SAVE_DELAY)
         self._maybe_auto_maintenance(settings, decisions)
@@ -1103,8 +1144,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         """Forget learned MPC state for some/all TRVs and re-run control."""
         targets = trv_ids or self.trv_ids
         for trv_id in targets:
-            self._mpc.pop(trv_id, None)
-            self._last_valve.pop(trv_id, None)
+            if (runtime := self._devices.get(trv_id)) is not None:
+                runtime.mpc = None
+                runtime.valve = None
         await self._mpc_store.async_save(self._mpc_persist_data())
         await self.async_request_refresh()
 
@@ -1184,6 +1226,6 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if self._window_recheck_unsub is not None:
             self._window_recheck_unsub()
             self._window_recheck_unsub = None
-        if self._mpc:
+        if any(rt.mpc is not None for rt in self._devices.values()):
             await self._mpc_store.async_save(self._mpc_persist_data())
         await super().async_shutdown()

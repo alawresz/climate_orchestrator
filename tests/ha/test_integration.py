@@ -297,7 +297,7 @@ async def test_self_tuning_ac_bias_lowers_the_setpoint(
     _, set_temp = _mock_climate_services(hass)
 
     coordinator: SmartClimateCoordinator = config_entry.runtime_data
-    coordinator._ac_bias_integral[AC_ENTITY] = 1.0  # learned extra bias
+    coordinator._runtime(AC_ENTITY).ac_bias_integral = 1.0  # learned extra bias
     hass.states.async_set(AREA_TEMP_SENSOR, "27.0")
     climate_id = entity_id_for("climate", config_entry.entry_id)
     await _drive(hass, coordinator, climate_id)

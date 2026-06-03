@@ -98,7 +98,7 @@ async def test_runtime_and_cycle_counters(
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     now = time.monotonic()
     # Over the last hour: off, on@-1800s, off@-900s, on@-600s.
-    coordinator._run_samples[TRV_ENTITY] = deque(
+    coordinator._runtime(TRV_ENTITY).run_samples = deque(
         [
             RuntimeSample(at=now - 3600.0, running=False),
             RuntimeSample(at=now - 1800.0, running=True),

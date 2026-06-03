@@ -101,7 +101,7 @@ async def test_reset_mpc_learning_service(
 ) -> None:
     """The reset service forgets the learned MPC controllers."""
     coordinator = await _setup_with_valve(hass, config_entry, living_area)
-    coordinator._mpc[TRV_ENTITY] = MpcController()
+    coordinator._runtime(TRV_ENTITY).mpc = MpcController()
 
     await hass.services.async_call(
         DOMAIN,
@@ -111,7 +111,7 @@ async def test_reset_mpc_learning_service(
     )
     await hass.async_block_till_done()
 
-    assert TRV_ENTITY not in coordinator._mpc
+    assert coordinator._runtime(TRV_ENTITY).mpc is None
 
 
 async def test_auto_valve_maintenance_runs_when_due(

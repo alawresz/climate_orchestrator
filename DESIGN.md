@@ -136,7 +136,7 @@ STAY ON until (x_local ≥ T_heat_target  AND  x_home ≥ T_heat_target)
 - `tolerance` is a configurable `number` entity (default 0.3 K). The engage-at-edge / release-past-edge gap *is* the anti-short-cycle hysteresis, so jitter at an edge can't toggle a device and a minimum on/off gap holds even for a narrow band. Capping the targets at the midpoint keeps heat/cool from fighting.
 - `release_offset` is a configurable `number` entity (default 0.5 K): a secondary early-out that stops cooling once a room has dropped near the heating regime (and vice-versa), preventing a device from dragging its room across the neutral zone.
 - The OR-to-engage / AND-to-release asymmetry makes the system eager to respond to a hot/cold room or a hot/cold house, but conservative to disengage — which suppresses short-cycling.
-- Per-device demand state is latched in coordinator state so hysteresis survives cycles.
+- Per-device demand state is latched in coordinator state so hysteresis survives cycles. All of a device's mutable bookkeeping — the demand latch, last command, AC-setpoint throttle state, MPC controller, last valve fraction, bias integral, and runtime samples — lives on a single per-device `DeviceRuntime` object (`coordinator.py`), so init and cleanup are atomic.
 
 ### 5.3 Comfort index (humidity use)
 

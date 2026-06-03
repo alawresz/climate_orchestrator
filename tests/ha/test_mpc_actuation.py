@@ -251,22 +251,22 @@ async def test_persisted_state_restored_on_load(
     """A fresh coordinator restores MPC + maintenance/rmot/bias/demand state."""
     config_entry.add_to_hass(hass)
     saver = SmartClimateCoordinator(hass, config_entry)
-    saver._mpc[TRV_ENTITY] = MpcController()
+    saver._runtime(TRV_ENTITY).mpc = MpcController()
     saver._last_maintenance = 12345.0
     saver._rmot = 18.5
-    saver._ac_bias_integral = {AC_ENTITY: 1.25}
-    saver._last_demand = {TRV_ENTITY: Demand.HEAT}
+    saver._runtime(AC_ENTITY).ac_bias_integral = 1.25
+    saver._runtime(TRV_ENTITY).demand = Demand.HEAT
     await saver._mpc_store.async_save(saver._mpc_persist_data())
     await saver._maint_store.async_save(saver._state_persist_data())
 
     fresh = SmartClimateCoordinator(hass, config_entry)
     await fresh.async_load_mpc()
 
-    assert TRV_ENTITY in fresh._mpc
+    assert fresh._runtime(TRV_ENTITY).mpc is not None
     assert fresh._last_maintenance == 12345.0
     assert fresh._rmot == 18.5
-    assert fresh._ac_bias_integral[AC_ENTITY] == 1.25
-    assert fresh._last_demand[TRV_ENTITY] is Demand.HEAT
+    assert fresh._runtime(AC_ENTITY).ac_bias_integral == 1.25
+    assert fresh._runtime(TRV_ENTITY).demand is Demand.HEAT
 
 
 async def test_mpc_fallback_without_valve_number(
