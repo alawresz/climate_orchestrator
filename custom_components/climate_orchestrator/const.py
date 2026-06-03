@@ -57,6 +57,11 @@ PRECONDITION_HORIZON_DEFAULT: Final = 2.0  # hours
 PRECONDITION_FORECAST_REFRESH_SECONDS: Final = 900.0
 PRECONDITION_MAX_STEPS: Final = 600
 
+# A single control-cycle failure is contained by design (logged, retried next
+# cycle). This many *consecutive* failures means devices are no longer being
+# commanded at all — surface a repair instead of failing silently in the log.
+CONTROL_FAILURE_ISSUE_THRESHOLD: Final = 3
+
 # Post-restart warm-up window. Until a managed device first reports a usable
 # temperature, the orchestrator reports ``initializing`` for this long and holds
 # back transient repairs (no temperature source, stale sensor) — sensors often

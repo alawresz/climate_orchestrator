@@ -56,6 +56,7 @@ from .const import (
     CONF_TRVS,
     CONF_VALVE_HINTS,
     CONF_WEATHER_ENTITY,
+    CONTROL_FAILURE_ISSUE_THRESHOLD,
     DEFAULT_PRESET,
     DEFAULT_PRESETS,
     DOMAIN,
@@ -178,6 +179,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         # transient startup gaps don't raise repairs (DESIGN.md §6.4).
         self._started = time.monotonic()
         self._ever_ready = False
+        # Consecutive control-cycle failures (drives the repair issue).
+        self._control_failures = 0
         # All mutable per-device state, one DeviceRuntime per managed entity.
         self._devices: dict[str, DeviceRuntime] = {}
         # The last cycle's decisions, replaced wholesale every control run (so
@@ -324,11 +327,25 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         data = replace(data, status=self._compute_status(data))
         self._update_temp_slope(data.home_avg_temperature)
         self._ensure_subscription(data.tracked_entities)
-        # Actuation must never break the read-only snapshot/update.
+        # Actuation must never break the read-only snapshot/update — but a
+        # *repeatedly* failing control loop must not stay silent in the log
+        # either: count consecutive failures and raise a repair past the
+        # threshold, cleared by the next clean cycle.
         try:
             await self._async_control(data)
         except Exception:
-            _LOGGER.exception("climate_orchestrator: control cycle failed")
+            self._control_failures += 1
+            _LOGGER.exception(
+                "climate_orchestrator: control cycle failed (%d consecutive)",
+                self._control_failures,
+            )
+        else:
+            self._control_failures = 0
+        self._toggle_issue(
+            "control_loop_failing",
+            self._control_failures >= CONTROL_FAILURE_ISSUE_THRESHOLD,
+            "control_loop_failing",
+        )
         return data
 
     # --- Control / actuation -------------------------------------------------

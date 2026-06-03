@@ -471,6 +471,9 @@ Developer Tools → Actions (target the whole-home `climate` entity):
   no temperature source) are transient right after a Home Assistant restart, so
   while the **Status** sensor reads `initializing` they're held back — they only
   surface once the warm-up window has elapsed and the gap is therefore real.
+  A separate notice appears if the control cycle itself fails several times in
+  a row — devices stop receiving fresh commands while readings continue — and
+  clears on the next successful cycle.
 - Learned state (MPC models, the adaptive bias, the running-mean outdoor
   temperature, and the per-device demand latch) is persisted, so a restart resumes
   where it left off.

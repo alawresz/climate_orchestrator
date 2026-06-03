@@ -7,9 +7,13 @@ from collections.abc import Callable
 from homeassistant.const import ATTR_ENTITY_ID, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.climate_orchestrator.const import DOMAIN
+from custom_components.climate_orchestrator.const import (
+    CONTROL_FAILURE_ISSUE_THRESHOLD,
+    DOMAIN,
+)
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, AREA_HUMIDITY_SENSOR, AREA_TEMP_SENSOR, TRV_ENTITY
 
@@ -95,3 +99,31 @@ async def test_no_temperature_source_raises_issue(
     await _refresh(hass, init_integration)
 
     assert registry.async_get_issue(DOMAIN, "no_temperature_source") is not None
+
+
+async def test_repeated_control_failures_raise_and_clear(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A repeatedly failing control cycle raises a repair; success clears it."""
+    registry = ir.async_get(hass)
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+
+    async def _boom(data: object) -> None:
+        raise RuntimeError
+
+    monkeypatch.setattr(coordinator, "_async_control", _boom)
+    # One failure short of the threshold: contained, no repair yet.
+    for _ in range(CONTROL_FAILURE_ISSUE_THRESHOLD - 1):
+        await _refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, "control_loop_failing") is None
+
+    # The threshold-th consecutive failure surfaces the repair.
+    await _refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, "control_loop_failing") is not None
+
+    # The next clean cycle clears it (and resets the counter).
+    monkeypatch.undo()
+    await _refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, "control_loop_failing") is None
