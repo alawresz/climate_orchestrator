@@ -1,0 +1,55 @@
+# Dependabot keeps the three version surfaces current: the uv-managed Python
+# tooling (pyproject.toml + uv.lock), the GitHub Actions in the workflows, and
+# the pre-commit hook revs.
+#
+# Grouping: minor + patch updates are batched into one PR per ecosystem per week
+# to keep noise down; major updates get their own PR each so a potentially
+# breaking bump can be reviewed in isolation.
+#
+# All updates here are dev/CI tooling (the only shipped runtime dep, scipy, lives
+# in manifest.json, which Dependabot doesn't manage), so they use a `chore`
+# commit prefix: python-semantic-release only bumps the release on `feat:`/`fix:`
+# commits, so a `chore(deps):` merge to main never cuts a release. (Dependabot's
+# own branches aren't `feat/**`/`fix/**` either, so the release workflow stays
+# off them.)
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore"
+    groups:
+      github-actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+    groups:
+      python-tooling:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore"
+    groups:
+      pre-commit:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
