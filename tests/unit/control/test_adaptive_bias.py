@@ -87,3 +87,13 @@ def test_bias_accumulates_onto_existing_integral() -> None:
         )
         == 1.1
     )
+
+
+def test_bias_decay_multiplies_the_integral() -> None:
+    """Decay scales the existing integral (0.8 -> 0.4), not a fixed reset."""
+    assert (
+        update_bias_integral(
+            0.8, error=0.0, dt_min=1.0, ki=0.1, max_add=2.0, cooling=False
+        )
+        == 0.4
+    )

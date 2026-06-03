@@ -293,3 +293,21 @@ def test_dew_point_guard_is_strictly_above_threshold() -> None:
     decision = decide(device, _global(dew_point_threshold=threshold - 1.0))
     assert decision.dry_mode is True
     assert decision.key == "ac"
+
+
+def test_master_off_decision_fields() -> None:
+    decision = decide(_heater(local_temp=18.0), _global(master_off=True))
+    assert decision.demand is Demand.IDLE
+    assert decision.reason == "master_off"
+
+
+def test_unavailable_decision_fields() -> None:
+    decision = decide(_heater(local_temp=18.0, available=False), _global())
+    assert decision.demand is Demand.IDLE
+    assert decision.reason == "unavailable"
+
+
+def test_home_fallback_respects_use_comfort_off() -> None:
+    """With comfort off, a humid home average stays dry-bulb (no cool call)."""
+    g = _global(home_temp=24.0, home_humidity=90.0)  # use_comfort defaults False
+    assert decide(_cooler(local_temp=None), g).demand is Demand.IDLE

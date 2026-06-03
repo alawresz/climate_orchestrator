@@ -65,3 +65,10 @@ def test_expand_forecast_interpolates_across_later_hours() -> None:
         25.0,
         30.0,
     ]
+
+
+def test_expand_forecast_subminute_steps() -> None:
+    """Step sizes in (0, 1] minutes are valid, not treated as disabled."""
+    series = expand_forecast([10.0, 20.0], 0.5, 2)
+    assert series[0] == 10.0
+    assert series[1] == pytest.approx(10.0833333, abs=1e-6)

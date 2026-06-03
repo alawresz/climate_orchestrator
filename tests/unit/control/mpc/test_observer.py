@@ -51,3 +51,15 @@ def test_kalman_update_gain_and_variance() -> None:
     # gain = 0.04 / (0.04 + 0.04) = 0.5
     assert out.temp == pytest.approx(20.5, abs=1e-12)
     assert out.variance == pytest.approx(0.02, abs=1e-12)
+
+
+def test_kalman_predict_variance_scales_quadratically() -> None:
+    """Variance propagates as jac * var * jac (visible when var != 1)."""
+    out = predict(
+        KalmanState(temp=20.0, variance=0.5),
+        valve=0.0,
+        outdoor=20.0,
+        params=ThermalParams(gain=0.1, loss=0.01),
+        dt=1.0,
+    )
+    assert out.variance == pytest.approx(0.50005, abs=1e-12)

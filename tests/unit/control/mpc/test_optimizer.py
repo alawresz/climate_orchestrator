@@ -63,3 +63,13 @@ def test_optimizer_holds_forecast_tail_value() -> None:
     warm_held = optimize_valve(19.0, 21.0, 25.0, _P, dt=5.0, horizon=6)
     cold_tail = optimize_valve(19.0, 21.0, [25.0, 5.0], _P, dt=5.0, horizon=6)
     assert cold_tail > warm_held + 0.3
+
+
+def test_short_series_equals_explicitly_held_tail() -> None:
+    """Holding the LAST value is exactly equivalent to spelling the tail out."""
+    short = optimize_valve(20.5, 21.0, [25.0, 5.0], _P, dt=5.0, horizon=6)
+    explicit = optimize_valve(
+        20.5, 21.0, [25.0, 5.0, 5.0, 5.0, 5.0, 5.0], _P, dt=5.0, horizon=6
+    )
+    assert short == pytest.approx(explicit, abs=1e-9)
+    assert short > 0.9  # the cold tail demands heat; a warm hold would not
