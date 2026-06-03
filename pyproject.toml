@@ -1,6 +1,6 @@
 [project]
 name = "climate-orchestrator"
-version = "0.15.0"
+version = "0.16.0"
 description = "Climate Orchestrator — whole-home climate orchestration for Home Assistant"
 readme = "README.md"
 requires-python = ">=3.13"

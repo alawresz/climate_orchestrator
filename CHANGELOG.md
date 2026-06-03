@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v0.16.0 (2026-06-03)
+
+### Bug Fixes
+
+- Improve forecast parsing robustness by adding strict type checks for response handling
+  ([`9f17e24`](https://github.com/alawresz/climate_orchestrator/commit/9f17e24f4b2da892a7eb8af1e4e07cf7f8a5c8b0))
+
+### Documentation
+
+- Update README and DESIGN.md to reflect recent features and improvements
+  ([`a9d41cc`](https://github.com/alawresz/climate_orchestrator/commit/a9d41cc5e53222c441d57e7d32b2c8b51f43ff55))
+
+### Features
+
+- Add forecast-based preconditioning for MPC TRVs; fetch hourly weather forecasts and optimize valve
+  control to pre-heat ahead of cold spells; update docs, settings, and tests
+  ([`7e1da1a`](https://github.com/alawresz/climate_orchestrator/commit/7e1da1ac6ba24bf69f7101e3e21e8c09a557767b))
+
+
 ## v0.15.0 (2026-06-03)
 
 ### Features
