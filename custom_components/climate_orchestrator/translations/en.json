@@ -8,7 +8,7 @@
           "trvs": "Radiator valves (TRVs)",
           "acs": "Air conditioners",
           "outdoor_sensor": "Outdoor temperature sensor (optional)",
-          "weather_entity": "Weather entity (optional, fallback outdoor source)",
+          "weather_entity": "Weather entity (optional, for forecast preconditioning)",
           "valve_opening_hints": "TRV valve-opening number name hints (comma-separated)",
           "calibration_hints": "TRV local-calibration number name hints (comma-separated)"
         }
@@ -30,7 +30,7 @@
           "trvs": "Radiator valves (TRVs)",
           "acs": "Air conditioners",
           "outdoor_sensor": "Outdoor temperature sensor (optional)",
-          "weather_entity": "Weather entity (optional, fallback outdoor source)",
+          "weather_entity": "Weather entity (optional, for forecast preconditioning)",
           "valve_opening_hints": "TRV valve-opening number name hints (comma-separated)",
           "calibration_hints": "TRV local-calibration number name hints (comma-separated)"
         }
@@ -127,6 +127,7 @@
       "window_open_delay": { "name": "Window open delay" },
       "valve_maintenance_interval": { "name": "Valve maintenance interval" },
       "sensor_max_age": { "name": "Sensor staleness timeout" },
+      "preconditioning_horizon": { "name": "Preconditioning look-ahead" },
       "preset_away_heat": { "name": "Preset Away heat setpoint" },
       "preset_away_cool": { "name": "Preset Away cool setpoint" },
       "preset_home_heat": { "name": "Preset Home heat setpoint" },
@@ -144,7 +145,8 @@
       "ac_heating_assist": { "name": "AC heating assist" },
       "self_tuning_ac_bias": { "name": "Self-tuning AC bias" },
       "auto_valve_maintenance": { "name": "Automatic valve maintenance" },
-      "adaptive_cooling_comfort": { "name": "Adaptive cooling comfort" }
+      "adaptive_cooling_comfort": { "name": "Adaptive cooling comfort" },
+      "forecast_preconditioning": { "name": "Forecast preconditioning" }
     },
     "select": {
       "calibration_mode": {
@@ -177,6 +179,10 @@
     "inverted_band": {
       "title": "Climate Orchestrator: comfort band inverted",
       "description": "The active comfort band has its cool setpoint *below* its heat setpoint, leaving no neutral zone — the system will heat below the cool edge and cool above it, running almost constantly. Check the active preset's heat/cool setpoints (the heat setpoint should be the lower of the two)."
+    },
+    "weather_forecast_missing": {
+      "title": "Climate Orchestrator: weather entity needed",
+      "description": "Forecast preconditioning is enabled, but no weather entity is configured, so there's no forecast to plan against and the feature does nothing. Add a weather entity in the integration's Configure dialog, or turn Forecast preconditioning off."
     }
   },
   "services": {

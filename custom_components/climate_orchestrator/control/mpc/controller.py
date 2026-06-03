@@ -8,6 +8,7 @@ learned state is serialisable so it survives restarts (DESIGN.md §9, §13). Pur
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Sequence
 from dataclasses import asdict
 import math
 from typing import Any
@@ -60,12 +61,16 @@ class MpcController:
         *,
         temp: float,
         target: float,
-        outdoor: float,
+        outdoor: float | Sequence[float],
         dt: float,
         horizon: int = DEFAULT_HORIZON,
         max_opening_pct: float = 100.0,
     ) -> float:
-        """Return the optimal valve opening as a percentage in [0, max]."""
+        """Return the optimal valve opening as a percentage in [0, max].
+
+        ``outdoor`` may be a constant or a per-step forecast series (for
+        forecast-based preconditioning over a longer ``horizon``).
+        """
         valve = optimize_valve(
             temp,
             target,
