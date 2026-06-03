@@ -6,7 +6,10 @@ import math
 
 import pytest
 
-from custom_components.climate_orchestrator.control.mpc.controller import MpcController
+from custom_components.climate_orchestrator.control.mpc.controller import (
+    MpcController,
+    preconditioned_valve_pct,
+)
 from custom_components.climate_orchestrator.control.mpc.model import (
     Sample,
     ThermalParams,
@@ -116,4 +119,45 @@ def test_fit_rmse_exact_value() -> None:
         temp += d
     assert c.fit_rmse() == pytest.approx(
         math.sqrt(sum(d * d for d in deltas) / 6), abs=1e-9
+    )
+
+
+# --- preconditioned_valve_pct: forecast overlay can only raise the valve ----
+
+
+def _params_controller() -> MpcController:
+    return MpcController(ThermalParams(gain=0.1, loss=0.01))
+
+
+def test_precondition_none_passes_base_through() -> None:
+    ctrl = _params_controller()
+    base = ctrl.compute_valve_pct(temp=20.5, target=21.0, outdoor=25.0, dt=5.0)
+    assert (
+        preconditioned_valve_pct(
+            ctrl, temp=20.5, target=21.0, outdoor=25.0, series=None, dt=5.0
+        )
+        == base
+        == 0.0
+    )
+
+
+def test_precondition_cold_forecast_raises_valve() -> None:
+    """Warm now (valve shut), cold spell coming -> pre-heat at full opening."""
+    ctrl = _params_controller()
+    assert (
+        preconditioned_valve_pct(
+            ctrl, temp=20.5, target=21.0, outdoor=25.0, series=[5.0] * 6, dt=5.0
+        )
+        == 100.0
+    )
+
+
+def test_precondition_warm_forecast_never_lowers_valve() -> None:
+    """Cold now (full heat), warm spell coming -> the present still wins."""
+    ctrl = _params_controller()
+    assert (
+        preconditioned_valve_pct(
+            ctrl, temp=20.5, target=21.0, outdoor=5.0, series=[25.0] * 6, dt=5.0
+        )
+        == 100.0
     )

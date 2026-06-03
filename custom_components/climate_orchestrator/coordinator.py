@@ -86,7 +86,7 @@ from .control.engine import (
 )
 from .control.forecast import expand_forecast
 from .control.hysteresis import Demand
-from .control.mpc.controller import MpcController
+from .control.mpc.controller import MpcController, preconditioned_valve_pct
 from .control.numeric import clamp
 from .control.slope import temperature_slope_per_min
 from .control.throttle import throttle_setpoint
@@ -160,6 +160,22 @@ class DeviceRuntime:
 
     ac_bias_integral: float = 0.0
     """Integral accumulator for the self-tuning AC setpoint bias."""
+
+
+@dataclass(frozen=True, slots=True)
+class CycleContext:
+    """Everything one control cycle resolves once and shares across devices.
+
+    Bundling these kills the 7-8 positional-argument signatures previously
+    threaded through the per-device helpers (same-typed adjacent floats are
+    exactly the swap-bug class neither mypy nor tests reliably catch).
+    """
+
+    settings: RuntimeSettings
+    band: Band
+    outdoor: float | None
+    dt_min: float
+    data: SmartClimateData
 
 
 class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
@@ -521,79 +537,75 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         entity_id: str,
         decision: DeviceDecision,
         reading: DeviceReading,
-        settings: RuntimeSettings,
-        band: Band,
-        outdoor: float | None,
-        dt_min: float,
+        ctx: CycleContext,
         adapter: ClimateAdapter,
     ) -> list[Coroutine[Any, Any, None]]:
-        """Extra MPC/offset writes for a TRV.
+        """Extra MPC/offset writes for a TRV (dispatch by calibration mode).
 
-        While heating, MPC drives the valve opening and offset mode corrects the
-        local calibration. When *not* heating in MPC mode the valve is driven
-        fully shut — otherwise it would linger at its last commanded opening
-        (a common cause of a TRV that "stays open" and keeps heating).
+        While heating, MPC drives the valve opening and offset mode corrects
+        the local calibration. When *not* heating in MPC mode the valve is
+        driven fully shut — otherwise it would linger at its last commanded
+        opening (a common cause of a TRV that "stays open" and keeps heating).
         """
-        area_temp = reading.area_temperature
         if decision.demand is not Demand.HEAT:
-            if settings.calibration_mode == CALIBRATION_MPC:
-                number = find_related_number(self.hass, entity_id, self.valve_hints)
-                if number is not None:
-                    self._runtime(entity_id).valve = 0.0
-                    return [self._set_number(number, 0.0)]
-            return []
-
-        if settings.calibration_mode == CALIBRATION_MPC:
-            number = find_related_number(self.hass, entity_id, self.valve_hints)
-            self._calibration_issue(entity_id, "mpc", missing=number is None)
-            if number is None or area_temp is None:
-                return []
-            ambient = outdoor if outdoor is not None else area_temp
-            runtime = self._runtime(entity_id)
-            if runtime.mpc is None:
-                runtime.mpc = MpcController()
-            controller = runtime.mpc
-            controller.observe(
-                temp=area_temp,
-                valve=0.0 if runtime.valve is None else runtime.valve,
-                outdoor=ambient,
-                dt=dt_min,
-            )
-            heat_target = band.heat_target(settings.tolerance)
-            pct = controller.compute_valve_pct(
-                temp=area_temp,
-                target=heat_target,
-                outdoor=ambient,
-                dt=dt_min,
-            )
-            # Forecast preconditioning: re-optimise over the look-ahead with the
-            # outdoor forecast series and pre-heat if a cold spell is coming. It
-            # can only raise the valve (never under-heat the present), so take
-            # the larger of the two openings.
-            series = self._precondition_series(dt_min, settings)
-            if series is not None:
-                pct = max(
-                    pct,
-                    controller.compute_valve_pct(
-                        temp=area_temp,
-                        target=heat_target,
-                        outdoor=series,
-                        dt=dt_min,
-                        horizon=len(series),
-                    ),
-                )
-            runtime.valve = pct / 100.0
-            return [self._set_number(number, pct)]
-
-        if settings.calibration_mode == CALIBRATION_OFFSET:
-            number = find_related_number(self.hass, entity_id, self.calibration_hints)
-            self._calibration_issue(entity_id, "offset", missing=number is None)
-            offset = local_offset(area_temp, adapter.read().current_temp)
-            if number is None or offset is None:
-                return []
-            return [self._set_number(number, offset)]
-
+            return self._idle_valve_writes(entity_id, ctx)
+        if ctx.settings.calibration_mode == CALIBRATION_MPC:
+            return self._mpc_valve_writes(entity_id, reading.area_temperature, ctx)
+        if ctx.settings.calibration_mode == CALIBRATION_OFFSET:
+            return self._offset_writes(entity_id, reading.area_temperature, adapter)
         return []
+
+    def _idle_valve_writes(
+        self, entity_id: str, ctx: CycleContext
+    ) -> list[Coroutine[Any, Any, None]]:
+        """Drive an MPC TRV's valve fully shut while it isn't heating."""
+        if ctx.settings.calibration_mode != CALIBRATION_MPC:
+            return []
+        number = find_related_number(self.hass, entity_id, self.valve_hints)
+        if number is None:
+            return []
+        self._runtime(entity_id).valve = 0.0
+        return [self._set_number(number, 0.0)]
+
+    def _mpc_valve_writes(
+        self, entity_id: str, area_temp: float | None, ctx: CycleContext
+    ) -> list[Coroutine[Any, Any, None]]:
+        """Observe the room, optimise the valve opening, and write it."""
+        number = find_related_number(self.hass, entity_id, self.valve_hints)
+        self._calibration_issue(entity_id, "mpc", missing=number is None)
+        if number is None or area_temp is None:
+            return []
+        ambient = ctx.outdoor if ctx.outdoor is not None else area_temp
+        runtime = self._runtime(entity_id)
+        if runtime.mpc is None:
+            runtime.mpc = MpcController()
+        runtime.mpc.observe(
+            temp=area_temp,
+            valve=0.0 if runtime.valve is None else runtime.valve,
+            outdoor=ambient,
+            dt=ctx.dt_min,
+        )
+        pct = preconditioned_valve_pct(
+            runtime.mpc,
+            temp=area_temp,
+            target=ctx.band.heat_target(ctx.settings.tolerance),
+            outdoor=ambient,
+            series=self._precondition_series(ctx.dt_min, ctx.settings),
+            dt=ctx.dt_min,
+        )
+        runtime.valve = pct / 100.0
+        return [self._set_number(number, pct)]
+
+    def _offset_writes(
+        self, entity_id: str, area_temp: float | None, adapter: ClimateAdapter
+    ) -> list[Coroutine[Any, Any, None]]:
+        """Write the local-calibration offset so the TRV sees the area temp."""
+        number = find_related_number(self.hass, entity_id, self.calibration_hints)
+        self._calibration_issue(entity_id, "offset", missing=number is None)
+        offset = local_offset(area_temp, adapter.read().current_temp)
+        if number is None or offset is None:
+            return []
+        return [self._set_number(number, offset)]
 
     @callback
     def _compute_status(self, data: SmartClimateData) -> Status:
@@ -690,21 +702,21 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
     @callback
     def _room_effective(
-        self, reading: DeviceReading, settings: RuntimeSettings, data: SmartClimateData
+        self, reading: DeviceReading, ctx: CycleContext
     ) -> float | None:
         """Return the device's comfort-adjusted room temperature (area, else home)."""
-        comfort = settings.comfort_index_targeting
-        influence = settings.comfort_humidity_influence
+        comfort = ctx.settings.comfort_index_targeting
+        influence = ctx.settings.comfort_humidity_influence
         area_temp = reading.area_temperature
         if area_temp is not None:
             humidity = reading.area_humidity
             return effective_temperature(
                 area_temp, humidity, use_comfort=comfort, influence=influence
             )
-        if data.home_avg_temperature is not None:
+        if ctx.data.home_avg_temperature is not None:
             return effective_temperature(
-                data.home_avg_temperature,
-                data.home_avg_humidity,
+                ctx.data.home_avg_temperature,
+                ctx.data.home_avg_humidity,
                 use_comfort=comfort,
                 influence=influence,
             )
@@ -965,9 +977,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         kind: DeviceKind,
         decision: DeviceDecision,
         reading: DeviceReading,
-        settings: RuntimeSettings,
-        band: Band,
-        dt_min: float,
+        ctx: CycleContext,
     ) -> float:
         """Effective AC setpoint bias, adapted by integral feedback if enabled.
 
@@ -975,6 +985,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         For an AC, the bias used *this* cycle reflects the accumulated integral;
         the accumulator is then advanced for next cycle from the current error.
         """
+        settings = ctx.settings
         base = settings.ac_setpoint_bias
         if kind is not DeviceKind.COOLER or not settings.self_tuning_ac_bias:
             return base
@@ -986,12 +997,15 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
         room = reading.area_temperature
         if room is None:
-            room = self.data.home_avg_temperature if self.data else None
+            # Fall back to *this* cycle's home average (ctx.data), not the
+            # previously published self.data — the integral error should be
+            # computed against the readings the rest of the cycle acts on.
+            room = ctx.data.home_avg_temperature
         if room is not None:
             runtime.ac_bias_integral = update_bias_integral(
                 integral,
-                error=room - band.cool_target(settings.tolerance),
-                dt_min=dt_min,
+                error=room - ctx.band.cool_target(settings.tolerance),
+                dt_min=ctx.dt_min,
                 ki=ADAPTIVE_BIAS_KI,
                 max_add=max_add,
                 cooling=decision.demand is Demand.COOL,
@@ -1028,6 +1042,72 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             return replace(command, target_temp=value)
         return command
 
+    def _control_one(
+        self,
+        entity_id: str,
+        kind: DeviceKind,
+        reading: DeviceReading,
+        global_input: GlobalInput,
+        *,
+        window_open: bool,
+        other_window_open: bool,
+        ctx: CycleContext,
+    ) -> tuple[DeviceDecision, list[tuple[str, Coroutine[Any, Any, None]]]]:
+        """Decide one device and build its ``(entity_id, write)`` pairs.
+
+        Updates the device's runtime latch/last-command as a side effect.
+        Returning the writes *paired* with the entity id (instead of appending
+        to two parallel lists) keeps the failure-logging zip structurally
+        impossible to desynchronize when calibration adds extra writes.
+        """
+        runtime = self._runtime(entity_id)
+        decision = decide(
+            DeviceInput(
+                key=entity_id,
+                kind=kind,
+                available=reading.available,
+                local_temp=reading.area_temperature,
+                local_humidity=reading.area_humidity,
+                window_open=window_open,
+                other_window_open=other_window_open,
+                previous=runtime.demand,
+                offset=area_band_offset(
+                    self.hass, self.entry.entry_id, reading.area_id
+                ),
+            ),
+            global_input,
+        )
+        runtime.demand = decision.demand
+        if not reading.available:
+            return decision, []  # excluded this cycle, but its latch is preserved
+        adapter = ClimateAdapter(self.hass, entity_id)
+        command = build_command(
+            decision,
+            kind,
+            band=ctx.band,
+            ac_setpoint_bias=self._ac_bias(entity_id, kind, decision, reading, ctx),
+            caps=adapter.capabilities(),
+            tolerance=ctx.settings.tolerance,
+            device_current_temp=adapter.read().current_temp,
+            room_temp=self._room_effective(reading, ctx),
+        )
+        command = self._throttle_ac_setpoint(entity_id, command)
+        runtime.command = command
+        writes: list[tuple[str, Coroutine[Any, Any, None]]] = [
+            (entity_id, adapter.apply(command))
+        ]
+        if (
+            kind is DeviceKind.HEATER
+            and ctx.settings.calibration_mode != CALIBRATION_TARGET
+        ):
+            writes += [
+                (entity_id, coro)
+                for coro in self._calibration_writes(
+                    entity_id, decision, reading, ctx, adapter
+                )
+            ]
+        return decision, writes
+
     async def _async_control(self, data: SmartClimateData) -> None:
         """Decide per device, apply commands, and run TRV calibration."""
         settings = resolve_settings(self.hass, self.entry.entry_id)
@@ -1061,6 +1141,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             ac_heating_assist=settings.ac_heating_assist,
         )
 
+        ctx = CycleContext(
+            settings=settings, band=band, outdoor=outdoor, dt_min=dt_min, data=data
+        )
         trvs = set(self.trv_ids)
         # Debounced window-open per device, plus the set of areas with a window
         # open — so a cooler exempted via `ac_ignore_window` can ignore its own
@@ -1071,77 +1154,39 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             for eid in self.device_ids
             if (reading := data.readings.get(eid)) is not None
         }
+        # Area-less devices can't open a window for "another room": filter the
+        # None area explicitly (today window_open is only ever set per-area,
+        # but that invariant lives three files away — make it local).
         open_areas = {
-            data.readings[eid].area_id for eid, opened in window_state.items() if opened
+            area_id
+            for eid, opened in window_state.items()
+            if opened and (area_id := data.readings[eid].area_id) is not None
         }
         decisions: dict[str, DeviceDecision] = {}
-        commanded: list[str] = []
-        tasks: list[Coroutine[Any, Any, None]] = []
+        writes: list[tuple[str, Coroutine[Any, Any, None]]] = []
         for entity_id in self.device_ids:
             reading = data.readings.get(entity_id)
             if reading is None:
                 continue
-            kind = DeviceKind.HEATER if entity_id in trvs else DeviceKind.COOLER
-            runtime = self._runtime(entity_id)
-            decision = decide(
-                DeviceInput(
-                    key=entity_id,
-                    kind=kind,
-                    available=reading.available,
-                    local_temp=reading.area_temperature,
-                    local_humidity=reading.area_humidity,
-                    window_open=window_state.get(entity_id, False),
-                    other_window_open=any(a != reading.area_id for a in open_areas),
-                    previous=runtime.demand,
-                    offset=area_band_offset(
-                        self.hass, self.entry.entry_id, reading.area_id
-                    ),
-                ),
+            decision, device_writes = self._control_one(
+                entity_id,
+                DeviceKind.HEATER if entity_id in trvs else DeviceKind.COOLER,
+                reading,
                 global_input,
+                window_open=window_state.get(entity_id, False),
+                other_window_open=any(a != reading.area_id for a in open_areas),
+                ctx=ctx,
             )
             decisions[entity_id] = decision
-            runtime.demand = decision.demand
-            if not reading.available:
-                continue  # excluded this cycle, but its latch is preserved
-            adapter = ClimateAdapter(self.hass, entity_id)
-            command = build_command(
-                decision,
-                kind,
-                band=band,
-                ac_setpoint_bias=self._ac_bias(
-                    entity_id, kind, decision, reading, settings, band, dt_min
-                ),
-                caps=adapter.capabilities(),
-                tolerance=settings.tolerance,
-                device_current_temp=adapter.read().current_temp,
-                room_temp=self._room_effective(reading, settings, data),
-            )
-            command = self._throttle_ac_setpoint(entity_id, command)
-            runtime.command = command
-            tasks.append(adapter.apply(command))
-            commanded.append(entity_id)
-
-            if kind is DeviceKind.HEATER and settings.calibration_mode != (
-                CALIBRATION_TARGET
-            ):
-                for coro in self._calibration_writes(
-                    entity_id,
-                    decision,
-                    reading,
-                    settings,
-                    band,
-                    outdoor,
-                    dt_min,
-                    adapter,
-                ):
-                    tasks.append(coro)
-                    commanded.append(entity_id)
+            writes.extend(device_writes)
 
         self.last_decisions = decisions
         self._record_runtime(decisions)
-        if tasks:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for entity_id, result in zip(commanded, results, strict=True):
+        if writes:
+            results = await asyncio.gather(
+                *(coro for _, coro in writes), return_exceptions=True
+            )
+            for (entity_id, _), result in zip(writes, results, strict=True):
                 if isinstance(result, Exception):
                     _LOGGER.warning(
                         "climate_orchestrator: failed to command %s: %s",

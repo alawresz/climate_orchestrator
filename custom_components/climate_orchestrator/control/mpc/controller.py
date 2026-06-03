@@ -121,3 +121,31 @@ class MpcController:
         for sample in data.get("history", []):
             controller.history.append(Sample(**sample))
         return controller
+
+
+def preconditioned_valve_pct(
+    controller: MpcController,
+    *,
+    temp: float,
+    target: float,
+    outdoor: float,
+    series: Sequence[float] | None,
+    dt: float,
+) -> float:
+    """Valve % for now, raised (never lowered) by the forecast look-ahead.
+
+    The plain optimisation answers "how open right now"; when a forecast
+    ``series`` is available, a second optimisation over the look-ahead may ask
+    for more heat ahead of a cold spell. Taking the max guarantees
+    preconditioning can only *pre-heat* — the present is never under-heated
+    just because the future looks warm.
+    """
+    pct = controller.compute_valve_pct(temp=temp, target=target, outdoor=outdoor, dt=dt)
+    if not series:
+        return pct
+    return max(
+        pct,
+        controller.compute_valve_pct(
+            temp=temp, target=target, outdoor=series, dt=dt, horizon=len(series)
+        ),
+    )
