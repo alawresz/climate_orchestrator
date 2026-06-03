@@ -63,10 +63,6 @@ jobs:
   hassfest:
     name: hassfest (HA manifest/structure validation)
     runs-on: ubuntu-latest
-    # strings.json is now maintained in lock-step with translations/en.json
-    # (sync-checked in lint-and-test). Advisory until one green run confirms
-    # hassfest passes — then drop this line to make it a real gate.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
       - uses: home-assistant/actions/hassfest@master
