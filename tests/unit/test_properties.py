@@ -36,6 +36,7 @@ from custom_components.climate_orchestrator.control.slope import (
 from custom_components.climate_orchestrator.devices.command import build_command
 from custom_components.climate_orchestrator.devices.model import AdapterCapabilities
 from custom_components.climate_orchestrator.models import Band
+from tests.unit.control.builders import make_cooler, make_global, make_heater
 
 _temps = st.floats(min_value=-20, max_value=50, allow_nan=False, allow_infinity=False)
 _rh = st.floats(min_value=0, max_value=100, allow_nan=False, allow_infinity=False)
@@ -139,21 +140,9 @@ def test_setpoint_always_within_device_limits(
 def test_heater_never_cools_and_ac_never_heats_without_assist(
     band: Band, local: float, home: float | None, comfort: bool
 ) -> None:
-    glob = GlobalInput(
-        band=band,
-        release_offset=0.5,
-        tolerance=0.3,
-        home_temp=home,
-        use_comfort=comfort,
-    )
-    heater = decide(
-        DeviceInput(key="h", kind=DeviceKind.HEATER, available=True, local_temp=local),
-        glob,
-    )
-    cooler = decide(
-        DeviceInput(key="c", kind=DeviceKind.COOLER, available=True, local_temp=local),
-        glob,
-    )
+    glob = make_global(band=band, tolerance=0.3, home_temp=home, use_comfort=comfort)
+    heater = decide(make_heater(local_temp=local), glob)
+    cooler = decide(make_cooler(local_temp=local), glob)
     assert heater.demand is not Demand.COOL
     assert cooler.demand is not Demand.HEAT
 
@@ -176,34 +165,15 @@ def test_heat_and_cool_never_engage_together(
 ) -> None:
     """The core safety invariant: across a heater + AC, one is never heating
     while the other cools — for *any* band, including inverted/degenerate ones."""
-    glob = GlobalInput(
+    glob = make_global(
         band=band,
-        release_offset=0.5,
         tolerance=0.3,
         home_temp=home,
         use_comfort=comfort,
         ac_heating_assist=assist,
     )
-    heater = decide(
-        DeviceInput(
-            key="h",
-            kind=DeviceKind.HEATER,
-            available=True,
-            local_temp=local,
-            previous=previous,
-        ),
-        glob,
-    )
-    cooler = decide(
-        DeviceInput(
-            key="c",
-            kind=DeviceKind.COOLER,
-            available=True,
-            local_temp=local,
-            previous=previous,
-        ),
-        glob,
-    )
+    heater = decide(make_heater(local_temp=local, previous=previous), glob)
+    cooler = decide(make_cooler(local_temp=local, previous=previous), glob)
     demands = {heater.demand, cooler.demand}
     assert not (Demand.HEAT in demands and Demand.COOL in demands)
 

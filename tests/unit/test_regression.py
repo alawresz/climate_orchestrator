@@ -14,9 +14,6 @@ from custom_components.climate_orchestrator.control.comfort import (
     dew_point,
 )
 from custom_components.climate_orchestrator.control.engine import (
-    DeviceInput,
-    DeviceKind,
-    GlobalInput,
     decide,
 )
 from custom_components.climate_orchestrator.control.hysteresis import (
@@ -25,9 +22,7 @@ from custom_components.climate_orchestrator.control.hysteresis import (
 )
 from custom_components.climate_orchestrator.control.mpc.model import ThermalParams
 from custom_components.climate_orchestrator.control.mpc.optimizer import optimize_valve
-from custom_components.climate_orchestrator.models import Band
-
-BAND = Band(heat_edge=20.0, cool_edge=24.0)  # target 22.0
+from tests.unit.control.builders import BAND, make_global, make_heater
 
 
 def test_hysteresis_golden_timeline() -> None:
@@ -84,20 +79,8 @@ def test_engine_golden_heater_timeline() -> None:
     result = []
     for temp in temps:
         decision = decide(
-            DeviceInput(
-                key="trv",
-                kind=DeviceKind.HEATER,
-                available=True,
-                local_temp=temp,
-                previous=previous,
-            ),
-            GlobalInput(
-                band=BAND,
-                release_offset=0.5,
-                tolerance=0.3,
-                home_temp=temp,
-                use_comfort=False,
-            ),
+            make_heater(local_temp=temp, previous=previous),
+            make_global(home_temp=temp, tolerance=0.3),
         )
         previous = decision.demand
         result.append(decision.demand)
