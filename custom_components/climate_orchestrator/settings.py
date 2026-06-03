@@ -9,6 +9,7 @@ with a default fallback when an entity isn't present yet.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from homeassistant.const import (
     STATE_UNAVAILABLE,
@@ -181,7 +182,13 @@ SWITCH_SETTINGS: tuple[SwitchSetting, ...] = (
 
 @dataclass(frozen=True, slots=True)
 class RuntimeSettings:
-    """Resolved values of every tuning entity for one control cycle."""
+    """Resolved values of every tuning entity for one control cycle.
+
+    Field names must match the ``NUMBER_SETTINGS``/``SWITCH_SETTINGS`` keys
+    one-to-one (plus ``calibration_mode``): ``resolve_settings`` constructs
+    this directly from the registries, so a mismatch fails loudly on the
+    first control cycle — and is pinned by ``test_settings``.
+    """
 
     release_offset: float
     tolerance: float
@@ -280,40 +287,16 @@ def _switch_value(hass: HomeAssistant, entry_id: str, setting: SwitchSetting) ->
 
 @callback
 def resolve_settings(hass: HomeAssistant, entry_id: str) -> RuntimeSettings:
-    """Read the current value of every tuning entity (default if absent)."""
-    numbers = {s.key: _number_value(hass, entry_id, s) for s in NUMBER_SETTINGS}
-    switches = {s.key: _switch_value(hass, entry_id, s) for s in SWITCH_SETTINGS}
-    return RuntimeSettings(
-        release_offset=numbers["release_offset"],
-        tolerance=numbers["tolerance"],
-        comfort_humidity_influence=numbers["comfort_humidity_influence"],
-        frost_protection_temp=numbers["frost_protection_temp"],
-        dew_point_threshold=numbers["dew_point_threshold"],
-        heat_off_outdoor=numbers["heat_off_outdoor"],
-        cool_off_outdoor=numbers["cool_off_outdoor"],
-        ac_setpoint_bias=numbers["ac_setpoint_bias"],
-        ac_setpoint_bias_max=numbers["ac_setpoint_bias_max"],
-        adaptive_cooling_comfort_max_shift=numbers[
-            "adaptive_cooling_comfort_max_shift"
-        ],
-        adaptive_cooling_comfort_onset_bias=numbers[
-            "adaptive_cooling_comfort_onset_bias"
-        ],
-        adaptive_cooling_comfort_response=numbers["adaptive_cooling_comfort_response"],
-        window_open_delay=numbers["window_open_delay"],
-        valve_maintenance_interval=numbers["valve_maintenance_interval"],
-        sensor_max_age=numbers["sensor_max_age"],
-        preconditioning_horizon=numbers["preconditioning_horizon"],
-        comfort_index_targeting=switches["comfort_index_targeting"],
-        dew_point_guard=switches["dew_point_guard"],
-        window_open_detection=switches["window_open_detection"],
-        ac_ignore_window=switches["ac_ignore_window"],
-        outdoor_temp_gating=switches["outdoor_temp_gating"],
-        frost_protection=switches["frost_protection"],
-        ac_heating_assist=switches["ac_heating_assist"],
-        self_tuning_ac_bias=switches["self_tuning_ac_bias"],
-        auto_valve_maintenance=switches["auto_valve_maintenance"],
-        adaptive_cooling_comfort=switches["adaptive_cooling_comfort"],
-        forecast_preconditioning=switches["forecast_preconditioning"],
-        calibration_mode=_calibration_mode(hass, entry_id),
-    )
+    """Read the current value of every tuning entity (default if absent).
+
+    Driven entirely by the setting registries — the registry keys *are* the
+    ``RuntimeSettings`` field names, so adding a setting means adding the
+    registry entry and the typed field, nothing else. Any drift between the
+    two raises ``TypeError`` here (missing or unexpected keyword).
+    """
+    values: dict[str, Any] = {
+        s.key: _number_value(hass, entry_id, s) for s in NUMBER_SETTINGS
+    }
+    values |= {s.key: _switch_value(hass, entry_id, s) for s in SWITCH_SETTINGS}
+    values["calibration_mode"] = _calibration_mode(hass, entry_id)
+    return RuntimeSettings(**values)
