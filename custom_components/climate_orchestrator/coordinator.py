@@ -1043,6 +1043,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             tolerance=settings.tolerance,
             home_temp=data.home_avg_temperature,
             home_humidity=data.home_avg_humidity,
+            home_trigger=settings.home_average_trigger,
             outdoor_temp=outdoor,
             master_off=hvac_mode == HVACMode.OFF,
             use_comfort=settings.comfort_index_targeting,

@@ -283,3 +283,27 @@ def test_home_fallback_respects_use_comfort_off() -> None:
     """With comfort off, a humid home average stays dry-bulb (no cool call)."""
     g = make_global(home_temp=24.0, home_humidity=90.0)  # use_comfort defaults False
     assert decide(make_cooler(local_temp=None), g).demand is Demand.IDLE
+
+
+def test_home_trigger_off_makes_rooms_independent() -> None:
+    """With the trigger off, a hot home can't start a mid-band room."""
+    g = make_global(home_temp=26.0, home_trigger=False)
+    assert decide(make_cooler(), g).demand is Demand.IDLE  # local 22, mid-band
+    # The room's own reading still engages it.
+    assert decide(make_cooler(local_temp=24.5), g).demand is Demand.COOL
+
+
+def test_home_trigger_off_releases_on_local_alone() -> None:
+    """Release stops waiting for the home average to come back to target."""
+    cooling = make_cooler(local_temp=23.0, previous=Demand.COOL)
+    # cool_target = 24 - 0.5 = 23.5; local 23 is back, home 26 is not.
+    g_off = make_global(home_temp=26.0, tolerance=0.5, home_trigger=False)
+    assert decide(cooling, g_off).demand is Demand.IDLE
+    g_on = make_global(home_temp=26.0, tolerance=0.5)
+    assert decide(cooling, g_on).demand is Demand.COOL
+
+
+def test_home_trigger_off_keeps_home_fallback_for_sensorless_rooms() -> None:
+    """A room with no reading of its own still falls back to the home average."""
+    g = make_global(home_temp=26.0, home_trigger=False)
+    assert decide(make_cooler(local_temp=None), g).demand is Demand.COOL

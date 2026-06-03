@@ -157,3 +157,56 @@ async def test_unavailable_device_does_not_break_the_cycle(
     assert TRV_ENTITY in coordinator.last_decisions
     assert AC_ENTITY in coordinator.last_decisions
     assert hass.states.get(climate_id).state != STATE_UNAVAILABLE
+
+
+async def test_home_average_trigger_switch_wires_into_control(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Switch off -> a cold home average no longer starts a satisfied room."""
+    set_hvac = async_mock_service(hass, "climate", "set_hvac_mode")
+    async_mock_service(hass, "climate", "set_temperature")
+    cid = init_integration.entry_id
+
+    # A whole-home override makes the home average (19.0) differ from the
+    # room's own reading (22.0, mid-band) in a one-room test home.
+    hass.states.async_set(
+        "sensor.whole_home_temp", "19.0", {"device_class": "temperature"}
+    )
+    hass.config_entries.async_update_entry(
+        init_integration,
+        options={"home_temperature_sensor": "sensor.whole_home_temp"},
+    )
+    await hass.async_block_till_done()
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    climate_id = entity_id_for("climate", cid)
+
+    hass.states.async_set(TRV_ENTITY, "off", _TRV_ATTRS)
+    hass.states.async_set(AREA_TEMP_SENSOR, "22.0")
+    _set_desired(hass, climate_id, "heat_cool")
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    # Trigger on (default): the cold home average pulls the room in.
+    assert any(
+        c.data[ATTR_ENTITY_ID] == TRV_ENTITY and c.data[ATTR_HVAC_MODE] == "heat"
+        for c in set_hvac
+    )
+
+    switch = entity_id_for("switch", f"{cid}_home_average_trigger")
+    await hass.services.async_call(
+        "switch", "turn_off", {ATTR_ENTITY_ID: switch}, blocking=True
+    )
+    await hass.async_block_till_done()
+    hass.states.async_set(TRV_ENTITY, "off", _TRV_ATTRS)
+    set_hvac.clear()
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    # Independent rooms: local 22.0 is content, the cold home average is ignored.
+    assert not [
+        c
+        for c in set_hvac
+        if c.data[ATTR_ENTITY_ID] == TRV_ENTITY and c.data[ATTR_HVAC_MODE] == "heat"
+    ]

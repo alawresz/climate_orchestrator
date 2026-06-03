@@ -50,6 +50,10 @@ class GlobalInput:
     frost_protection: bool = True
     outdoor_gating: bool = True
     ac_heating_assist: bool = False
+    # When False, a device with its own reading is judged on it alone (no
+    # home-average OR-engage / AND-release coupling); the home average then
+    # only serves as the sole reading for devices without an area sensor.
+    home_trigger: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +143,12 @@ def decide(device: DeviceInput, g: GlobalInput) -> DeviceDecision:
         if g.home_temp is not None
         else None
     )
+    # With the home-average trigger disabled, a room that has its own
+    # reading is fully independent: drop the home side so engage *and*
+    # release are judged on the local reading alone. A room with no reading
+    # still falls back to the home average (else it would be uncontrollable).
+    if not g.home_trigger and local_eff is not None:
+        home_eff = None
     local_for = local_eff if local_eff is not None else home_eff
     home_for = home_eff if home_eff is not None else local_eff
     if local_for is None or home_for is None:

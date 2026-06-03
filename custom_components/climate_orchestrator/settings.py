@@ -167,6 +167,7 @@ PRESET_NUMBER_SETTINGS: tuple[NumberSetting, ...] = tuple(
 
 SWITCH_SETTINGS: tuple[SwitchSetting, ...] = (
     SwitchSetting("comfort_index_targeting", True),
+    SwitchSetting("home_average_trigger", True),
     SwitchSetting("dew_point_guard", True),
     SwitchSetting("window_open_detection", True),
     SwitchSetting("ac_ignore_window", False),
@@ -207,6 +208,7 @@ class RuntimeSettings:
     sensor_max_age: float
     preconditioning_horizon: float
     comfort_index_targeting: bool
+    home_average_trigger: bool
     dew_point_guard: bool
     window_open_detection: bool
     ac_ignore_window: bool

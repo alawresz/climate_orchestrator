@@ -27,6 +27,7 @@
     },
     "switch": {
       "comfort_index_targeting": { "default": "mdi:emoticon-happy-outline" },
+      "home_average_trigger": { "default": "mdi:home-thermometer-outline" },
       "dew_point_guard": { "default": "mdi:water-percent-alert" },
       "window_open_detection": { "default": "mdi:window-open-variant" },
       "ac_ignore_window": { "default": "mdi:window-open" },

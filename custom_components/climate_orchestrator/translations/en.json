@@ -150,6 +150,7 @@
     },
     "switch": {
       "comfort_index_targeting": { "name": "Comfort index targeting" },
+      "home_average_trigger": { "name": "Home average trigger" },
       "dew_point_guard": { "name": "Dew point guard" },
       "window_open_detection": { "name": "Window open detection" },
       "ac_ignore_window": { "name": "AC ignores open windows" },

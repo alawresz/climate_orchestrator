@@ -168,6 +168,10 @@ the computed average quietly stands in, and the **Home average source**
 diagnostic shows where the values are coming from (`external`, `computed`,
 `fallback`, or `mixed` when temperature and humidity differ).
 
+Don't want the home average influencing rooms at all? Turn off the **Home
+average trigger** switch and every room runs purely on its own sensor (see
+*Runtime settings*).
+
 This "eager on, reluctant off" asymmetry prevents short-cycling on small sensor
 fluctuations.
 
@@ -383,6 +387,7 @@ within 7–35 °C.
 
 | Switch | Default | Description |
 |--------|---------|-------------|
+| Home average trigger | On | When off, each room engages and releases on its **own** reading only — the home average no longer pulls borderline rooms in or holds them on. Rooms without their own area sensor still use the home average as their only reading. The averages and their sensors stay available for display/automations. |
 | Comfort index targeting | On | Control off a humidity-adjusted feels-like (apparent) temperature rather than dry-bulb. While on, the climate entity's current temperature shows the feels-like value (raw dry-bulb kept in the `dry_bulb_temperature` attribute). How strongly humidity counts is set by **Comfort humidity influence**. |
 | Dew point guard | On | When a room's dew point exceeds the **Dew point threshold** and the AC isn't already cooling, run the AC in **dry** mode to dehumidify. |
 | Window open detection | On | A window/door `binary_sensor` open in a device's area stops that device (after **Window open delay**). Auto-discovered from the area. Frost protection still overrides it. |
