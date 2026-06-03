@@ -108,6 +108,14 @@ pythonpath = ["."]
 # mutmut's per-mutant subset runs. CI passes --cov explicitly; run it locally
 # with `uv run pytest --cov=custom_components/climate_orchestrator`.
 addopts = "-q"
+filterwarnings = [
+  # False positive on CPython >= 3.13: hypothesis's register_random heuristic
+  # trusts gc.get_referrers(), whose behaviour changed (cpython#118522). The
+  # warning branch only fires when the refcount proves other references exist
+  # (a truly dead PRNG raises ReferenceError instead), so the pytest-randomly
+  # PRNG is alive and managed. Scoped to this exact message.
+  "ignore:It looks like `register_random` was passed:hypothesis.errors.HypothesisWarning",
+]
 
 [tool.coverage.run]
 branch = true
