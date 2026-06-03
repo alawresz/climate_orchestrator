@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.20.0 (2026-06-03)
+
+### Features
+
+- **mpc**: Wire the Kalman observer into valve planning
+  ([`3593556`](https://github.com/alawresz/climate_orchestrator/commit/3593556a89290d419736f74315dfc9111516b9c4))
+
+
 ## v0.19.2 (2026-06-03)
 
 ### Bug Fixes

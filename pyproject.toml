@@ -1,6 +1,6 @@
 [project]
 name = "climate-orchestrator"
-version = "0.19.2"
+version = "0.20.0"
 description = "Climate Orchestrator — whole-home climate orchestration for Home Assistant"
 readme = "README.md"
 # Dev/test environment floor — tracks current Home Assistant's runtime
