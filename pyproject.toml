@@ -1,0 +1,89 @@
+[project]
+name = "climate-orchestrator"
+version = "0.11.0"
+description = "Climate Orchestrator — whole-home climate orchestration for Home Assistant"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Aleksander Ławresz" }]
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "homeassistant>=2024.12",
+  "scipy>=1.11",
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "pytest-cov>=5.0",
+  "pytest-homeassistant-custom-component>=0.13",
+  "syrupy>=4.6",
+  "ruff>=0.6",
+  "mypy>=1.11",
+  "hypothesis>=6.0",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+src = ["custom_components", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "I",    # isort
+  "UP",   # pyupgrade
+  "B",    # flake8-bugbear
+  "C4",   # flake8-comprehensions
+  "SIM",  # flake8-simplify
+  "ASYNC",# flake8-async
+  "RUF",  # ruff-specific
+]
+# RUF012: HA entity `_attr_*` lists are effectively class-level constants;
+# annotating them ClassVar conflicts with the base classes' instance attrs.
+ignore = ["RUF012"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["custom_components"]
+force-sort-within-sections = true
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unreachable = true
+warn_return_any = true
+disallow_untyped_defs = true
+plugins = []
+# Tests use HA helpers that are not fully typed; keep strictness on source.
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+# SciPy ships no type stubs.
+[[tool.mypy.overrides]]
+module = "scipy.*"
+ignore_missing_imports = true
+# Home Assistant re-exports many public names (HVACMode, ClimateEntityFeature,
+# ATTR_*, SERVICE_*, DOMAIN, ...) without an explicit __all__, which trips
+# strict no-implicit-reexport. Treat its modules' imports as re-exported.
+[[tool.mypy.overrides]]
+module = "homeassistant.*"
+implicit_reexport = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --cov=custom_components/climate_orchestrator --cov-report=term-missing"
+
+[tool.coverage.run]
+branch = true
+source = ["custom_components/climate_orchestrator"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 90
+
+[tool.uv]
+# This is a Home Assistant custom-component layout, not an installable package.
+package = false

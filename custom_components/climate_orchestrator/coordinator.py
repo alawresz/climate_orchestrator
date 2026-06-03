@@ -1,0 +1,1004 @@
+"""Coordinator for the Climate Orchestrator integration.
+
+Owns the shared runtime snapshot and the control cycle. In Phase 1 the cycle
+just resolves sensors and aggregates; control logic lands in later phases. It is
+event-driven (state-change listeners over the managed devices and their area
+sensors) with a periodic keepalive, and re-subscribes when the tracked set
+changes.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from collections import deque
+from collections.abc import Coroutine
+from datetime import timedelta
+import logging
+import time
+from typing import Any
+
+from homeassistant.components.climate import HVACMode
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.core import (
+    CALLBACK_TYPE,
+    Event,
+    EventStateChangedData,
+    HomeAssistant,
+    callback,
+)
+from homeassistant.helpers import (
+    entity_registry as er,
+)
+from homeassistant.helpers import (
+    issue_registry as ir,
+)
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_state_change_event,
+)
+from homeassistant.helpers.storage import Store
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+from .const import (
+    ADAPTIVE_BIAS_DECAY,
+    ADAPTIVE_BIAS_KI,
+    CALIBRATION_MPC,
+    CALIBRATION_OFFSET,
+    CALIBRATION_TARGET,
+    COMFORT_HUMIDITY_INFLUENCE_DEFAULT,
+    CONF_ACS,
+    CONF_CALIBRATION_HINTS,
+    CONF_OUTDOOR_SENSOR,
+    CONF_TRVS,
+    CONF_VALVE_HINTS,
+    DEFAULT_PRESET,
+    DEFAULT_PRESETS,
+    DOMAIN,
+    RMOT_TAU_SECONDS,
+    RUNTIME_WINDOW_SECONDS,
+    SENSOR_MAX_AGE_DEFAULT,
+    UPDATE_INTERVAL_SECONDS,
+    VALVE_MAINTENANCE_DWELL_SECONDS,
+)
+from .control.adaptive_bias import effective_bias, update_bias_integral
+from .control.adaptive_comfort import (
+    adaptive_band,
+    running_mean_update,
+)
+from .control.comfort import effective_temperature
+from .control.engine import (
+    DeviceDecision,
+    DeviceInput,
+    DeviceKind,
+    GlobalInput,
+    decide,
+)
+from .control.hysteresis import Demand
+from .control.mpc.controller import MpcController
+from .control.slope import temperature_slope_per_min
+from .control.window import window_suppresses
+from .devices.adapter import ClimateAdapter
+from .devices.command import build_command
+from .devices.model import DeviceCommand
+from .devices.trv import (
+    LOCAL_CALIBRATION_HINTS,
+    VALVE_OPENING_HINTS,
+    find_related_number,
+    local_offset,
+)
+from .models import Band, DeviceReading, SmartClimateData
+from .sensing.registry import build_snapshot
+from .settings import RuntimeSettings, number_value, resolve_settings
+
+_MPC_STORE_VERSION = 1
+_MPC_SAVE_DELAY = 30.0
+
+# Trailing window (seconds) and sample cap for the home temperature-slope figure.
+_SLOPE_WINDOW_SECONDS = 900.0
+_SLOPE_MAX_SAMPLES = 240
+
+_LOGGER = logging.getLogger(__name__)
+
+type SmartClimateConfigEntry = ConfigEntry["SmartClimateCoordinator"]
+
+
+class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
+    """Coordinate sensor resolution and (later) control for the whole home."""
+
+    def __init__(self, hass: HomeAssistant, entry: SmartClimateConfigEntry) -> None:
+        """Initialise the coordinator for a config entry."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=DOMAIN,
+            update_interval=timedelta(seconds=UPDATE_INTERVAL_SECONDS),
+        )
+        self.entry = entry
+        self._unsub_state: CALLBACK_TYPE | None = None
+        self._tracked: frozenset[str] = frozenset()
+        # Latched per-device demand (for hysteresis) and the latest decisions.
+        self._last_demand: dict[str, Demand] = {}
+        self.last_decisions: dict[str, DeviceDecision] = {}
+        # Last command actually sent per device (for the diagnostics sensors).
+        self._last_command: dict[str, DeviceCommand] = {}
+        # Trailing (monotonic, running?) samples per device for cycle/runtime.
+        self._run_samples: dict[str, deque[tuple[float, bool]]] = {}
+        # Per-TRV MPC controllers, last commanded valve fraction, and timing.
+        self._mpc: dict[str, MpcController] = {}
+        self._last_valve: dict[str, float] = {}
+        self._last_cycle: float | None = None
+        # Per-area monotonic timestamp of when its window most recently opened,
+        # plus a one-shot timer to re-run control when the grace delay expires.
+        self._window_open_since: dict[str, float] = {}
+        self._window_recheck_unsub: CALLBACK_TYPE | None = None
+        # Trailing (time, home-avg-temp) samples and the latest slope (K/min).
+        self._temp_samples: deque[tuple[float, float]] = deque()
+        self._temp_slope: float | None = None
+        # Per-AC integral accumulator for the adaptive setpoint bias.
+        self._ac_bias_integral: dict[str, float] = {}
+        # Valve-maintenance bookkeeping (wall-clock epoch of the last run).
+        self._maintenance_running = False
+        self._last_maintenance: float | None = None
+        # Adaptive comfort: running-mean outdoor temp and the shifted band.
+        self._rmot: float | None = None
+        self._adaptive_band: Band | None = None
+        self._mpc_store: Store[dict[str, Any]] = Store(
+            hass, _MPC_STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.mpc"
+        )
+        self._maint_store: Store[dict[str, Any]] = Store(
+            hass, _MPC_STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.maintenance"
+        )
+
+    async def async_load_mpc(self) -> None:
+        """Restore persisted MPC + maintenance state (call before first refresh)."""
+        data = await self._mpc_store.async_load()
+        if data:
+            for trv_id, payload in data.items():
+                self._mpc[trv_id] = MpcController.from_dict(payload)
+        maint = await self._maint_store.async_load()
+        if maint:
+            if isinstance(maint.get("last"), int | float):
+                self._last_maintenance = float(maint["last"])
+            if isinstance(maint.get("rmot"), int | float):
+                self._rmot = float(maint["rmot"])
+            if isinstance(integral := maint.get("ac_bias_integral"), dict):
+                self._ac_bias_integral = {
+                    k: float(v)
+                    for k, v in integral.items()
+                    if isinstance(v, int | float)
+                }
+            if isinstance(demand := maint.get("last_demand"), dict):
+                valid = {d.value for d in Demand}
+                self._last_demand = {
+                    k: Demand(v) for k, v in demand.items() if v in valid
+                }
+
+    @callback
+    def _state_persist_data(self) -> dict[str, Any]:
+        return {
+            "last": self._last_maintenance,
+            "rmot": self._rmot,
+            "ac_bias_integral": dict(self._ac_bias_integral),
+            "last_demand": {k: d.value for k, d in self._last_demand.items()},
+        }
+
+    @callback
+    def _mpc_persist_data(self) -> dict[str, Any]:
+        return {
+            trv_id: controller.to_dict() for trv_id, controller in self._mpc.items()
+        }
+
+    @property
+    def _options(self) -> dict[str, object]:
+        """Merged config: options override the original setup data."""
+        return {**self.entry.data, **self.entry.options}
+
+    def _id_list(self, key: str) -> list[str]:
+        """Read a configured list of entity ids (defensively typed)."""
+        value = self._options.get(key)
+        return [str(item) for item in value] if isinstance(value, list) else []
+
+    @property
+    def trv_ids(self) -> list[str]:
+        """Managed radiator-valve entities."""
+        return self._id_list(CONF_TRVS)
+
+    @property
+    def ac_ids(self) -> list[str]:
+        """Managed air-conditioner entities."""
+        return self._id_list(CONF_ACS)
+
+    @property
+    def device_ids(self) -> list[str]:
+        """All managed climate entities (TRVs followed by ACs)."""
+        return [*self.trv_ids, *self.ac_ids]
+
+    @property
+    def outdoor_sensor(self) -> str | None:
+        """The user-selected outdoor temperature sensor, if any."""
+        value = self._options.get(CONF_OUTDOOR_SENSOR)
+        return value if isinstance(value, str) else None
+
+    def _hint_tuple(self, key: str, default: tuple[str, ...]) -> tuple[str, ...]:
+        """Parse a comma-separated hint string from options, else the default."""
+        raw = self._options.get(key)
+        if isinstance(raw, str):
+            parts = tuple(h.strip().lower() for h in raw.split(",") if h.strip())
+            if parts:
+                return parts
+        return default
+
+    @property
+    def valve_hints(self) -> tuple[str, ...]:
+        """Name hints used to discover a TRV's valve-opening number entity."""
+        return self._hint_tuple(CONF_VALVE_HINTS, VALVE_OPENING_HINTS)
+
+    @property
+    def calibration_hints(self) -> tuple[str, ...]:
+        """Name hints used to discover a TRV's local-calibration number entity."""
+        return self._hint_tuple(CONF_CALIBRATION_HINTS, LOCAL_CALIBRATION_HINTS)
+
+    async def _async_update_data(self) -> SmartClimateData:
+        """Resolve sensors and aggregates, keep listeners in sync, and actuate."""
+        max_age_min = number_value(
+            self.hass, self.entry.entry_id, "sensor_max_age", SENSOR_MAX_AGE_DEFAULT
+        )
+        data = build_snapshot(
+            self.hass,
+            self.device_ids,
+            outdoor_sensor=self.outdoor_sensor,
+            max_age_seconds=max_age_min * 60.0,
+        )
+        self._update_temp_slope(data.home_avg_temperature)
+        self._ensure_subscription(data.tracked_entities)
+        # Actuation must never break the read-only snapshot/update.
+        try:
+            await self._async_control(data)
+        except Exception:
+            _LOGGER.exception("climate_orchestrator: control cycle failed")
+        return data
+
+    # --- Control / actuation -------------------------------------------------
+
+    @callback
+    def _desired(self) -> tuple[str, Band]:
+        """Read the desired (hvac_mode, band) from the climate entity.
+
+        The band's edges are the two setpoints; fall back to the active preset's
+        edges (then the default preset) when the climate entity isn't ready.
+        """
+        entity_id = er.async_get(self.hass).async_get_entity_id(
+            "climate", DOMAIN, self.entry.entry_id
+        )
+        state = self.hass.states.get(entity_id) if entity_id else None
+        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            default_low, default_high = DEFAULT_PRESETS[DEFAULT_PRESET]
+            return HVACMode.OFF, Band(heat_edge=default_low, cool_edge=default_high)
+
+        # Prefer the user-set *base* band (the climate entity may display the
+        # adaptive-comfort-shifted cool edge in ``target_temp_high``; reading
+        # that back would re-apply the shift each cycle).
+        low = state.attributes.get(
+            "base_target_temp_low", state.attributes.get("target_temp_low")
+        )
+        high = state.attributes.get(
+            "base_target_temp_high", state.attributes.get("target_temp_high")
+        )
+        if low is None or high is None:
+            preset = state.attributes.get("preset_mode", DEFAULT_PRESET)
+            low, high = DEFAULT_PRESETS.get(preset, DEFAULT_PRESETS[DEFAULT_PRESET])
+        return state.state, Band(heat_edge=float(low), cool_edge=float(high))
+
+    @callback
+    def _outdoor_temp(self) -> float | None:
+        """Read the configured outdoor temperature sensor, if any."""
+        if self.outdoor_sensor is None:
+            return None
+        state = self.hass.states.get(self.outdoor_sensor)
+        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return None
+        try:
+            return float(state.state)
+        except (TypeError, ValueError):
+            return None
+
+    @callback
+    def _update_temp_slope(self, home_temp: float | None) -> None:
+        """Record the latest home-average temperature and recompute the slope."""
+        if home_temp is None:
+            return
+        now = time.monotonic()
+        self._temp_samples.append((now, home_temp))
+        cutoff = now - _SLOPE_WINDOW_SECONDS
+        while self._temp_samples and self._temp_samples[0][0] < cutoff:
+            self._temp_samples.popleft()
+        while len(self._temp_samples) > _SLOPE_MAX_SAMPLES:
+            self._temp_samples.popleft()
+        self._temp_slope = temperature_slope_per_min(self._temp_samples)
+
+    @property
+    def temperature_slope(self) -> float | None:
+        """Latest home-average temperature slope in K/min (diagnostic)."""
+        return self._temp_slope
+
+    @callback
+    def mpc_state(self, trv_id: str) -> MpcController | None:
+        """The MPC controller learned for a TRV, if any (diagnostics)."""
+        return self._mpc.get(trv_id)
+
+    @callback
+    def mpc_diagnostics(self) -> dict[str, dict[str, float | int]]:
+        """Learned MPC parameters per TRV (gain, loss, sample count)."""
+        return {
+            trv_id: {
+                "gain": controller.params.gain,
+                "loss": controller.params.loss,
+                "samples": len(controller.history),
+            }
+            for trv_id, controller in self._mpc.items()
+        }
+
+    @callback
+    def _cycle_minutes(self) -> float:
+        """Minutes since the last control cycle (for MPC), with a sane default."""
+        now = time.monotonic()
+        if self._last_cycle is None:
+            self._last_cycle = now
+            return UPDATE_INTERVAL_SECONDS / 60.0
+        elapsed = (now - self._last_cycle) / 60.0
+        self._last_cycle = now
+        return elapsed if elapsed > 0 else UPDATE_INTERVAL_SECONDS / 60.0
+
+    @callback
+    def _window_open(self, reading: DeviceReading, delay_seconds: float) -> bool:
+        """Debounced window-open for a device: open only after the grace delay.
+
+        Tracks when each area's window first opened and suppresses heating/
+        cooling once it has stayed open for ``delay_seconds``. Schedules a
+        one-shot refresh so control re-runs exactly when the delay elapses
+        (rather than waiting for the next keepalive).
+        """
+        raw_open = reading.window_open
+        area_id = reading.area_id
+        if not raw_open:
+            if area_id is not None:
+                self._window_open_since.pop(area_id, None)
+            return False
+        if area_id is None:
+            # No area key to debounce against; honour the delay only as on/off.
+            return delay_seconds <= 0.0
+
+        now = time.monotonic()
+        opened_at = self._window_open_since.get(area_id)
+        if opened_at is None:
+            self._window_open_since[area_id] = opened_at = now
+            if delay_seconds > 0.0:
+                self._schedule_window_recheck(delay_seconds)
+        return window_suppresses(raw_open, opened_at, now, delay_seconds)
+
+    @callback
+    def _schedule_window_recheck(self, delay_seconds: float) -> None:
+        """Re-run control shortly after a window's grace delay expires."""
+        if self._window_recheck_unsub is not None:
+            self._window_recheck_unsub()
+
+        @callback
+        def _fire(_now: object) -> None:
+            self._window_recheck_unsub = None
+            self.hass.async_create_task(self.async_request_refresh())
+
+        # A small margin ensures the elapsed check passes when it fires.
+        self._window_recheck_unsub = async_call_later(
+            self.hass, delay_seconds + 0.5, _fire
+        )
+
+    async def _set_number(self, entity_id: str, value: float) -> None:
+        """Write a number entity, skipping no-op changes (update minimization)."""
+        state = self.hass.states.get(entity_id)
+        if state is not None:
+            try:
+                if abs(float(state.state) - value) < 0.1:
+                    return
+            except (TypeError, ValueError):
+                pass
+        await self.hass.services.async_call(
+            "number",
+            "set_value",
+            {"entity_id": entity_id, "value": value},
+            blocking=True,
+        )
+
+    def _calibration_writes(
+        self,
+        entity_id: str,
+        decision: DeviceDecision,
+        reading: DeviceReading,
+        settings: RuntimeSettings,
+        band: Band,
+        outdoor: float | None,
+        dt_min: float,
+        adapter: ClimateAdapter,
+    ) -> list[Coroutine[Any, Any, None]]:
+        """Extra MPC/offset writes for a TRV.
+
+        While heating, MPC drives the valve opening and offset mode corrects the
+        local calibration. When *not* heating in MPC mode the valve is driven
+        fully shut — otherwise it would linger at its last commanded opening
+        (a common cause of a TRV that "stays open" and keeps heating).
+        """
+        area_temp = reading.area_temperature
+        if decision.demand is not Demand.HEAT:
+            if settings.calibration_mode == CALIBRATION_MPC:
+                number = find_related_number(self.hass, entity_id, self.valve_hints)
+                if number is not None:
+                    self._last_valve[entity_id] = 0.0
+                    return [self._set_number(number, 0.0)]
+            return []
+
+        if settings.calibration_mode == CALIBRATION_MPC:
+            number = find_related_number(self.hass, entity_id, self.valve_hints)
+            self._calibration_issue(entity_id, "mpc", missing=number is None)
+            if number is None or area_temp is None:
+                return []
+            ambient = outdoor if outdoor is not None else area_temp
+            controller = self._mpc.setdefault(entity_id, MpcController())
+            controller.observe(
+                temp=area_temp,
+                valve=self._last_valve.get(entity_id, 0.0),
+                outdoor=ambient,
+                dt=dt_min,
+            )
+            pct = controller.compute_valve_pct(
+                temp=area_temp,
+                target=band.heat_target(settings.tolerance),
+                outdoor=ambient,
+                dt=dt_min,
+            )
+            self._last_valve[entity_id] = pct / 100.0
+            return [self._set_number(number, pct)]
+
+        if settings.calibration_mode == CALIBRATION_OFFSET:
+            number = find_related_number(self.hass, entity_id, self.calibration_hints)
+            self._calibration_issue(entity_id, "offset", missing=number is None)
+            offset = local_offset(area_temp, adapter.read().current_temp)
+            if number is None or offset is None:
+                return []
+            return [self._set_number(number, offset)]
+
+        return []
+
+    @callback
+    def _calibration_issue(self, entity_id: str, mode: str, *, missing: bool) -> None:
+        """Raise/clear a repair issue when a TRV lacks its calibration number."""
+        issue_id = f"missing_calibration_number_{entity_id}"
+        if missing:
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                issue_id,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="missing_calibration_number",
+                translation_placeholders={"entity_id": entity_id, "mode": mode},
+            )
+        else:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+
+    @callback
+    def _toggle_issue(self, issue_id: str, active: bool, key: str) -> None:
+        """Create or clear a static (no-placeholder) repair issue."""
+        if active:
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                issue_id,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key=key,
+            )
+        else:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+
+    @callback
+    def _environment_issues(
+        self, settings: RuntimeSettings, data: SmartClimateData, base_band: Band
+    ) -> None:
+        """Surface misconfigurations that would otherwise fail silently."""
+        # An inverted band (cool edge below heat edge) has no neutral zone, so
+        # the home would heat below the cool edge and cool above it — running
+        # constantly. Flag it rather than burn energy silently.
+        self._toggle_issue(
+            "inverted_band",
+            base_band.cool_edge < base_band.heat_edge,
+            "inverted_band",
+        )
+        # Adaptive comfort is opt-in, so enabling it without an outdoor sensor is
+        # a clear mistake. Outdoor gating is on by default, so don't nag about it.
+        self._toggle_issue(
+            "outdoor_sensor_missing",
+            settings.adaptive_comfort and self.outdoor_sensor is None,
+            "outdoor_sensor_missing",
+        )
+        self._toggle_issue(
+            "no_temperature_source",
+            bool(self.device_ids) and data.home_avg_temperature is None,
+            "no_temperature_source",
+        )
+        self._toggle_issue(
+            "stale_sensor",
+            bool(data.stale_sensors),
+            "stale_sensor",
+        )
+
+    @callback
+    def _room_effective(
+        self, reading: DeviceReading, settings: RuntimeSettings, data: SmartClimateData
+    ) -> float | None:
+        """The device's comfort-adjusted room temperature (area, else home)."""
+        comfort = settings.comfort_index_targeting
+        influence = settings.comfort_humidity_influence
+        area_temp = reading.area_temperature
+        if area_temp is not None:
+            humidity = reading.area_humidity
+            return effective_temperature(
+                area_temp, humidity, use_comfort=comfort, influence=influence
+            )
+        if data.home_avg_temperature is not None:
+            return effective_temperature(
+                data.home_avg_temperature,
+                data.home_avg_humidity,
+                use_comfort=comfort,
+                influence=influence,
+            )
+        return None
+
+    @callback
+    def _apply_adaptive_comfort(
+        self,
+        base_band: Band,
+        outdoor: float | None,
+        settings: RuntimeSettings,
+        dt_min: float,
+    ) -> Band:
+        """Update the running-mean outdoor temp and return the band to control on.
+
+        Adaptive comfort only relaxes *cooling* in the heat: once the
+        running-mean outdoor temperature climbs past the cool edge (plus the
+        onset bias), the cool setpoint drifts up by a smooth, saturating amount
+        capped at ``max_shift``. The heat edge is never touched, so a device is
+        never made to work harder than the user's preset. The shifted band is
+        always computed for the preview sensors; it's only *applied* when the
+        toggle is on.
+        """
+        self._rmot = running_mean_update(
+            self._rmot, outdoor, dt_seconds=dt_min * 60.0, tau_seconds=RMOT_TAU_SECONDS
+        )
+        heat_edge, cool_edge = adaptive_band(
+            base_band.heat_edge,
+            base_band.cool_edge,
+            self._rmot,
+            settings.adaptive_comfort_max_shift,
+            bias=settings.adaptive_comfort_bias,
+            response=settings.adaptive_comfort_response,
+        )
+        self._adaptive_band = Band(heat_edge=heat_edge, cool_edge=cool_edge)
+        return self._adaptive_band if settings.adaptive_comfort else base_band
+
+    @property
+    def comfort_influence(self) -> float:
+        """The comfort-index humidity influence factor (live)."""
+        return number_value(
+            self.hass,
+            self.entry.entry_id,
+            "comfort_humidity_influence",
+            COMFORT_HUMIDITY_INFLUENCE_DEFAULT,
+        )
+
+    @property
+    def running_mean_outdoor(self) -> float | None:
+        """Running-mean outdoor temperature driving adaptive comfort (°C)."""
+        return self._rmot
+
+    @property
+    def adaptive_band_low(self) -> float | None:
+        """Would-be heat edge after the adaptive shift (preview)."""
+        return self._adaptive_band.heat_edge if self._adaptive_band else None
+
+    @property
+    def adaptive_band_high(self) -> float | None:
+        """Would-be cool edge after the adaptive shift (preview)."""
+        return self._adaptive_band.cool_edge if self._adaptive_band else None
+
+    @callback
+    def hvac_action_reason(self) -> str:
+        """A single headline reason for the current heat/cool/idle state."""
+        hvac_mode, _ = self._desired()
+        if hvac_mode == HVACMode.OFF:
+            return "off"
+        decisions = list(self.last_decisions.values())
+        if not decisions:
+            return "idle"
+        reasons = {d.reason for d in decisions}
+        if any(d.demand is Demand.HEAT for d in decisions):
+            return "frost_protection" if "frost_protection" in reasons else "heating"
+        if any(d.demand is Demand.COOL for d in decisions):
+            return "cooling"
+        if any(d.dry_mode for d in decisions):
+            return "dehumidifying"
+        for reason in ("window_open", "outdoor_gating", "unavailable", "no_data"):
+            if reason in reasons:
+                return reason
+        return "idle"
+
+    @callback
+    def device_reasons(self) -> dict[str, str]:
+        """Per-device decision reasons, for the reason sensor's attributes."""
+        return {key: d.reason for key, d in self.last_decisions.items()}
+
+    # --- Per-device diagnostics / counters ----------------------------------
+
+    @callback
+    def _record_runtime(self, decisions: dict[str, DeviceDecision]) -> None:
+        """Append a (monotonic, running?) sample per device, pruned to the window."""
+        now = time.monotonic()
+        cutoff = now - RUNTIME_WINDOW_SECONDS
+        for entity_id, decision in decisions.items():
+            running = decision.demand in (Demand.HEAT, Demand.COOL)
+            samples = self._run_samples.setdefault(entity_id, deque())
+            samples.append((now, running))
+            # Keep one sample before the cutoff so the integral spans the edge.
+            while len(samples) > 1 and samples[1][0] < cutoff:
+                samples.popleft()
+
+    @callback
+    def device_action(self, entity_id: str) -> str:
+        """Per-device action label (idle/heating/cooling/drying/off/unavailable)."""
+        decision = self.last_decisions.get(entity_id)
+        if decision is None:
+            return "idle"
+        if decision.reason == "unavailable":
+            return "unavailable"
+        if decision.reason == "master_off":
+            return "off"
+        if decision.demand is Demand.HEAT:
+            return "heating"
+        if decision.demand is Demand.COOL:
+            return "cooling"
+        if decision.dry_mode:
+            return "drying"
+        return "idle"
+
+    @callback
+    def device_command_attrs(self, entity_id: str) -> dict[str, str | float | None]:
+        """The last command sent to a device (mode + setpoint), for attributes."""
+        command = self._last_command.get(entity_id)
+        if command is None:
+            return {}
+        return {
+            "commanded_mode": command.hvac_mode.value,
+            "commanded_setpoint": command.target_temp,
+        }
+
+    @callback
+    def valve_position(self, entity_id: str) -> float | None:
+        """Last commanded valve opening (%) for a TRV in MPC mode, else None."""
+        valve = self._last_valve.get(entity_id)
+        return None if valve is None else round(valve * 100.0, 1)
+
+    @callback
+    def device_runtime_fraction(self, entity_id: str) -> float | None:
+        """Fraction of the trailing window the device was running (0..1)."""
+        samples = self._run_samples.get(entity_id)
+        if not samples:
+            return None
+        now = time.monotonic()
+        start = max(samples[0][0], now - RUNTIME_WINDOW_SECONDS)
+        span = now - start
+        if span <= 0.0:
+            return None
+        pts = list(samples)
+        running_time = 0.0
+        for i, (t, running) in enumerate(pts):
+            seg_start = max(t, start)
+            seg_end = pts[i + 1][0] if i + 1 < len(pts) else now
+            if running and seg_end > seg_start:
+                running_time += seg_end - seg_start
+        return max(0.0, min(1.0, running_time / span))
+
+    @callback
+    def device_cycles_per_hour(self, entity_id: str) -> float | None:
+        """Off->on starts per hour over the trailing window."""
+        samples = self._run_samples.get(entity_id)
+        if not samples or len(samples) < 2:
+            return None
+        now = time.monotonic()
+        start = max(samples[0][0], now - RUNTIME_WINDOW_SECONDS)
+        span = now - start
+        if span <= 0.0:
+            return None
+        transitions = 0
+        prev: bool | None = None
+        for t, running in samples:
+            if prev is not None and not prev and running and t >= start:
+                transitions += 1
+            prev = running
+        return transitions * 3600.0 / span
+
+    @callback
+    def frost_active(self) -> bool:
+        """Whether any device is currently in forced frost-protection heating."""
+        return any(d.reason == "frost_protection" for d in self.last_decisions.values())
+
+    @callback
+    def dew_point_active(self) -> bool:
+        """Whether any AC is currently running dry mode for the dew-point guard."""
+        return any(d.dry_mode for d in self.last_decisions.values())
+
+    @callback
+    def _ac_bias(
+        self,
+        entity_id: str,
+        kind: DeviceKind,
+        decision: DeviceDecision,
+        reading: DeviceReading,
+        settings: RuntimeSettings,
+        band: Band,
+        dt_min: float,
+    ) -> float:
+        """Effective AC setpoint bias, adapted by integral feedback if enabled.
+
+        Heaters always use the plain base bias (it's ignored for them anyway).
+        For an AC, the bias used *this* cycle reflects the accumulated integral;
+        the accumulator is then advanced for next cycle from the current error.
+        """
+        base = settings.ac_setpoint_bias
+        if kind is not DeviceKind.COOLER or not settings.adaptive_ac_bias:
+            return base
+
+        integral = self._ac_bias_integral.get(entity_id, 0.0)
+        max_add = max(0.0, settings.ac_setpoint_bias_max - base)
+        bias = effective_bias(base, integral, settings.ac_setpoint_bias_max)
+
+        room = reading.area_temperature
+        if room is None:
+            room = self.data.home_avg_temperature if self.data else None
+        if room is not None:
+            self._ac_bias_integral[entity_id] = update_bias_integral(
+                integral,
+                error=room - band.cool_target(settings.tolerance),
+                dt_min=dt_min,
+                ki=ADAPTIVE_BIAS_KI,
+                max_add=max_add,
+                cooling=decision.demand is Demand.COOL,
+                decay=ADAPTIVE_BIAS_DECAY,
+            )
+        return bias
+
+    async def _async_control(self, data: SmartClimateData) -> None:
+        """Decide per device, apply commands, and run TRV calibration."""
+        settings = resolve_settings(self.hass, self.entry.entry_id)
+        dt_min = self._cycle_minutes()
+        hvac_mode, base_band = self._desired()
+        outdoor = self._outdoor_temp()
+        band = self._apply_adaptive_comfort(base_band, outdoor, settings, dt_min)
+        self._environment_issues(settings, data, base_band)
+        global_input = GlobalInput(
+            band=band,
+            release_offset=settings.release_offset,
+            tolerance=settings.tolerance,
+            home_temp=data.home_avg_temperature,
+            home_humidity=data.home_avg_humidity,
+            outdoor_temp=outdoor,
+            master_off=hvac_mode == HVACMode.OFF,
+            use_comfort=settings.comfort_index_targeting,
+            comfort_influence=settings.comfort_humidity_influence,
+            dew_point_threshold=(
+                settings.dew_point_threshold if settings.dew_point_guard else None
+            ),
+            frost_temp=settings.frost_protection_temp,
+            heat_off_outdoor=settings.heat_off_outdoor,
+            cool_off_outdoor=settings.cool_off_outdoor,
+            window_detection=settings.window_open_detection,
+            ac_ignore_window=settings.ac_ignore_window,
+            frost_protection=settings.frost_protection,
+            outdoor_gating=settings.outdoor_temp_gating and outdoor is not None,
+            ac_heating_assist=settings.ac_heating_assist,
+        )
+
+        trvs = set(self.trv_ids)
+        # Debounced window-open per device, plus the set of areas with a window
+        # open — so a cooler exempted via `ac_ignore_window` can ignore its own
+        # area's window yet still be suppressed by a window open in another room.
+        delay_s = settings.window_open_delay * 60.0
+        window_state = {
+            eid: self._window_open(reading, delay_s)
+            for eid in self.device_ids
+            if (reading := data.readings.get(eid)) is not None
+        }
+        open_areas = {
+            data.readings[eid].area_id for eid, opened in window_state.items() if opened
+        }
+        decisions: dict[str, DeviceDecision] = {}
+        commanded: list[str] = []
+        tasks: list[Coroutine[Any, Any, None]] = []
+        for entity_id in self.device_ids:
+            reading = data.readings.get(entity_id)
+            if reading is None:
+                continue
+            kind = DeviceKind.HEATER if entity_id in trvs else DeviceKind.COOLER
+            decision = decide(
+                DeviceInput(
+                    key=entity_id,
+                    kind=kind,
+                    available=reading.available,
+                    local_temp=reading.area_temperature,
+                    local_humidity=reading.area_humidity,
+                    window_open=window_state.get(entity_id, False),
+                    other_window_open=any(a != reading.area_id for a in open_areas),
+                    previous=self._last_demand.get(entity_id, Demand.IDLE),
+                ),
+                global_input,
+            )
+            decisions[entity_id] = decision
+            self._last_demand[entity_id] = decision.demand
+            if not reading.available:
+                continue  # excluded this cycle, but its latch is preserved
+            adapter = ClimateAdapter(self.hass, entity_id)
+            command = build_command(
+                decision,
+                kind,
+                band=band,
+                ac_setpoint_bias=self._ac_bias(
+                    entity_id, kind, decision, reading, settings, band, dt_min
+                ),
+                caps=adapter.capabilities(),
+                tolerance=settings.tolerance,
+                device_current_temp=adapter.read().current_temp,
+                room_temp=self._room_effective(reading, settings, data),
+            )
+            self._last_command[entity_id] = command
+            tasks.append(adapter.apply(command))
+            commanded.append(entity_id)
+
+            if kind is DeviceKind.HEATER and settings.calibration_mode != (
+                CALIBRATION_TARGET
+            ):
+                for coro in self._calibration_writes(
+                    entity_id,
+                    decision,
+                    reading,
+                    settings,
+                    band,
+                    outdoor,
+                    dt_min,
+                    adapter,
+                ):
+                    tasks.append(coro)
+                    commanded.append(entity_id)
+
+        self.last_decisions = decisions
+        self._record_runtime(decisions)
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for entity_id, result in zip(commanded, results, strict=True):
+                if isinstance(result, Exception):
+                    _LOGGER.warning(
+                        "climate_orchestrator: failed to command %s: %s",
+                        entity_id,
+                        result,
+                    )
+        if self._mpc:
+            self._mpc_store.async_delay_save(self._mpc_persist_data, _MPC_SAVE_DELAY)
+        self._maint_store.async_delay_save(self._state_persist_data, _MPC_SAVE_DELAY)
+        self._maybe_auto_maintenance(settings, decisions)
+
+    @callback
+    def _ensure_subscription(self, tracked: frozenset[str]) -> None:
+        """(Re)subscribe to state changes when the tracked set changes."""
+        if tracked == self._tracked and self._unsub_state is not None:
+            return
+        if self._unsub_state is not None:
+            self._unsub_state()
+            self._unsub_state = None
+        self._tracked = tracked
+        if tracked:
+            self._unsub_state = async_track_state_change_event(
+                self.hass, list(tracked), self._handle_state_event
+            )
+
+    @callback
+    def _handle_state_event(self, event: Event[EventStateChangedData]) -> None:
+        """Trigger a (debounced) refresh when a tracked entity changes."""
+        self.hass.async_create_task(self.async_request_refresh())
+
+    # --- Services / maintenance ---------------------------------------------
+
+    async def async_reset_mpc(self, trv_ids: list[str] | None = None) -> None:
+        """Forget learned MPC state for some/all TRVs and re-run control."""
+        targets = trv_ids or self.trv_ids
+        for trv_id in targets:
+            self._mpc.pop(trv_id, None)
+            self._last_valve.pop(trv_id, None)
+        await self._mpc_store.async_save(self._mpc_persist_data())
+        await self.async_request_refresh()
+
+    async def _force_number(self, entity_id: str, value: float) -> None:
+        """Write a number entity unconditionally (no no-op skipping)."""
+        await self.hass.services.async_call(
+            "number",
+            "set_value",
+            {"entity_id": entity_id, "value": value},
+            blocking=True,
+        )
+
+    async def async_run_valve_maintenance(
+        self,
+        trv_ids: list[str] | None = None,
+        *,
+        dwell: float = VALVE_MAINTENANCE_DWELL_SECONDS,
+    ) -> None:
+        """Exercise each TRV's valve fully open then closed, then restore control.
+
+        Prevents the valve seizing/scaling when it sits at a fixed opening for a
+        long time. Re-entrancy guarded so overlapping triggers can't stack.
+        """
+        if self._maintenance_running:
+            return
+        self._maintenance_running = True
+        try:
+            valves = [
+                number
+                for trv_id in (trv_ids or self.trv_ids)
+                if (
+                    number := find_related_number(
+                        self.hass, trv_id, VALVE_OPENING_HINTS
+                    )
+                )
+            ]
+            for opening in (100.0, 0.0):
+                await asyncio.gather(
+                    *(self._force_number(number, opening) for number in valves),
+                    return_exceptions=True,
+                )
+                await asyncio.sleep(dwell)
+            self._last_maintenance = time.time()
+            await self._maint_store.async_save(self._state_persist_data())
+        finally:
+            self._maintenance_running = False
+            # Restore normal valve positions on the next cycle.
+            await self.async_request_refresh()
+
+    @callback
+    def _maybe_auto_maintenance(
+        self, settings: RuntimeSettings, decisions: dict[str, DeviceDecision]
+    ) -> None:
+        """Kick off auto valve maintenance when due and the home isn't heating."""
+        if not settings.auto_valve_maintenance or self._maintenance_running:
+            return
+        now = time.time()
+        if self._last_maintenance is None:
+            # First run after install: start the clock rather than acting now.
+            self._last_maintenance = now
+            self.hass.async_create_task(
+                self._maint_store.async_save(self._state_persist_data())
+            )
+            return
+        if now - self._last_maintenance < settings.valve_maintenance_interval * 86400:
+            return
+        trvs = set(self.trv_ids)
+        if any(d.demand is Demand.HEAT for key, d in decisions.items() if key in trvs):
+            return  # don't interrupt active heating
+        self.hass.async_create_task(self.async_run_valve_maintenance())
+
+    async def async_shutdown(self) -> None:
+        """Cancel listeners, flush MPC state, and shut the coordinator down."""
+        if self._unsub_state is not None:
+            self._unsub_state()
+            self._unsub_state = None
+        if self._window_recheck_unsub is not None:
+            self._window_recheck_unsub()
+            self._window_recheck_unsub = None
+        if self._mpc:
+            await self._mpc_store.async_save(self._mpc_persist_data())
+        await super().async_shutdown()
