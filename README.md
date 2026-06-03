@@ -300,6 +300,11 @@ step. The room sensor (via the engine releasing the demand) is what stops it. If
 the dew point is high the AC can run **dry** mode instead, and any fan/swing modes
 it supports are surfaced on the whole-home entity and forwarded.
 
+Because that anchored setpoint drifts a little every cycle, the commanded value
+is **throttled**: it's only re-sent when it moves at least 0.5 °C *and* a few
+minutes have passed, with a periodic keep-alive re-assert. This keeps a steady
+cooling run from spamming the AC with near-identical setpoint changes.
+
 ## Controls & settings reference
 
 Every item below is a runtime entity on the hub device — adjust any of it live; it

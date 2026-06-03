@@ -79,6 +79,14 @@ ADAPTIVE_BIAS_DECAY: Final = 0.5
 # stop. See DESIGN.md §6.2.
 AC_COOL_KICK: Final = 1.0
 
+# AC setpoint write throttling: the proportional compressor anchor nudges the
+# commanded setpoint most cycles, so re-write it only when it has moved at least
+# this much AND this long has elapsed since the last write, with a periodic
+# keep-alive re-assert so the device never drifts away unnoticed.
+AC_SETPOINT_MIN_CHANGE: Final = 0.5
+AC_SETPOINT_MIN_INTERVAL_SECONDS: Final = 180.0
+AC_SETPOINT_KEEPALIVE_SECONDS: Final = 900.0
+
 # Adaptive comfort: max cool-edge shift (°C), the onset bias (°C) relative to
 # the cool edge, the smoothing "response" (°C of outdoor excess for ~63% of the
 # cap), and the running-mean-outdoor time constant (seconds) for the

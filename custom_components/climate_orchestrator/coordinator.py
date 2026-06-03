@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 from collections import deque
 from collections.abc import Coroutine
+from dataclasses import replace
 from datetime import timedelta
 import logging
 import time
@@ -41,6 +42,9 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
+    AC_SETPOINT_KEEPALIVE_SECONDS,
+    AC_SETPOINT_MIN_CHANGE,
+    AC_SETPOINT_MIN_INTERVAL_SECONDS,
     ADAPTIVE_BIAS_DECAY,
     ADAPTIVE_BIAS_KI,
     CALIBRATION_MPC,
@@ -77,10 +81,11 @@ from .control.engine import (
 from .control.hysteresis import Demand
 from .control.mpc.controller import MpcController
 from .control.slope import temperature_slope_per_min
+from .control.throttle import throttle_setpoint
 from .control.window import window_suppresses
 from .devices.adapter import ClimateAdapter
 from .devices.command import build_command
-from .devices.model import DeviceCommand
+from .devices.model import DeviceCommand, Mode
 from .devices.trv import (
     LOCAL_CALIBRATION_HINTS,
     VALVE_OPENING_HINTS,
@@ -122,6 +127,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self.last_decisions: dict[str, DeviceDecision] = {}
         # Last command actually sent per device (for the diagnostics sensors).
         self._last_command: dict[str, DeviceCommand] = {}
+        # Last written AC cooling setpoint + monotonic timestamp, for throttling.
+        self._ac_setpoint: dict[str, tuple[float, float]] = {}
         # Trailing (monotonic, running?) samples per device for cycle/runtime.
         self._run_samples: dict[str, deque[tuple[float, bool]]] = {}
         # Per-TRV MPC controllers, last commanded valve fraction, and timing.
@@ -775,6 +782,34 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             )
         return bias
 
+    @callback
+    def _throttle_ac_setpoint(
+        self, entity_id: str, command: DeviceCommand
+    ) -> DeviceCommand:
+        """Hold an AC's cooling setpoint between cycles to avoid write spam.
+
+        Non-cooling commands pass through and reset the throttle (so the next
+        cooling run writes fresh). A cooling command may have its setpoint
+        replaced with the previously written value per ``throttle_setpoint``.
+        """
+        if command.hvac_mode is not Mode.COOL or command.target_temp is None:
+            self._ac_setpoint.pop(entity_id, None)
+            return command
+        prev = self._ac_setpoint.get(entity_id)
+        value, ts = throttle_setpoint(
+            prev[0] if prev else None,
+            prev[1] if prev else None,
+            command.target_temp,
+            time.monotonic(),
+            min_change=AC_SETPOINT_MIN_CHANGE,
+            min_interval_s=AC_SETPOINT_MIN_INTERVAL_SECONDS,
+            keepalive_s=AC_SETPOINT_KEEPALIVE_SECONDS,
+        )
+        self._ac_setpoint[entity_id] = (value, ts)
+        if value != command.target_temp:
+            return replace(command, target_temp=value)
+        return command
+
     async def _async_control(self, data: SmartClimateData) -> None:
         """Decide per device, apply commands, and run TRV calibration."""
         settings = resolve_settings(self.hass, self.entry.entry_id)
@@ -857,6 +892,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                 device_current_temp=adapter.read().current_temp,
                 room_temp=self._room_effective(reading, settings, data),
             )
+            command = self._throttle_ac_setpoint(entity_id, command)
             self._last_command[entity_id] = command
             tasks.append(adapter.apply(command))
             commanded.append(entity_id)
