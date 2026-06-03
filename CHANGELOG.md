@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.14.0 (2026-06-03)
+
+### Features
+
+- Introduce per-area comfort band offsets for localized temperature adjustments and improved
+  flexibility
+  ([`262f5f0`](https://github.com/alawresz/climate_orchestrator/commit/262f5f01cdad7799522414045d6415cbcd55fa3d))
+
+
 ## v0.13.0 (2026-06-03)
 
 ### Features
