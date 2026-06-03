@@ -29,7 +29,7 @@ jobs:
       - name: pytest (with coverage)
         run: uv run pytest --cov-report=xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: coverage.xml
           # Public repos upload tokenless; add the secret if uploads start failing.
