@@ -26,7 +26,7 @@ AREA_HUMIDITY_SENSOR = "sensor.living_humidity"
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(
     enable_custom_integrations: None,
-) -> Generator[None, None, None]:
+) -> Generator[None]:
     """Enable loading of custom integrations in every test."""
     yield
 
