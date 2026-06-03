@@ -6,7 +6,7 @@ __pycache__/
 
 # Virtual envs / uv
 .venv/
-uv.lock
+# uv.lock IS committed (dev/CI reproducibility + Dependabot uv updates it).
 
 # Test / coverage
 .pytest_cache/
