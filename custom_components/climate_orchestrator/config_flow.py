@@ -21,6 +21,8 @@ import voluptuous as vol
 from .const import (
     CONF_ACS,
     CONF_CALIBRATION_HINTS,
+    CONF_HOME_HUMIDITY_SENSOR,
+    CONF_HOME_TEMP_SENSOR,
     CONF_OUTDOOR_SENSOR,
     CONF_TRVS,
     CONF_VALVE_HINTS,
@@ -38,6 +40,9 @@ _CLIMATE_SELECTOR = selector.EntitySelector(
 )
 _TEMP_SENSOR_SELECTOR = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="sensor", device_class="temperature")
+)
+_HUMIDITY_SENSOR_SELECTOR = selector.EntitySelector(
+    selector.EntitySelectorConfig(domain="sensor", device_class="humidity")
 )
 _WEATHER_SELECTOR = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="weather")
@@ -71,6 +76,12 @@ def _build_schema(defaults: dict[str, Any]) -> vol.Schema:
             _optional(
                 CONF_WEATHER_ENTITY, defaults.get(CONF_WEATHER_ENTITY)
             ): _WEATHER_SELECTOR,
+            _optional(
+                CONF_HOME_TEMP_SENSOR, defaults.get(CONF_HOME_TEMP_SENSOR)
+            ): _TEMP_SENSOR_SELECTOR,
+            _optional(
+                CONF_HOME_HUMIDITY_SENSOR, defaults.get(CONF_HOME_HUMIDITY_SENSOR)
+            ): _HUMIDITY_SENSOR_SELECTOR,
             _optional(
                 CONF_VALVE_HINTS,
                 defaults.get(CONF_VALVE_HINTS, _DEFAULT_VALVE_HINTS),

@@ -165,3 +165,56 @@ async def test_mpc_learning_status_ready_with_enough_history(
 
     status_id = entity_id_for("sensor", f"{cid}_{TRV_ENTITY}_mpc_learning_status")
     assert hass.states.get(status_id).state == "ready"
+
+
+async def test_home_avg_source_sensor_defaults_to_computed(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Without overrides the source diagnostic reads computed/computed."""
+    cid = init_integration.entry_id
+    source = hass.states.get(entity_id_for("sensor", f"{cid}_home_avg_source"))
+    assert source is not None
+    assert source.state == "computed"
+    assert source.attributes["temperature_source"] == "computed"
+    assert source.attributes["humidity_source"] == "computed"
+    assert source.attributes["temperature_sensor"] is None
+
+
+async def test_home_avg_source_sensor_with_override_is_mixed_then_fallback(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """A temp-only override reads mixed (external + computed); outage -> fallback."""
+    cid = init_integration.entry_id
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    hass.states.async_set(
+        "sensor.whole_home_temp", "23.5", {"device_class": "temperature"}
+    )
+    hass.config_entries.async_update_entry(
+        init_integration,
+        options={"home_temperature_sensor": "sensor.whole_home_temp"},
+    )
+    await hass.async_block_till_done()
+    coordinator = init_integration.runtime_data  # may have reloaded
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    source_id = entity_id_for("sensor", f"{cid}_home_avg_source")
+    temp_id = entity_id_for("sensor", f"{cid}_home_avg_temperature")
+    source = hass.states.get(source_id)
+    assert source.state == "mixed"
+    assert source.attributes["temperature_source"] == "external"
+    assert source.attributes["humidity_source"] == "computed"
+    assert source.attributes["temperature_sensor"] == "sensor.whole_home_temp"
+    assert float(hass.states.get(temp_id).state) == 23.5
+
+    # Override goes unavailable -> computed mean stands in, source says so.
+    hass.states.async_set("sensor.whole_home_temp", "unavailable")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    source = hass.states.get(source_id)
+    assert source.attributes["temperature_source"] == "fallback"
+    assert float(hass.states.get(temp_id).state) == 21.0  # area sensor average

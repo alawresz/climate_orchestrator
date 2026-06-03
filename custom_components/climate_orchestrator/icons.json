@@ -49,6 +49,7 @@
       "adaptive_cool_setpoint": { "default": "mdi:thermometer-chevron-down" },
       "running_mean_outdoor_temperature": { "default": "mdi:sun-thermometer" },
       "status": { "default": "mdi:heart-pulse" },
+      "home_avg_source": { "default": "mdi:source-branch" },
       "hvac_action_reason": { "default": "mdi:help-circle-outline" },
       "mpc_heating_gain": { "default": "mdi:radiator" },
       "mpc_heat_loss": { "default": "mdi:home-thermometer-outline" },

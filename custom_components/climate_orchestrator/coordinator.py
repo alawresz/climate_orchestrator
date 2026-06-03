@@ -52,6 +52,8 @@ from .const import (
     COMFORT_HUMIDITY_INFLUENCE_DEFAULT,
     CONF_ACS,
     CONF_CALIBRATION_HINTS,
+    CONF_HOME_HUMIDITY_SENSOR,
+    CONF_HOME_TEMP_SENSOR,
     CONF_OUTDOOR_SENSOR,
     CONF_TRVS,
     CONF_VALVE_HINTS,
@@ -289,6 +291,18 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         return value if isinstance(value, str) else None
 
     @property
+    def home_temp_sensor(self) -> str | None:
+        """The user-provided whole-home average temperature sensor, if any."""
+        value = self._options.get(CONF_HOME_TEMP_SENSOR)
+        return value if isinstance(value, str) and value else None
+
+    @property
+    def home_humidity_sensor(self) -> str | None:
+        """The user-provided whole-home average humidity sensor, if any."""
+        value = self._options.get(CONF_HOME_HUMIDITY_SENSOR)
+        return value if isinstance(value, str) and value else None
+
+    @property
     def weather_entity(self) -> str | None:
         """The user-selected weather entity (forecast source), if any."""
         value = self._options.get(CONF_WEATHER_ENTITY)
@@ -322,6 +336,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             self.hass,
             self.device_ids,
             outdoor_sensor=self.outdoor_sensor,
+            home_temp_sensor=self.home_temp_sensor,
+            home_humidity_sensor=self.home_humidity_sensor,
             max_age_seconds=max_age_min * 60.0,
         )
         data = replace(data, status=self._compute_status(data))

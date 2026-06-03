@@ -26,7 +26,7 @@ from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
 from .control.comfort import effective_temperature
 from .control.mpc.model import MIN_SAMPLES
 from .entity import SmartClimateBaseEntity
-from .models import SmartClimateData, Status
+from .models import HomeAvgSource, SmartClimateData, Status
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -59,6 +59,19 @@ _LEARNING_READY = "ready"
 _LEARNING_OPTIONS = [_LEARNING_IDLE, _LEARNING_LEARNING, _LEARNING_READY]
 
 _STATUS_OPTIONS = [s.value for s in Status]
+
+# Headline for the home-average source diagnostic: when temperature and
+# humidity disagree (e.g. only one override configured), report "mixed" and
+# carry the per-reading detail in the attributes.
+_HOME_AVG_SOURCE_OPTIONS = [*[s.value for s in HomeAvgSource], "mixed"]
+
+
+def _home_avg_source(data: SmartClimateData) -> str:
+    """Combine the temperature + humidity sources into one headline."""
+    if data.home_temp_source is data.home_humidity_source:
+        return data.home_temp_source.value
+    return "mixed"
+
 
 _PER_HOUR = "/h"
 _ACTION_OPTIONS = [
@@ -152,6 +165,20 @@ SENSORS: tuple[SmartClimateSensorDescription, ...] = (
         value_fn=lambda _coord, data: data.status.value,
         attrs_fn=lambda _coord, data: {
             "unavailable_devices": sorted(data.unavailable_devices)
+        },
+    ),
+    SmartClimateSensorDescription(
+        key="home_avg_source",
+        translation_key="home_avg_source",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.ENUM,
+        options=_HOME_AVG_SOURCE_OPTIONS,
+        value_fn=lambda _coord, data: _home_avg_source(data),
+        attrs_fn=lambda coord, data: {
+            "temperature_source": data.home_temp_source.value,
+            "humidity_source": data.home_humidity_source.value,
+            "temperature_sensor": coord.home_temp_sensor,
+            "humidity_sensor": coord.home_humidity_sensor,
         },
     ),
     SmartClimateSensorDescription(

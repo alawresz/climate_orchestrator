@@ -94,7 +94,8 @@ and what every control is for. For the architecture and the maths, see
 2. **Fully restart** Home Assistant (a new integration is only discovered on
    startup; "reload" is not enough). On first start HA installs `scipy`.
 3. **Settings → Devices & Services → Add Integration → "Climate Orchestrator"**, then
-   select your TRVs, ACs, and (optionally) an outdoor sensor and weather entity.
+   select your TRVs, ACs, and (optionally) an outdoor sensor, a weather entity,
+   and your own whole-home average temperature/humidity sensors (see below).
 
 You can change the selected devices later via the integration's **Configure**
 (options) dialog. The same dialog has two advanced fields — **TRV valve-opening**
@@ -157,6 +158,15 @@ and the *whole-home average*.
   turns on its own radiator; a house that's warm on average can switch on the AC
   in a room that's only borderline.
 - **To stop:** *both* have to be back at target before the device backs off.
+
+By default the home average is computed over the area sensors of rooms that
+have managed devices. If you'd rather it reflect the *entire* home (or a
+specific sensor you trust), pick your own **whole-home average temperature /
+humidity sensors** in the integration options — they replace the computed
+average wherever it's used. If an override sensor goes unavailable or stale,
+the computed average quietly stands in, and the **Home average source**
+diagnostic shows where the values are coming from (`external`, `computed`,
+`fallback`, or `mixed` when temperature and humidity differ).
 
 This "eager on, reluctant off" asymmetry prevents short-cycling on small sensor
 fluctuations.
@@ -414,7 +424,7 @@ its step, so a large bias can never ask for a temperature the AC won't accept.
 
 | Sensor | Description |
 |--------|-------------|
-| Home average temperature / humidity | The home-wide aggregates used as the second trigger input (primary measurements). |
+| Home average temperature / humidity | The home-wide aggregates used as the second trigger input (primary measurements). Computed from the managed areas' sensors, or taken from your own override sensors when configured. |
 | Home feels-like temperature | The home comfort index — apparent temperature of the home average scaled by **Comfort humidity influence** (equals the raw apparent temperature at the default 1.0). What Comfort index targeting judges against. |
 | Temperature slope (K/min) | Rate the home average is rising or falling (least-squares over a trailing window). |
 | Adaptive cool setpoint | The cool edge after the adaptive cooling-comfort shift (the heat edge never moves). Always computed, so you can preview the effect before enabling it. |
@@ -432,6 +442,7 @@ its step, so a large bias can never ask for a temperature the AC won't accept.
 | {TRV} valve position | The last commanded valve opening % (in `mpc` mode). |
 | Running mean outdoor temperature | The slow exponential running mean of the outdoor temperature driving adaptive comfort. |
 | Status (diagnostic) | `initializing` during the post-restart warm-up, then `ok`, or `degraded` once a managed device is unavailable or no temperature source can be found. Any offline devices are listed in its `unavailable_devices` attribute. |
+| Home average source | Where the home averages come from: `computed` (managed areas' mean), `external` (your override sensors), `fallback` (override configured but unusable — computed mean standing in), or `mixed`; per-reading detail and the configured sensors in its attributes. |
 | HVAC action reason | Plain-language headline of why the home is heating/cooling/idle/paused (e.g. `Heating`, `Frost protection`, `Paused — window open`), with a per-device breakdown in its attributes. |
 
 ### Binary sensors

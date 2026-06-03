@@ -24,10 +24,11 @@ from homeassistant.helpers import (
 )
 from homeassistant.util import dt as dt_util
 
-from ..models import DeviceReading, SmartClimateData, Status
+from ..models import DeviceReading, HomeAvgSource, SmartClimateData, Status
 from .aggregate import mean_or_none
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from datetime import datetime
 
 # binary_sensor device classes that count as a window/door being open.
@@ -118,12 +119,32 @@ def _any_on(hass: HomeAssistant, entity_ids: list[str]) -> bool:
     )
 
 
+def _override_or_computed(
+    resolve: Callable[[str | None], float | None],
+    override_sensor: str | None,
+    computed: float | None,
+) -> tuple[float | None, HomeAvgSource]:
+    """Pick the user override when usable, else fall back to the computed mean.
+
+    The override goes through the same ``resolve`` path as every other sensor,
+    so the staleness guard applies — a frozen override can't drive the home.
+    """
+    if override_sensor is None:
+        return computed, HomeAvgSource.COMPUTED
+    value = resolve(override_sensor)
+    if value is not None:
+        return value, HomeAvgSource.EXTERNAL
+    return computed, HomeAvgSource.FALLBACK
+
+
 @callback
 def build_snapshot(
     hass: HomeAssistant,
     device_ids: list[str],
     *,
     outdoor_sensor: str | None = None,
+    home_temp_sensor: str | None = None,
+    home_humidity_sensor: str | None = None,
     max_age_seconds: float = 0.0,
     now: datetime | None = None,
 ) -> SmartClimateData:
@@ -185,8 +206,14 @@ def build_snapshot(
             window_open=window_open,
         )
 
-    home_avg_temperature = mean_or_none(resolve(s) for s in temp_sensors)
-    home_avg_humidity = mean_or_none(resolve(s) for s in humidity_sensors)
+    home_avg_temperature, temp_source = _override_or_computed(
+        resolve, home_temp_sensor, mean_or_none(resolve(s) for s in temp_sensors)
+    )
+    home_avg_humidity, humidity_source = _override_or_computed(
+        resolve,
+        home_humidity_sensor,
+        mean_or_none(resolve(s) for s in humidity_sensors),
+    )
 
     available = frozenset(eid for eid, r in readings.items() if r.available)
     unavailable = frozenset(eid for eid, r in readings.items() if not r.available)
@@ -194,8 +221,9 @@ def build_snapshot(
     tracked: set[str] = (
         set(device_ids) | temp_sensors | humidity_sensors | window_sensors
     )
-    if outdoor_sensor is not None:
-        tracked.add(outdoor_sensor)
+    for extra in (outdoor_sensor, home_temp_sensor, home_humidity_sensor):
+        if extra is not None:
+            tracked.add(extra)
 
     return SmartClimateData(
         home_avg_temperature=home_avg_temperature,
@@ -205,6 +233,8 @@ def build_snapshot(
         readings=readings,
         tracked_entities=frozenset(tracked),
         stale_sensors=frozenset(stale),
+        home_temp_source=temp_source,
+        home_humidity_source=humidity_source,
         # A warm-up-unaware best effort; the coordinator refines this to
         # ``INITIALIZING`` during the post-restart grace window.
         status=Status.DEGRADED if unavailable else Status.OK,

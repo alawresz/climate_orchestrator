@@ -27,6 +27,12 @@ CONF_TRVS: Final = "trvs"
 CONF_ACS: Final = "acs"
 CONF_OUTDOOR_SENSOR: Final = "outdoor_sensor"
 CONF_WEATHER_ENTITY: Final = "weather_entity"
+# Optional user-provided whole-home average sensors. When set they override the
+# internally computed mean of the managed areas' sensors (e.g. to include rooms
+# without managed devices); if an override is unavailable/stale, the computed
+# mean stands in and the home_avg_source diagnostic reports the fallback.
+CONF_HOME_TEMP_SENSOR: Final = "home_temperature_sensor"
+CONF_HOME_HUMIDITY_SENSOR: Final = "home_humidity_sensor"
 # Name hints (comma-separated, set in the options UI) used to discover a TRV's
 # valve-opening and local-calibration `number` entities for mpc/offset modes.
 # Defaults target Zigbee2MQTT naming; override for other brands/firmware.

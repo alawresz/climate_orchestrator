@@ -9,6 +9,8 @@
           "acs": "Air conditioners",
           "outdoor_sensor": "Outdoor temperature sensor (optional)",
           "weather_entity": "Weather entity (optional, for forecast preconditioning)",
+          "home_temperature_sensor": "Whole-home average temperature sensor (optional, overrides the computed average)",
+          "home_humidity_sensor": "Whole-home average humidity sensor (optional, overrides the computed average)",
           "valve_opening_hints": "TRV valve-opening number name hints (comma-separated)",
           "calibration_hints": "TRV local-calibration number name hints (comma-separated)"
         }
@@ -31,6 +33,8 @@
           "acs": "Air conditioners",
           "outdoor_sensor": "Outdoor temperature sensor (optional)",
           "weather_entity": "Weather entity (optional, for forecast preconditioning)",
+          "home_temperature_sensor": "Whole-home average temperature sensor (optional, overrides the computed average)",
+          "home_humidity_sensor": "Whole-home average humidity sensor (optional, overrides the computed average)",
           "valve_opening_hints": "TRV valve-opening number name hints (comma-separated)",
           "calibration_hints": "TRV local-calibration number name hints (comma-separated)"
         }
@@ -56,6 +60,15 @@
           "initializing": "Initializing",
           "ok": "OK",
           "degraded": "Degraded"
+        }
+      },
+      "home_avg_source": {
+        "name": "Home average source",
+        "state": {
+          "computed": "Computed",
+          "external": "External",
+          "fallback": "Fallback (computed)",
+          "mixed": "Mixed"
         }
       },
       "hvac_action_reason": {

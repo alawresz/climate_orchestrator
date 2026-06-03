@@ -19,6 +19,19 @@ class Status(StrEnum):
     DEGRADED = "degraded"
 
 
+class HomeAvgSource(StrEnum):
+    """Where a home-average reading came from this cycle.
+
+    ``EXTERNAL`` is the user-configured override sensor; ``FALLBACK`` means an
+    override is configured but currently unusable (unavailable, non-numeric,
+    or stale), so the internally computed mean is standing in for it.
+    """
+
+    COMPUTED = "computed"
+    EXTERNAL = "external"
+    FALLBACK = "fallback"
+
+
 @dataclass(frozen=True, slots=True)
 class DeviceReading:
     """A snapshot of one managed device and its resolved area sensors."""
@@ -44,6 +57,8 @@ class SmartClimateData:
     readings: dict[str, DeviceReading]
     tracked_entities: frozenset[str]
     stale_sensors: frozenset[str] = frozenset()
+    home_temp_source: HomeAvgSource = HomeAvgSource.COMPUTED
+    home_humidity_source: HomeAvgSource = HomeAvgSource.COMPUTED
     status: Status = Status.OK
 
     @property
