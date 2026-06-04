@@ -123,7 +123,8 @@ observations are ignored outright.
 
 The hand-rolled coarse/fine grid search is replaced by a scipy bounded
 minimiser (`control/mpc/optimizer.py: optimize_valve`) minimising a quadratic
-tracking cost over a receding horizon (default 30 min / 6 steps,
+tracking cost over a receding horizon (default 6 steps — about 6 minutes
+at the 1-minute control cycle,
 `DEFAULT_HORIZON`) with an optional control-effort penalty. Bounds
 `0 ≤ u ≤ max_opening`. A single held move is optimised per cycle, which suits a
 TRV that keeps its opening until the next update.

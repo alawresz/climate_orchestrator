@@ -85,7 +85,7 @@ One heat/cool edge pair per preset, each editable within 7–35 °C — behaviou
 | Adaptive cooling comfort response | 5 °C | 1–10 | How gently the cool edge ramps — the degrees of outdoor excess for ~63% of the cap. Larger = gentler. |
 | Window open delay | 0 min | 0–30 | Grace period an open window may stay open before its area stops. `0` stops immediately. Frost protection ignores it. |
 | Valve maintenance interval | 30 days | 1–60 | Days between automatic valve-exercise runs (when Automatic valve maintenance is on). |
-| Sensor staleness timeout | 6 h | 0–12 h | Treat an area sensor that hasn't reported for longer than this as missing (falls back to the home average) and raise a repair. `0` disables the guard. |
+| Sensor staleness timeout | 6 h (the UI shows minutes: 360) | 0–12 h (0–720 min) | Treat an area sensor that hasn't reported for longer than this as missing (falls back to the home average) and raise a repair. `0` disables the guard. |
 
 !!! note
     Every commanded AC setpoint is clamped to the device's own min/max and
