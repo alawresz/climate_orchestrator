@@ -332,6 +332,7 @@ climate_orchestrator/
 │       ├── const.py               # domain, defaults, presets, tuning constants
 │       ├── models.py              # SmartClimateData, DeviceReading, Band, Status (pure value objects)
 │       ├── config_flow.py         # config + options flow (TRVs/ACs, outdoor sensor, weather entity, hints)
+│       ├── brand/                 # in-integration icon.png/icon@2x.png (HA >= 2026.3 local brands)
 │       ├── coordinator.py         # SmartClimateCoordinator: snapshot + control cycle + persistence
 │       ├── settings.py            # NumberSetting/SwitchSetting registries + RuntimeSettings resolver
 │       ├── entity.py              # shared base entity + hub DeviceInfo
@@ -397,7 +398,7 @@ CI is GitHub Actions (`.github/workflows/ci.yml`), which also unlocks HACS distr
 
 - **lint-and-test** — `uv sync --dev`, then `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy custom_components/climate_orchestrator`, and `uv run pytest --cov-report=xml --junitxml=junit.xml`; coverage goes to Codecov, and the JUnit file feeds **Codecov Test Analytics** (per-test run times, failure rates, flake detection — uploaded with `report_type: test_results`, even when pytest fails, since failure data is the point).
 - **hassfest** — `home-assistant/actions/hassfest` (advisory via `continue-on-error` until one green run with the synced `strings.json` is confirmed).
-- **hacs** — `hacs/action` with `category: integration` (and `ignore: brands` until the logo is submitted to `home-assistant/brands`).
+- **hacs** — `hacs/action` with `category: integration` (`ignore: brands` stays: that check looks for the domain in `home-assistant/brands`, while since HA 2026.3 the icons ship *inside* the integration — `custom_components/climate_orchestrator/brand/icon.png` + `icon@2x.png`, served via the local brands proxy API and taking priority over the CDN; the SVG source stays in the repo-root `brand/`).
 
 uv (with Python 3.14, HA's runtime) is installed via `astral-sh/setup-uv`.
 

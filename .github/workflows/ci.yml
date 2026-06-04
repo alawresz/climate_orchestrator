@@ -89,6 +89,8 @@ jobs:
       - uses: hacs/action@main # zizmor: ignore[unpinned-uses]
         with:
           category: integration
-          # Skip the brands check until the logo is submitted to
-          # home-assistant/brands.
+          # The HACS brands check looks for the domain in home-assistant/brands;
+          # since HA 2026.3 the icons ship inside the integration instead
+          # (custom_components/climate_orchestrator/brand/), which takes
+          # priority over the CDN. Keep ignoring the upstream-repo check.
           ignore: brands
