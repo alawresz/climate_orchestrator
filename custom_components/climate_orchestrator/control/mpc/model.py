@@ -12,6 +12,7 @@ toward a prior so a cold start stays sane (DESIGN.md §9). Pure: numpy/scipy.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -25,6 +26,12 @@ DEFAULT_GAIN = 0.10
 DEFAULT_LOSS = 0.01
 MIN_SAMPLES = 6
 _PRIOR_WEIGHT = 0.05
+# Physical sanity bounds for the fit. A radiator gaining 2 K/min at full valve
+# or a room with a 1-minute thermal time constant is already absurd; anything
+# the solver pushes past these is degenerate data, not physics. Finite bounds
+# also keep the optimiser's rollout from overflowing on runaway parameters.
+MAX_GAIN = 2.0  # K per minute at full valve
+MAX_LOSS = 1.0  # 1/minute coupling to the outdoor delta
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,7 +86,13 @@ def identify_parameters(
 
     result = least_squares(
         residuals,
-        x0=np.array([prior.gain, prior.loss]),
-        bounds=([0.0, 0.0], [np.inf, np.inf]),
+        # x0 must lie inside the bounds, whatever a restored prior claims.
+        x0=np.array([min(prior.gain, MAX_GAIN), min(prior.loss, MAX_LOSS)]),
+        bounds=([0.0, 0.0], [MAX_GAIN, MAX_LOSS]),
     )
-    return ThermalParams(gain=float(result.x[0]), loss=float(result.x[1]))
+    gain, loss = float(result.x[0]), float(result.x[1])
+    if not result.success or not (math.isfinite(gain) and math.isfinite(loss)):
+        # Degenerate data (all-identical samples, NaN creep) can make the
+        # solver give up or return garbage — keep the last good parameters.
+        return prior
+    return ThermalParams(gain=gain, loss=loss)

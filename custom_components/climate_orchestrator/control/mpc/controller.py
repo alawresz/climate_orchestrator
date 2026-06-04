@@ -12,20 +12,28 @@ from dataclasses import asdict
 import math
 from typing import TYPE_CHECKING, Any
 
+from ..numeric import clamp
 from .model import (
     DEFAULT_PARAMS,
+    MAX_GAIN,
+    MAX_LOSS,
     MIN_SAMPLES,
     Sample,
     ThermalParams,
     identify_parameters,
 )
-from .observer import MEASUREMENT_VAR, KalmanState, predict, update
+from .observer import MAX_VARIANCE, MEASUREMENT_VAR, KalmanState, predict, update
 from .optimizer import DEFAULT_HORIZON, optimize_valve
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 DEFAULT_MAX_HISTORY = 200
+# Transitions longer than this (HA freeze, restart gap, long device outage)
+# carry essentially no information about the valve's effect — the room has
+# re-equilibrated several times over — and a huge dt skews the fit and blows
+# up the Kalman projection. Such gaps re-anchor instead of being learned from.
+MAX_SAMPLE_DT_MIN = 30.0
 
 
 class MpcController:
@@ -50,9 +58,16 @@ class MpcController:
         the model to its own Kalman-smoothed output would be circular. The
         filter only shapes what the optimiser plans from
         (:attr:`estimated_temperature`).
+
+        Non-finite inputs are ignored outright; a gap longer than
+        ``MAX_SAMPLE_DT_MIN`` re-anchors the estimate on the new measurement
+        instead of being learned from.
         """
-        if self._last is not None and dt > 0:
-            last_temp, last_valve, last_outdoor = self._last
+        if not all(math.isfinite(v) for v in (temp, valve, outdoor, dt)):
+            return
+        bridgeable = self._last is not None and 0 < dt <= MAX_SAMPLE_DT_MIN
+        if bridgeable:
+            last_temp, last_valve, last_outdoor = self._last  # type: ignore[misc]
             self.history.append(
                 Sample(
                     dt=dt,
@@ -66,12 +81,14 @@ class MpcController:
                 self.params = identify_parameters(list(self.history), self.params)
         # Kalman: project the previous estimate across the transition that just
         # elapsed (the *previous* valve/outdoor held for dt), then correct with
-        # the new measurement. The first measurement seeds the state.
-        if self.kalman is None:
+        # the new measurement. The first measurement — or the first after an
+        # unbridgeable gap — (re-)anchors the state; dt <= 0 (same-instant
+        # re-read) corrects without projecting.
+        if self.kalman is None or dt > MAX_SAMPLE_DT_MIN:
             self.kalman = KalmanState(temp=temp, variance=MEASUREMENT_VAR)
         else:
-            if self._last is not None and dt > 0:
-                _, last_valve, last_outdoor = self._last
+            if bridgeable:
+                _, last_valve, last_outdoor = self._last  # type: ignore[misc]
                 self.kalman = predict(
                     self.kalman, last_valve, last_outdoor, self.params, dt
                 )
@@ -107,7 +124,9 @@ class MpcController:
             horizon=horizon,
             max_opening=max_opening_pct / 100.0,
         )
-        return round(valve * 100.0, 1)
+        # Final hardware clamp: whatever the caller passed as max, a valve
+        # opening outside [0, 100] is never a valid command.
+        return round(clamp(valve * 100.0, 0.0, 100.0), 1)
 
     def fit_rmse(self) -> float | None:
         """Root-mean-square residual (K/step) of the current fit over history.
@@ -147,16 +166,50 @@ class MpcController:
         payloads; the coordinator catches these per entry on restore.
         """
         gain, loss = data.get("gain"), data.get("loss")
-        if not isinstance(gain, int | float) or not isinstance(loss, int | float):
+        if (
+            not isinstance(gain, int | float)
+            or not isinstance(loss, int | float)
+            or not math.isfinite(gain)
+            or not math.isfinite(loss)
+        ):
+            # Python's json round-trips NaN/Infinity, so a corrupted store can
+            # hand back "numbers" that would poison every prediction.
             raise TypeError
         controller = cls(
-            ThermalParams(gain=float(gain), loss=float(loss)),
+            # Re-clamp to the fit bounds: a store written by an older release
+            # (or by hand) must not seed parameters the fitter itself refuses.
+            ThermalParams(
+                gain=clamp(float(gain), 0.0, MAX_GAIN),
+                loss=clamp(float(loss), 0.0, MAX_LOSS),
+            ),
             max_history=max_history,
         )
         for sample in data.get("history", []):
-            controller.history.append(Sample(**sample))
+            restored = Sample(**sample)
+            if all(
+                isinstance(v, int | float) and math.isfinite(v)
+                for v in (
+                    restored.dt,
+                    restored.temp,
+                    restored.next_temp,
+                    restored.valve,
+                    restored.outdoor,
+                )
+            ):
+                controller.history.append(restored)
         if (kalman := data.get("kalman")) is not None:
-            controller.kalman = KalmanState(**kalman)
+            state = KalmanState(**kalman)
+            if (
+                isinstance(state.temp, int | float)
+                and isinstance(state.variance, int | float)
+                and math.isfinite(state.temp)
+                and math.isfinite(state.variance)
+                and state.variance >= 0.0
+            ):
+                controller.kalman = KalmanState(
+                    temp=float(state.temp),
+                    variance=min(float(state.variance), MAX_VARIANCE),
+                )
         return controller
 
 

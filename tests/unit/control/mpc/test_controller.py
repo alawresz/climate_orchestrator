@@ -11,9 +11,14 @@ from custom_components.climate_orchestrator.control.mpc.controller import (
     preconditioned_valve_pct,
 )
 from custom_components.climate_orchestrator.control.mpc.model import (
+    MAX_GAIN,
     Sample,
     ThermalParams,
     predict_step,
+)
+from custom_components.climate_orchestrator.control.mpc.observer import (
+    MAX_VARIANCE,
+    MEASUREMENT_VAR,
 )
 
 
@@ -242,3 +247,67 @@ def test_precondition_sees_cold_beyond_the_default_horizon() -> None:
         ctrl, temp=20.5, target=21.0, outdoor=25.0, series=series, dt=5.0
     )
     assert pct == pytest.approx(42.6, abs=2.0)
+
+
+# --- production hardening: garbage inputs, long gaps, restore validation -----
+
+
+def test_non_finite_observation_is_ignored() -> None:
+    ctrl = MpcController()
+    for _ in range(8):
+        ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=1.0)
+    before = (ctrl.params, len(ctrl.history), ctrl.kalman)
+    ctrl.observe(temp=float("nan"), valve=0.5, outdoor=10.0, dt=1.0)
+    ctrl.observe(temp=20.0, valve=float("inf"), outdoor=10.0, dt=1.0)
+    assert (ctrl.params, len(ctrl.history), ctrl.kalman) == before
+
+
+def test_long_gap_reanchors_instead_of_learning() -> None:
+    """A 6 h freeze is not a usable transition: no sample, estimate re-seeded."""
+    ctrl = MpcController()
+    for _ in range(8):
+        ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=1.0)
+    n_hist = len(ctrl.history)
+    ctrl.observe(temp=25.0, valve=0.5, outdoor=10.0, dt=360.0)
+    assert len(ctrl.history) == n_hist
+    assert ctrl.kalman is not None
+    assert ctrl.kalman.temp == 25.0
+    assert ctrl.kalman.variance == MEASUREMENT_VAR
+
+
+def test_valve_pct_clamped_to_hardware_range() -> None:
+    """Even an absurd max_opening_pct never commands more than 100%."""
+    pct = MpcController().compute_valve_pct(
+        temp=15.0, target=25.0, outdoor=-10.0, dt=1.0, max_opening_pct=500.0
+    )
+    assert 0.0 <= pct <= 100.0
+
+
+def test_from_dict_rejects_non_finite_params() -> None:
+    """json round-trips NaN, so a corrupt store can hand back 'numbers'."""
+    with pytest.raises(TypeError):
+        MpcController.from_dict({"gain": float("nan"), "loss": 0.01})
+
+
+def test_from_dict_sanitises_history_kalman_and_params() -> None:
+    good = {"dt": 1.0, "temp": 20.0, "next_temp": 20.1, "valve": 0.5, "outdoor": 5.0}
+    bad = dict(good, temp=float("nan"))
+    ctrl = MpcController.from_dict(
+        {
+            "gain": 5.0,  # past the fit bound -> clamped
+            "loss": 0.01,
+            "history": [good, bad],  # the nan sample is dropped
+            "kalman": {"temp": 20.0, "variance": 1e9},  # variance capped
+        }
+    )
+    assert ctrl.params.gain == MAX_GAIN
+    assert len(ctrl.history) == 1
+    assert ctrl.kalman is not None
+    assert ctrl.kalman.variance == MAX_VARIANCE
+
+
+def test_from_dict_drops_non_finite_kalman_state() -> None:
+    ctrl = MpcController.from_dict(
+        {"gain": 0.1, "loss": 0.01, "kalman": {"temp": float("inf"), "variance": 0.04}}
+    )
+    assert ctrl.kalman is None  # re-learns from the next measurement

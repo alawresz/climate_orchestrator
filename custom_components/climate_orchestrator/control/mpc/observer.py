@@ -14,6 +14,11 @@ from .model import ThermalParams, predict_step
 # Default process/measurement variances (tunable later).
 PROCESS_VAR = 0.01
 MEASUREMENT_VAR = 0.04
+# Variance ceiling: a 5 K standard deviation already means "the estimate is
+# worthless, trust the next measurement almost entirely" (Kalman gain ~0.998).
+# Without a ceiling, a long prediction gap or corrupt restored state can grow
+# the variance without bound and destabilise subsequent updates.
+MAX_VARIANCE = 25.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +42,7 @@ def predict(
     temp = predict_step(state.temp, valve, outdoor, params, dt)
     # Jacobian of the model w.r.t. temperature.
     jac = 1.0 - dt * params.loss
-    variance = jac * state.variance * jac + process_var
+    variance = min(jac * state.variance * jac + process_var, MAX_VARIANCE)
     return KalmanState(temp=temp, variance=variance)
 
 

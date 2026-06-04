@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pytest
 
 from custom_components.climate_orchestrator.control.mpc.model import (
     DEFAULT_PARAMS,
+    MAX_GAIN,
+    MAX_LOSS,
     Sample,
     ThermalParams,
     identify_parameters,
@@ -82,3 +86,29 @@ def test_identify_clamps_gain_at_zero() -> None:
     falling = [Sample(dt=1.0, temp=20.0, next_temp=19.9, valve=1.0, outdoor=20.0)] * 6
     fit = identify_parameters(falling)
     assert 0.0 <= fit.gain < 0.01
+
+
+# --- production hardening: fit robustness ------------------------------------
+
+
+def test_identify_degenerate_samples_stay_finite_and_bounded() -> None:
+    """All-identical (zero-information) samples never produce nan/inf params."""
+    samples = [
+        Sample(dt=1.0, temp=20.0, next_temp=20.0, valve=0.5, outdoor=10.0)
+        for _ in range(10)
+    ]
+    params = identify_parameters(samples)
+    assert math.isfinite(params.gain) and math.isfinite(params.loss)
+    assert 0.0 <= params.gain <= MAX_GAIN
+    assert 0.0 <= params.loss <= MAX_LOSS
+
+
+def test_identify_accepts_out_of_bounds_prior() -> None:
+    """A restored prior past the fit bounds is clamped into x0, not a crash."""
+    samples = [
+        Sample(dt=1.0, temp=20.0, next_temp=20.1, valve=0.5, outdoor=10.0)
+        for _ in range(10)
+    ]
+    params = identify_parameters(samples, ThermalParams(gain=50.0, loss=20.0))
+    assert 0.0 <= params.gain <= MAX_GAIN
+    assert 0.0 <= params.loss <= MAX_LOSS

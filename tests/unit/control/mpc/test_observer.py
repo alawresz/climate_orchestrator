@@ -7,6 +7,7 @@ import pytest
 
 from custom_components.climate_orchestrator.control.mpc.model import ThermalParams
 from custom_components.climate_orchestrator.control.mpc.observer import (
+    MAX_VARIANCE,
     KalmanState,
     predict,
     update,
@@ -63,3 +64,12 @@ def test_kalman_predict_variance_scales_quadratically() -> None:
         dt=1.0,
     )
     assert out.variance == pytest.approx(0.50005, abs=1e-12)
+
+
+def test_predict_variance_is_capped() -> None:
+    """The variance ceiling holds even from an already-saturated state."""
+    state = KalmanState(temp=20.0, variance=MAX_VARIANCE)
+    grown = predict(
+        state, 0.5, 10.0, ThermalParams(gain=0.1, loss=0.0), 5.0
+    )
+    assert grown.variance <= MAX_VARIANCE
