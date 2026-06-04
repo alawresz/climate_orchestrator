@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v0.22.3 (2026-06-04)
+
+### Bug Fixes
+
+- Bound runtime state — store eviction, window-timer pruning, forecast cap
+  ([`6926e5d`](https://github.com/alawresz/climate_orchestrator/commit/6926e5dfc008dcefbd8c39cd4950dde48398aa19))
+
+- Rate-limit learned-state store writes
+  ([`b6710ce`](https://github.com/alawresz/climate_orchestrator/commit/b6710cec10d746c1fadd286539977245e72a95eb))
+
+### Code Style
+
+- WEATHER obj formatting
+  ([`0d15f88`](https://github.com/alawresz/climate_orchestrator/commit/0d15f884f976eba594ad032b5f7efe260da12a3d))
+
+
 ## v0.22.2 (2026-06-04)
 
 ### Bug Fixes
