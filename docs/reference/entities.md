@@ -118,14 +118,14 @@ instead it gets two tunables (when selected):
 | Diagnostic | Description |
 |------------|-------------|
 | {TRV} MPC learning status | `idle` (no model / not in MPC mode), `learning` (collecting samples), or `ready`. The learned model rides along as attributes: `heating_gain` (K/min at full valve), `heat_loss` (1/min), `model_error` (RMS residual of the fit, K — lower means a better-trusted model), and `samples`. |
-| {device} action | The device's current action (idle / heating / cooling / drying / off / unavailable), with the last commanded mode + setpoint as attributes. |
+| {device} action | The device's current action (idle / heating / cooling / drying / off / unavailable), with the last commanded mode + setpoint as attributes. During a [manual takeover](../guides/how-it-controls.md#manual-override-takeover) it also carries `manual_override: true` and `manual_override_remaining_min`. |
 | {device} runtime | Percentage of the last hour the device was running. |
 | {device} cycles per hour | Off→on starts per hour over the last hour — surfaces short-cycling. |
 | {TRV} valve position | The last commanded valve opening % (in `mpc` mode). |
 | Running mean outdoor temperature | The slow exponential running mean of the outdoor temperature driving adaptive comfort. |
 | Status (diagnostic) | `initializing` during the post-restart warm-up, then `ok`, or `degraded` once a managed device is unavailable or no temperature source can be found. Any offline devices are listed in its `unavailable_devices` attribute. |
 | Home average source | Where the home averages come from: `computed` (managed areas' mean), `external` (your override sensors), `fallback` (override configured but unusable — computed mean standing in), or `mixed`; per-reading detail and the configured sensors in its attributes. |
-| HVAC action reason | Plain-language headline of why the home is heating/cooling/idle/paused (e.g. `Heating`, `Frost protection`, `Paused — window open`), with a per-device breakdown in its attributes. |
+| HVAC action reason | Plain-language headline of why the home is heating/cooling/idle/paused (e.g. `Heating`, `Frost protection`, `Paused — window open`, `Paused — manual override`), with a per-device breakdown in its attributes. |
 
 ## Binary sensors
 

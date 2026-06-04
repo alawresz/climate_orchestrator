@@ -116,8 +116,10 @@ when it's cool out).
 
 ## Each cycle, step by step
 
-Climate Orchestrator re-evaluates whenever a relevant sensor changes (plus a periodic
-safety check). For every managed device:
+Climate Orchestrator re-evaluates whenever a relevant sensor changes (plus a
+periodic safety check). A device under a
+[manual takeover](#manual-override-takeover) is left alone entirely (unless
+frost protection punches through); for every other managed device:
 
 1. **Read the room** — the device's area temperature/humidity and the home
    average, as feels-like values when Comfort index targeting is on. An area

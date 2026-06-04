@@ -9,6 +9,13 @@ tour; if you just want it running, jump to [Installation](installation.md).
 
 - **One control surface.** A single `climate.climate_orchestrator` entity with two
   setpoints (a heating edge and a cooling edge) controls all your TRVs and ACs.
+- **Configurable presets, plus boost.** Pick which presets (home/away/sleep/
+  boost) the thermostat offers — only those create tuning entities. **Boost**
+  temporarily pushes the band in the right direction (heat or cool) and
+  auto-reverts after a set duration.
+- **Manual changes are respected.** Adjust a TRV or the AC directly (on the
+  device or its own entity) and the orchestrator stands back from *that* device
+  for a configurable window instead of silently fighting you.
 - **Area-matched sensors.** Each device reads the temperature/humidity sensor on
   its Home Assistant **area** (Settings → Areas → *Related sensors*); a home-wide
   average is computed across all of them.
@@ -36,7 +43,10 @@ tour; if you just want it running, jump to [Installation](installation.md).
   cold spell.
 - **Observability.** Per-device diagnostics (action, runtime, cycles, valve %,
   learned MPC model), a whole-home **status** sensor (`initializing`/`ok`/
-  `degraded`), and Repairs notices that flag silent misconfigurations.
+  `degraded`), Repairs notices that flag silent misconfigurations (including a
+  watchdog for devices that accept commands but ignore them), **bus events** for
+  every notable transition, and self-clearing bell notifications for the
+  important ones.
 - **Resilient.** One device or sensor going offline never takes the whole-home
   entity down, and a frozen ("stale") sensor is detected and dropped rather than
   trusted.

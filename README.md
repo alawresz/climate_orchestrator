@@ -70,9 +70,13 @@ sensors*). Full steps, manual installation, upgrading, and removal:
   forecast preconditioning that pre-heats ahead of a cold spell.
 - **Layered guards** — window-open (with grace delay), frost protection,
   outdoor-temperature gating, per-area comfort offsets.
+- **Lives with you, not against you** — pick which presets to offer, **boost**
+  for a timed extra push, and a manual-override takeover that stands back from
+  any device you adjust by hand instead of fighting the change.
 - **Observable & resilient** — per-device diagnostics, a tri-state status
-  sensor, Repairs notices for silent misconfigurations, stale-sensor detection,
-  and graceful degradation when devices drop offline.
+  sensor, Repairs notices for silent misconfigurations (including devices that
+  quietly ignore commands), bus events with self-clearing notifications,
+  stale-sensor detection, and graceful degradation when devices drop offline.
 
 ## Development
 

@@ -17,12 +17,17 @@ All of it is restored on startup with safe priors. Beyond the store, every
 tunable persists via `RestoreNumber`/`RestoreEntity` and re-runs control on
 change, and the whole-home `climate` entity restores its mode, preset, and
 manual band across restarts (`RestoreEntity`) — a restart no longer silently
-turns the system off.
+turns the system off. An active [boost](../guides/comfort-features.md#boost)
+also resumes: its deadline, direction, and the preset to revert to ride along
+as restored attributes, so a restart mid-boost keeps the original end time.
 
 What is *not* persisted: the rolling runtime/cycle samples behind the
 per-device runtime and cycles-per-hour diagnostics are transient and reset on
-restart, and the per-AC adaptive-bias accumulator's in-memory component
-re-learns in minutes.
+restart, the per-AC adaptive-bias accumulator's in-memory component re-learns
+in minutes, and a [manual-override
+takeover](../guides/how-it-controls.md#manual-override-takeover) deliberately
+does not survive a restart — its deadline lives on the monotonic clock, and
+after a restart reasserting the configured band is the safer default.
 
 ## Schema versioning
 
