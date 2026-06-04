@@ -25,6 +25,7 @@ from homeassistant.helpers import (
 from homeassistant.util import dt as dt_util
 
 from ..models import DeviceReading, HomeAvgSource, SmartClimateData, Status
+from ..util import as_float
 from .aggregate import mean_or_none
 
 if TYPE_CHECKING:
@@ -70,9 +71,8 @@ def _read_sensor(
     state = hass.states.get(entity_id)
     if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
         return None, False
-    try:
-        value = float(state.state)
-    except (TypeError, ValueError):
+    value = as_float(state.state)  # rejects garbage and non-finite (nan/inf)
+    if value is None:
         return None, False
     if max_age_seconds > 0.0:
         last = state.last_reported or state.last_updated

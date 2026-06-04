@@ -2,16 +2,25 @@
 
 from __future__ import annotations
 
+import math
+
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, callback
 
 
 def as_float(value: object) -> float | None:
-    """Coerce a state/attribute value to ``float``, or ``None`` if it isn't one."""
+    """Coerce a value to a *finite* ``float``, or ``None`` if it isn't one.
+
+    ``float("nan")``/``float("inf")`` parse without raising, so a sensor
+    reporting ``nan`` would otherwise slip through and silently poison every
+    mean and comparison downstream. Non-finite values are rejected here, once,
+    for every numeric read in the integration.
+    """
     try:
-        return float(value)  # type: ignore[arg-type]
+        result = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+    return result if math.isfinite(result) else None
 
 
 @callback

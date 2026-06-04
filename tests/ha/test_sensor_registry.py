@@ -206,3 +206,23 @@ async def test_stale_home_override_falls_back_to_computed(
     assert data.home_avg_temperature is None
     assert data.home_temp_source is HomeAvgSource.FALLBACK
     assert "sensor.whole_home_temp" in data.stale_sensors
+
+
+async def test_non_finite_sensor_reading_is_dropped(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+) -> None:
+    """A sensor reporting 'nan' is treated as missing, not averaged.
+
+    float("nan") parses without raising, so without the finiteness guard a
+    single such reading would silently poison the home average (NaN compares
+    False against everything, freezing control).
+    """
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat")
+    hass.states.async_set(AREA_TEMP_SENSOR, "nan")
+
+    data = build_snapshot(hass, [TRV_ENTITY])
+    assert data.readings[TRV_ENTITY].area_temperature is None
+    assert data.home_avg_temperature is None

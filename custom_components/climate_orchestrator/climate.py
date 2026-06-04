@@ -48,6 +48,7 @@ from .control.comfort import effective_temperature
 from .control.hysteresis import Demand
 from .entity import SmartClimateBaseEntity
 from .settings import preset_band
+from .util import as_float
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant, State
@@ -174,17 +175,16 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         preset = last.attributes.get("preset_mode")
         if preset in PRESET_MODES:
             self._attr_preset_mode = preset
-        low = last.attributes.get(ATTR_TARGET_TEMP_LOW)
-        high = last.attributes.get(ATTR_TARGET_TEMP_HIGH)
-        temp = last.attributes.get(ATTR_TEMPERATURE)
-        try:
-            if low is not None and high is not None:
-                self._manual_low = float(low)
-                self._manual_high = float(high)
-            elif temp is not None:
-                self._set_single_manual(float(temp))
-        except (TypeError, ValueError):
-            pass
+        # as_float: restored attributes come from JSON, which round-trips
+        # NaN/Infinity — garbage and non-finite values are both dropped.
+        low = as_float(last.attributes.get(ATTR_TARGET_TEMP_LOW))
+        high = as_float(last.attributes.get(ATTR_TARGET_TEMP_HIGH))
+        temp = as_float(last.attributes.get(ATTR_TEMPERATURE))
+        if low is not None and high is not None:
+            self._manual_low = low
+            self._manual_high = high
+        elif temp is not None:
+            self._set_single_manual(temp)
         # Reflect the restored mode and re-run control so it takes effect.
         self.async_write_ha_state()
         await self.coordinator.async_request_refresh()

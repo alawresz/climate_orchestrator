@@ -14,6 +14,7 @@ from collections import deque
 from dataclasses import dataclass, field, replace
 from datetime import timedelta
 import logging
+import math
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -270,13 +271,19 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                     )
         maint = await self._maint_store.async_load()
         if maint:
-            if isinstance(maint.get("last"), int | float):
+            # isfinite: Python's json happily round-trips NaN/Infinity, so a
+            # corrupted store could otherwise poison comparisons downstream.
+            if isinstance(maint.get("last"), int | float) and math.isfinite(
+                maint["last"]
+            ):
                 self._last_maintenance = float(maint["last"])
-            if isinstance(maint.get("rmot"), int | float):
+            if isinstance(maint.get("rmot"), int | float) and math.isfinite(
+                maint["rmot"]
+            ):
                 self._rmot = float(maint["rmot"])
             if isinstance(integral := maint.get("ac_bias_integral"), dict):
                 for k, v in integral.items():
-                    if isinstance(v, int | float):
+                    if isinstance(v, int | float) and math.isfinite(v):
                         self._runtime(k).ac_bias_integral = float(v)
             if isinstance(demand := maint.get("last_demand"), dict):
                 valid = {d.value for d in Demand}
@@ -840,7 +847,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         for entry in entries:
             if isinstance(entry, dict):
                 temp = entry.get("temperature")
-                if isinstance(temp, int | float) and not isinstance(temp, bool):
+                if (
+                    isinstance(temp, int | float)
+                    and not isinstance(temp, bool)
+                    and math.isfinite(temp)
+                ):
                     temps.append(float(temp))
         if temps:
             self._forecast_hourly = temps
