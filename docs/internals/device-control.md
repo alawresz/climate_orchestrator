@@ -33,7 +33,7 @@ Zigbee2MQTT/SONOFF naming but are **user-configurable** in the options flow
 lower-cased tuple by the coordinator), so another brand's naming can be
 supported without code changes. `target` mode (the default) needs none of this.
 
-## TRV controller (mpc / offset / target)
+## TRV controller (mpc, offset, target)
 
 The `calibration_mode` select chooses the strategy: `target` (mode + setpoint,
 default), `mpc` (drive valve via MPC), `offset` (bias local temperature).

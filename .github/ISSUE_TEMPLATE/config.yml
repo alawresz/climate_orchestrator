@@ -5,5 +5,5 @@ contact_links:
     url: https://alawresz.github.io/climate_orchestrator/
     about: Setup, guides, every entity and setting, troubleshooting, internals.
   - name: 🩺 Troubleshooting guide
-    url: https://alawresz.github.io/climate_orchestrator/reference/troubleshooting/
+    url: https://alawresz.github.io/climate_orchestrator/latest/reference/troubleshooting/
     about: Common problems, Repairs notices, diagnostics, and debug logging.

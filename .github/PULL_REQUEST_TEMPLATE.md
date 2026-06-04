@@ -8,7 +8,7 @@ Thanks for contributing! Two things to know up front:
   under docs/ are part of the deliverable, not an afterthought.
 
 Conventions, testing strategy, and the release flow:
-https://alawresz.github.io/climate_orchestrator/project/contributing/
+https://alawresz.github.io/climate_orchestrator/latest/project/contributing/
 -->
 
 ## What & why

@@ -92,6 +92,7 @@ validation:
   links:
     absolute_links: warn
     unrecognized_links: warn
+    anchors: warn # broken #fragment targets in cross-page links
   nav:
     omitted_files: warn
 

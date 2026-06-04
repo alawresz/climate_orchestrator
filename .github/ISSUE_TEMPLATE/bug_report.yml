@@ -6,7 +6,7 @@ body:
     attributes:
       value: >-
         Thanks for taking the time! Please check the
-        [troubleshooting guide](https://alawresz.github.io/climate_orchestrator/reference/troubleshooting/)
+        [troubleshooting guide](https://alawresz.github.io/climate_orchestrator/latest/reference/troubleshooting/)
         first — several common problems (and the Repairs notices that explain
         them) are covered there.
   - type: checkboxes
@@ -81,6 +81,6 @@ body:
       label: Debug log
       description: >-
         Enable debug logging (see the
-        [troubleshooting guide](https://alawresz.github.io/climate_orchestrator/reference/troubleshooting/#enable-debug-logging)),
+        [troubleshooting guide](https://alawresz.github.io/climate_orchestrator/latest/reference/troubleshooting/#enable-debug-logging)),
         reproduce, and paste the relevant lines.
       render: text

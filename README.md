@@ -28,12 +28,12 @@ toggles and numbers; there's no YAML to write.
 **Full documentation lives at
 [alawresz.github.io/climate_orchestrator](https://alawresz.github.io/climate_orchestrator/):**
 
-- **[Getting started](https://alawresz.github.io/climate_orchestrator/getting-started/introduction/)** —
+- **[Getting started](https://alawresz.github.io/climate_orchestrator/latest/getting-started/introduction/)** —
   installation and the first-setup walkthrough.
-- **[Guides & Reference](https://alawresz.github.io/climate_orchestrator/guides/how-it-controls/)** —
+- **[Guides & Reference](https://alawresz.github.io/climate_orchestrator/latest/guides/how-it-controls/)** —
   how the control works, every entity and setting, services, automations, and
-  [troubleshooting](https://alawresz.github.io/climate_orchestrator/reference/troubleshooting/).
-- **[Internals & Project](https://alawresz.github.io/climate_orchestrator/internals/architecture/)** —
+  [troubleshooting](https://alawresz.github.io/climate_orchestrator/latest/reference/troubleshooting/).
+- **[Internals & Project](https://alawresz.github.io/climate_orchestrator/latest/internals/architecture/)** —
   architecture, the control model and MPC maths, persistence, testing,
   tooling/CI, and the release process.
 
@@ -53,8 +53,8 @@ Via [HACS](https://hacs.xyz/) (recommended):
 Devices should be assigned to Home Assistant **areas** that have a temperature
 (and ideally humidity) sensor configured (Settings → Areas → *Related
 sensors*). Full steps, manual installation, upgrading, and removal:
-[Installation](https://alawresz.github.io/climate_orchestrator/getting-started/installation/)
-· [First setup](https://alawresz.github.io/climate_orchestrator/getting-started/first-setup/).
+[Installation](https://alawresz.github.io/climate_orchestrator/latest/getting-started/installation/)
+· [First setup](https://alawresz.github.io/climate_orchestrator/latest/getting-started/first-setup/).
 
 ## Highlights
 
@@ -79,7 +79,7 @@ sensors*). Full steps, manual installation, upgrading, and removal:
 Standalone `uv` project: `uv sync --dev`, then `uv run pytest` / `uv run mypy` /
 `uv run ruff check .`. Docs preview: `uv run --group docs mkdocs serve`.
 Conventions, testing strategy, and the release process live in the docs'
-[Project chapters](https://alawresz.github.io/climate_orchestrator/project/contributing/);
+[Project chapters](https://alawresz.github.io/climate_orchestrator/latest/project/contributing/);
 the architecture and control maths in the Internals chapters. Versioning is automated
 with [python-semantic-release](https://python-semantic-release.readthedocs.io/)
 from [Conventional Commits](https://www.conventionalcommits.org/); every change
@@ -94,7 +94,7 @@ baseline. As with any early-stage thermostat replacement, keep an independent
 fallback for heating/cooling until it has proven itself in your setup. Issues
 and PRs welcome — a debug log plus the diagnostics JSON makes reports
 actionable (see
-[Troubleshooting](https://alawresz.github.io/climate_orchestrator/reference/troubleshooting/)).
+[Troubleshooting](https://alawresz.github.io/climate_orchestrator/latest/reference/troubleshooting/)).
 
 ## License
 
