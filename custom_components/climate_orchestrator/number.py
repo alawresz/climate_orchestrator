@@ -16,6 +16,7 @@ from .settings import (
     PRESET_NUMBER_SETTINGS,
     NumberSetting,
     area_offset_key,
+    preset_number_key,
 )
 
 if TYPE_CHECKING:
@@ -51,9 +52,18 @@ async def async_setup_entry(
 ) -> None:
     """Set up the tuning, per-preset, and per-area number entities."""
     coordinator = entry.runtime_data
+    # Setpoint numbers only for the presets the user chose to expose.
+    preset_keys = {
+        preset_number_key(preset, edge)
+        for preset in coordinator.enabled_presets
+        for edge in ("heat", "cool")
+    }
     entities: list[RestoreNumber] = [
         SmartClimateNumber(coordinator, setting)
-        for setting in (*NUMBER_SETTINGS, *PRESET_NUMBER_SETTINGS)
+        for setting in (
+            *NUMBER_SETTINGS,
+            *(s for s in PRESET_NUMBER_SETTINGS if s.key in preset_keys),
+        )
     ]
     area_reg = ar.async_get(hass)
     for area_id in _managed_area_ids(hass, coordinator):

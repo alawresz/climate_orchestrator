@@ -52,6 +52,12 @@ The override sensors replace the computed whole-home average wherever it's
 used; how that average drives control — and what happens when an override goes
 stale — is covered in [How it controls](../guides/how-it-controls.md).
 
+### Presets
+
+| Field | Default | What it is |
+|-------|---------|------------|
+| **Presets** | Home, Away, Sleep | Which presets the thermostat offers. Only selected presets get editable setpoint `number` entities; the manual band is always available. |
+
 ### Advanced: TRV discovery hints
 
 | Field | Default | What it is |

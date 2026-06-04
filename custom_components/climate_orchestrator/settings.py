@@ -9,7 +9,7 @@ with a default fallback when an entity isn't present yet.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import (
     STATE_UNAVAILABLE,
@@ -30,6 +30,7 @@ from .const import (
     AREA_BAND_OFFSET_LIMIT,
     CALIBRATION_MODES,
     COMFORT_HUMIDITY_INFLUENCE_DEFAULT,
+    CONF_PRESETS,
     COOL_OFF_OUTDOOR_DEFAULT,
     DEFAULT_CALIBRATION_MODE,
     DEFAULT_PRESETS,
@@ -50,12 +51,30 @@ from .const import (
 from .control.numeric import clamp
 from .util import float_state
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
 _CALIBRATION_MODE_KEY = "calibration_mode"
 
 
 def preset_number_key(preset: str, edge: str) -> str:
     """Build the number key for a preset's edge, e.g. ``preset_home_heat``."""
     return f"preset_{preset}_{edge}"
+
+
+def enabled_presets(options: Mapping[str, Any]) -> list[str]:
+    """Named presets the user chose to expose (merged entry data + options).
+
+    Unset (or anything malformed) means **all** — preset selection is opt-in
+    narrowing. Order and validity come from ``DEFAULT_PRESETS``, so unknown
+    values are dropped and the result is stable regardless of how the
+    selection was stored. ``manual`` is not listed here; it is always
+    available on the climate entity.
+    """
+    value = options.get(CONF_PRESETS)
+    if not isinstance(value, list):
+        return list(DEFAULT_PRESETS)
+    return [preset for preset in DEFAULT_PRESETS if preset in value]
 
 
 def area_offset_key(area_id: str) -> str:

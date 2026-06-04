@@ -113,6 +113,7 @@ from .settings import (
     RuntimeSettings,
     area_band_offset,
     clamped_number_value,
+    enabled_presets,
     resolve_settings,
 )
 from .util import as_float, float_state
@@ -460,6 +461,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     def device_ids(self) -> list[str]:
         """All managed climate entities (TRVs followed by ACs)."""
         return [*self.trv_ids, *self.ac_ids]
+
+    @property
+    def enabled_presets(self) -> list[str]:
+        """Named presets the user chose to expose (default: all)."""
+        return enabled_presets(self._options)
 
     @property
     def outdoor_sensor(self) -> str | None:

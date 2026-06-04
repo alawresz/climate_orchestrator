@@ -42,6 +42,10 @@ CONF_HOME_HUMIDITY_SENSOR: Final = "home_humidity_sensor"
 # Defaults target Zigbee2MQTT naming; override for other brands/firmware.
 CONF_VALVE_HINTS: Final = "valve_opening_hints"
 CONF_CALIBRATION_HINTS: Final = "calibration_hints"
+# Which named presets to expose (subset of DEFAULT_PRESETS; "manual" is always
+# available). Unset means all — selecting fewer drops the unused presets from
+# the climate entity and skips creating their setpoint number entities.
+CONF_PRESETS: Final = "presets"
 
 # --- Control surface defaults ------------------------------------------------
 TARGET_TEMP_STEP: Final = 0.5

@@ -41,6 +41,8 @@ current temperature shows the feels-like value (raw dry-bulb kept in the
 
 One heat/cool edge pair per preset, each editable within 7–35 °C — behaviour in
 [Presets and their edges](../guides/comfort-features.md#presets-and-their-edges).
+Only presets selected in the integration's Configure dialog are offered and get
+these numbers; the manual band needs no preset.
 
 | Preset | Heat setpoint | Cool setpoint |
 |--------|:-------------:|:-------------:|

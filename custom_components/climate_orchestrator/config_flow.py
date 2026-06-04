@@ -24,10 +24,12 @@ from .const import (
     CONF_HOME_HUMIDITY_SENSOR,
     CONF_HOME_TEMP_SENSOR,
     CONF_OUTDOOR_SENSOR,
+    CONF_PRESETS,
     CONF_TRVS,
     CONF_VALVE_HINTS,
     CONF_WEATHER_ENTITY,
     CONFIG_ENTRY_VERSION,
+    DEFAULT_PRESETS,
     DEFAULT_TITLE,
     DOMAIN,
 )
@@ -49,6 +51,14 @@ _WEATHER_SELECTOR = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="weather")
 )
 _TEXT_SELECTOR = selector.TextSelector()
+_PRESET_SELECTOR = selector.SelectSelector(
+    selector.SelectSelectorConfig(
+        options=list(DEFAULT_PRESETS),
+        multiple=True,
+        mode=selector.SelectSelectorMode.LIST,
+        translation_key="presets",
+    )
+)
 
 _DEFAULT_VALVE_HINTS = ", ".join(VALVE_OPENING_HINTS)
 _DEFAULT_CALIBRATION_HINTS = ", ".join(LOCAL_CALIBRATION_HINTS)
@@ -83,6 +93,10 @@ def _build_schema(defaults: dict[str, Any]) -> vol.Schema:
             _optional(
                 CONF_HOME_HUMIDITY_SENSOR, defaults.get(CONF_HOME_HUMIDITY_SENSOR)
             ): _HUMIDITY_SENSOR_SELECTOR,
+            vol.Optional(
+                CONF_PRESETS,
+                default=list(defaults.get(CONF_PRESETS, list(DEFAULT_PRESETS))),
+            ): _PRESET_SELECTOR,
             _optional(
                 CONF_VALVE_HINTS,
                 defaults.get(CONF_VALVE_HINTS, _DEFAULT_VALVE_HINTS),

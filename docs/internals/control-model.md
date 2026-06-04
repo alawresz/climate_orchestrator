@@ -242,6 +242,12 @@ entity switches to a "manual" band derived from the single target + deadband
 and remembers the last preset. All preset edges are `number` entities that
 persist across restarts (RestoreEntity / coordinator store).
 
+The offering is narrowed by the **Presets** multi-select in the config/options
+flow: only selected presets appear in `preset_modes` and get setpoint numbers
+(deselected presets' registry entries are pruned at setup), `manual` is always
+last. Restoring (or defaulting to) a preset that is no longer selected falls
+back to `home`, else `manual`.
+
 ### What the climate entity displays vs. controls
 
 To keep the thermostat card consistent with the control loop, the entity shows

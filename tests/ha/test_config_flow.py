@@ -10,8 +10,10 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.climate_orchestrator.const import (
     CONF_ACS,
     CONF_CALIBRATION_HINTS,
+    CONF_PRESETS,
     CONF_TRVS,
     CONF_VALVE_HINTS,
+    DEFAULT_PRESETS,
     DEFAULT_TITLE,
     DOMAIN,
 )
@@ -103,6 +105,25 @@ async def test_options_flow_sets_custom_discovery_hints(
     # Parsed, trimmed, lower-cased into a tuple.
     assert coordinator.valve_hints == ("my valve", "custom_pos")
     assert coordinator.calibration_hints == ("my_calib",)
+
+
+async def test_options_flow_stores_preset_selection(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """The preset multi-select round-trips into options and the coordinator."""
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    assert coordinator.enabled_presets == list(DEFAULT_PRESETS)  # default: all
+
+    result = await hass.config_entries.options.async_init(init_integration.entry_id)
+    await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {CONF_TRVS: [TRV_ENTITY], CONF_ACS: [AC_ENTITY], CONF_PRESETS: ["home"]},
+    )
+    await hass.async_block_till_done()
+
+    assert init_integration.options[CONF_PRESETS] == ["home"]
+    coordinator = init_integration.runtime_data  # reloaded entry
+    assert coordinator.enabled_presets == ["home"]
 
 
 async def test_options_flow_requires_a_device(

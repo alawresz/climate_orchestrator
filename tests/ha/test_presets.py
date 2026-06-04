@@ -1,4 +1,4 @@
-"""Tests for the editable per-preset band entities."""
+"""Tests for the editable per-preset band entities and the preset selection."""
 
 from __future__ import annotations
 
@@ -12,10 +12,20 @@ from homeassistant.components.climate import (
     DOMAIN as CLIMATE_DOMAIN,
 )
 from homeassistant.const import ATTR_ENTITY_ID
-from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from homeassistant.core import HomeAssistant, State
+from homeassistant.helpers import entity_registry as er
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    mock_restore_cache,
+)
 
-from custom_components.climate_orchestrator.const import DEFAULT_PRESETS
+from custom_components.climate_orchestrator.const import (
+    CONF_PRESETS,
+    DEFAULT_PRESETS,
+    DOMAIN,
+)
+from custom_components.climate_orchestrator.settings import enabled_presets
+from tests.conftest import TRV_ENTITY
 
 
 async def _set_number(hass: HomeAssistant, entity_id: str, value: float) -> None:
@@ -70,3 +80,122 @@ async def test_selecting_preset_uses_edited_numbers(
         blocking=True,
     )
     assert hass.states.get(climate).attributes["target_temp_high"] == 22.0
+
+
+async def _setup_with_presets(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    presets: list[str],
+) -> None:
+    """Set up the integration with one TRV and an explicit preset selection."""
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat")
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        config_entry, options={CONF_PRESETS: presets}
+    )
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_preset_selection_limits_modes_and_numbers(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Only selected presets appear on the climate entity and get numbers."""
+    await _setup_with_presets(
+        hass, config_entry, living_area, register_entity_in_area, ["home", "sleep"]
+    )
+    cid = config_entry.entry_id
+
+    climate = hass.states.get(entity_id_for("climate", cid))
+    assert climate.attributes["preset_modes"] == ["home", "sleep", "manual"]
+
+    assert hass.states.get(entity_id_for("number", f"{cid}_preset_home_heat"))
+    assert hass.states.get(entity_id_for("number", f"{cid}_preset_sleep_cool"))
+    registry = er.async_get(hass)
+    for edge in ("heat", "cool"):
+        assert (
+            registry.async_get_entity_id("number", DOMAIN, f"{cid}_preset_away_{edge}")
+            is None
+        )
+
+
+async def test_deselecting_active_preset_falls_back(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """A restored preset that is no longer selected falls back to home."""
+    mock_restore_cache(
+        hass,
+        [State("climate.climate_orchestrator", "heat", {"preset_mode": "away"})],
+    )
+    await _setup_with_presets(
+        hass, config_entry, living_area, register_entity_in_area, ["home", "sleep"]
+    )
+    climate = hass.states.get(entity_id_for("climate", config_entry.entry_id))
+    assert climate.attributes[ATTR_PRESET_MODE] == "home"
+
+
+async def test_deselecting_home_falls_back_to_manual(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Without home in the selection the default preset is manual."""
+    await _setup_with_presets(
+        hass, config_entry, living_area, register_entity_in_area, ["sleep"]
+    )
+    climate = hass.states.get(entity_id_for("climate", config_entry.entry_id))
+    assert climate.attributes["preset_modes"] == ["sleep", "manual"]
+    assert climate.attributes[ATTR_PRESET_MODE] == "manual"
+
+
+async def test_deselected_preset_numbers_are_pruned(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+) -> None:
+    """Registry entries of a deselected preset's numbers are removed at setup."""
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat")
+    config_entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    cid = config_entry.entry_id
+    stale = [
+        registry.async_get_or_create(
+            "number", DOMAIN, f"{cid}_preset_away_{edge}", config_entry=config_entry
+        ).entity_id
+        for edge in ("heat", "cool")
+    ]
+    hass.config_entries.async_update_entry(
+        config_entry, options={CONF_PRESETS: ["home", "sleep"]}
+    )
+
+    assert await hass.config_entries.async_setup(cid)
+    await hass.async_block_till_done()
+
+    for entity_id in stale:
+        assert registry.async_get(entity_id) is None
+
+
+def test_enabled_presets_defaults_and_filtering() -> None:
+    """Unset/malformed selections mean all; unknowns drop; order is canonical."""
+    assert enabled_presets({}) == list(DEFAULT_PRESETS)
+    assert enabled_presets({CONF_PRESETS: "home"}) == list(DEFAULT_PRESETS)
+    assert enabled_presets({CONF_PRESETS: ["sleep", "bogus", "home"]}) == [
+        "home",
+        "sleep",
+    ]
+    assert enabled_presets({CONF_PRESETS: []}) == []

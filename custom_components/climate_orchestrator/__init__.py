@@ -11,8 +11,9 @@ from typing import TYPE_CHECKING
 
 from homeassistant.helpers import entity_registry as er
 
-from .const import CONFIG_ENTRY_VERSION, PLATFORMS
+from .const import CONFIG_ENTRY_VERSION, DEFAULT_PRESETS, PLATFORMS
 from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
+from .settings import enabled_presets, preset_number_key
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -31,10 +32,25 @@ _RETIRED_UNIQUE_ID_SUFFIXES = (
 def _async_remove_retired_entities(
     hass: HomeAssistant, entry: SmartClimateConfigEntry
 ) -> None:
-    """Drop registry entries for entities this version no longer creates."""
+    """Drop registry entries for entities this configuration no longer creates.
+
+    Covers entities retired by upgrades (fixed suffixes above) and the setpoint
+    numbers of presets deselected in the options flow — without this, both
+    linger in the registry as permanently-unavailable orphans.
+    """
+    selected = set(enabled_presets({**entry.data, **entry.options}))
+    deselected_ids = {
+        f"{entry.entry_id}_{preset_number_key(preset, edge)}"
+        for preset in DEFAULT_PRESETS
+        if preset not in selected
+        for edge in ("heat", "cool")
+    }
     registry = er.async_get(hass)
     for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
-        if entity.unique_id.endswith(_RETIRED_UNIQUE_ID_SUFFIXES):
+        if (
+            entity.unique_id.endswith(_RETIRED_UNIQUE_ID_SUFFIXES)
+            or entity.unique_id in deselected_ids
+        ):
             registry.async_remove(entity.entity_id)
 
 

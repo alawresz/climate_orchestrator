@@ -21,6 +21,13 @@ is editable within 7–35 °C.
 The preset edges live as `number` entities on the hub device (e.g. *Preset Home
 heat setpoint*), so automations can edit them too.
 
+Don't need all three? The **Presets** multi-select in the integration's
+Configure dialog narrows the offering: deselected presets disappear from the
+thermostat and their setpoint numbers aren't created (existing ones are cleaned
+up). The manual band is always available. If the *active* preset is
+deselected, the thermostat falls back to Home — or to manual when Home isn't
+selected either.
+
 ## The manual band
 
 You don't have to go through a preset: moving the setpoints directly on the

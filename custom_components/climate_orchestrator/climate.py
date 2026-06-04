@@ -38,7 +38,6 @@ from .const import (
     MAX_TEMP,
     MIN_TEMP,
     PRESET_MANUAL,
-    PRESET_MODES,
     SERVICE_RESET_MPC_LEARNING,
     SERVICE_RUN_VALVE_MAINTENANCE,
     TARGET_TEMP_STEP,
@@ -91,7 +90,6 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
     _attr_name = None  # use the hub device name
     _attr_icon = "mdi:thermostat"  # mdi:home-thermostat is not a real MDI name
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
-    _attr_preset_modes = PRESET_MODES
     _attr_target_temperature_step = TARGET_TEMP_STEP
     _attr_min_temp = MIN_TEMP
     _attr_max_temp = MAX_TEMP
@@ -102,7 +100,14 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         super().__init__(coordinator)
         self._attr_unique_id = coordinator.entry.entry_id
         self._attr_hvac_mode = HVACMode.OFF
-        self._attr_preset_mode = DEFAULT_PRESET
+        # The configured selection (plus "manual", always last) — fixed for the
+        # entity's lifetime: changing it in the options flow reloads the entry.
+        self._attr_preset_modes = [*coordinator.enabled_presets, PRESET_MANUAL]
+        self._attr_preset_mode = (
+            DEFAULT_PRESET
+            if DEFAULT_PRESET in self._attr_preset_modes
+            else PRESET_MANUAL
+        )
         # Manual band edges (used only when preset == "manual").
         low, high = DEFAULT_PRESETS[DEFAULT_PRESET]
         self._manual_low = low
@@ -173,7 +178,9 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         if last.state in self.hvac_modes:
             self._attr_hvac_mode = HVACMode(last.state)
         preset = last.attributes.get("preset_mode")
-        if preset in PRESET_MODES:
+        # Restoring a preset that has since been deselected in the options
+        # falls through to the __init__ default (home if enabled, else manual).
+        if preset in (self._attr_preset_modes or []):
             self._attr_preset_mode = preset
         # as_float: restored attributes come from JSON, which round-trips
         # NaN/Infinity — garbage and non-finite values are both dropped.
