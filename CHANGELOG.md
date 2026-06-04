@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v0.23.0 (2026-06-04)
+
+### Bug Fixes
+
+- Re-arm window recheck timer mid-grace
+  ([`4513046`](https://github.com/alawresz/climate_orchestrator/commit/4513046ab6a7c867ce1c0d8cebed6bc1fddc13d1))
+
+### Documentation
+
+- Document docs workflow
+  ([`e29dde8`](https://github.com/alawresz/climate_orchestrator/commit/e29dde87c9b4bd48a945b195325c6538c79dd43b))
+
+### Features
+
+- Fold per-TRV MPC diagnostics into the learning-status sensor's attributes
+  ([`56d381c`](https://github.com/alawresz/climate_orchestrator/commit/56d381c9fdc2320ae9e09140af457dc1f25f19ef))
+
+
 ## v0.22.6 (2026-06-04)
 
 ### Bug Fixes
