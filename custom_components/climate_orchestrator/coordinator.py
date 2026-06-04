@@ -1,10 +1,10 @@
 """Coordinator for the Climate Orchestrator integration.
 
-Owns the shared runtime snapshot and the control cycle. In Phase 1 the cycle
-just resolves sensors and aggregates; control logic lands in later phases. It is
-event-driven (state-change listeners over the managed devices and their area
-sensors) with a periodic keepalive, and re-subscribes when the tracked set
-changes.
+Owns the shared runtime snapshot and the control cycle: each cycle resolves
+the area sensors into a snapshot, decides every managed device through the
+control engine, and applies the minimal writes. It is event-driven
+(state-change listeners over the managed devices and their area sensors) with
+a periodic keepalive, and re-subscribes when the tracked set changes.
 """
 
 from __future__ import annotations
@@ -178,8 +178,8 @@ class DeviceRuntime:
     """All mutable runtime state of one managed device, in one place.
 
     One instance per managed entity, created on first touch via
-    ``SmartClimateCoordinator._runtime`` — so per-device init and cleanup are
-    atomic instead of being scattered across parallel dicts.
+    ``SmartClimateCoordinator._runtime`` — one object per device keeps init
+    and cleanup atomic (no parallel per-field dicts to keep in sync).
     """
 
     demand: Demand = Demand.IDLE
@@ -217,9 +217,9 @@ class DeviceRuntime:
 class CycleContext:
     """Everything one control cycle resolves once and shares across devices.
 
-    Bundling these kills the 7-8 positional-argument signatures previously
-    threaded through the per-device helpers (same-typed adjacent floats are
-    exactly the swap-bug class neither mypy nor tests reliably catch).
+    Passed as one bundle so the per-device helpers don't take long runs of
+    positional same-typed floats — exactly the argument-swap bug class that
+    neither mypy nor tests reliably catch.
     """
 
     settings: RuntimeSettings
@@ -245,7 +245,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self._tracked: frozenset[str] = frozenset()
         # Post-restart warm-up bookkeeping: when we started, and whether we've
         # yet seen a usable home temperature. Drives the tri-state status so
-        # transient startup gaps don't raise repairs (DESIGN.md §6.4).
+        # transient startup gaps don't raise repairs (docs/internals/device-control.md).
         self._started = time.monotonic()
         self._ever_ready = False
         # Consecutive control-cycle failures (drives the repair issue).
@@ -591,8 +591,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         )
         low_f, high_f = as_float(low), as_float(high)
         if low_f is None or high_f is None:
-            # Missing *or* garbage attributes fall back to the preset band —
-            # this read previously trusted float() blindly.
+            # Missing *or* garbage attributes (restored state is arbitrary
+            # JSON) fall back to the active preset's default band.
             preset = state.attributes.get("preset_mode", DEFAULT_PRESET)
             low_f, high_f = DEFAULT_PRESETS.get(preset, DEFAULT_PRESETS[DEFAULT_PRESET])
         return state.state, Band(heat_edge=low_f, cool_edge=high_f)

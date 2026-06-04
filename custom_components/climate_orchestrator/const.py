@@ -92,9 +92,9 @@ COMMAND_IGNORED_SECONDS: Final = 300.0
 STARTUP_GRACE_SECONDS: Final = 120.0
 
 # --- Presets -----------------------------------------------------------------
-# Each preset is a comfort band defined by its two edges: heat below `min`,
-# cool above `max` (see DESIGN.md §7). These are Phase 1 defaults; they become
-# editable `number` entities in a later phase.
+# Each preset is a comfort band defined by its two edges: heat below the first,
+# cool above the second (docs/internals/control-model.md). These values seed
+# the per-preset `number` entities; the live band always comes from those.
 PRESET_MANUAL: Final = "manual"
 DEFAULT_PRESETS: Final[dict[str, tuple[float, float]]] = {
     "away": (16.0, 30.0),
@@ -130,7 +130,7 @@ DEW_POINT_THRESHOLD_DEFAULT: Final = 16.0
 HEAT_OFF_OUTDOOR_DEFAULT: Final = 20.0
 COOL_OFF_OUTDOOR_DEFAULT: Final = 16.0
 # How far below the real target to bias an AC's setpoint so its own sensor
-# doesn't satisfy before the room does (DESIGN.md §6.2).
+# doesn't satisfy before the room does (docs/internals/control-model.md).
 AC_SETPOINT_BIAS_DEFAULT: Final = 1.5
 # Adaptive AC bias (integral feedback): ceiling on total bias, integral gain
 # (°C added per °C-minute of error), and decay applied when not cooling.
@@ -140,7 +140,7 @@ ADAPTIVE_BIAS_DECAY: Final = 0.5
 # When cooling is wanted, force the AC's setpoint at least this far below the
 # AC's *own* internal sensor, so the compressor actually runs (it idles/fans if
 # the setpoint isn't below what it reads). The room sensor still decides when to
-# stop. See DESIGN.md §6.2.
+# stop. See docs/internals/control-model.md.
 AC_COOL_KICK: Final = 1.0
 
 # AC setpoint write throttling: the proportional compressor anchor nudges the
@@ -176,7 +176,7 @@ VALVE_MAINTENANCE_INTERVAL_DEFAULT: Final = 30.0
 SERVICE_RESET_MPC_LEARNING: Final = "reset_mpc_learning"
 SERVICE_RUN_VALVE_MAINTENANCE: Final = "run_valve_maintenance"
 # Grace period (minutes) a window may stay open before heating/cooling stops;
-# 0 = stop immediately (DESIGN.md §6.5).
+# 0 = stop immediately (docs/internals/control-model.md).
 WINDOW_OPEN_DELAY_DEFAULT: Final = 0.0
 
 # --- TRV calibration strategy ------------------------------------------------

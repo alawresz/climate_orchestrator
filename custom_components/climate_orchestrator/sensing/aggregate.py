@@ -17,7 +17,7 @@ def mean_or_none(values: Iterable[float | None]) -> float | None:
     """Return the mean of the non-``None`` values, or ``None`` if there are none.
 
     Offline/unknown sensors are represented as ``None`` and dropped from the
-    mean rather than poisoning it (see DESIGN.md §6.4).
+    mean rather than poisoning it (see docs/internals/sensing.md).
     """
     present = [value for value in values if value is not None]
     if not present:

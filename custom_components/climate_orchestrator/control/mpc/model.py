@@ -6,7 +6,7 @@ Room dynamics are modelled as a single RC node::
 
 where ``valve`` is the heat input fraction in [0, 1]. Parameters are fitted from
 observed transitions with ``scipy.optimize.least_squares`` and regularised
-toward a prior so a cold start stays sane (DESIGN.md §9). Pure: numpy/scipy.
+toward a prior so a cold start stays sane (docs/internals/mpc.md). Pure: numpy/scipy.
 """
 
 from __future__ import annotations

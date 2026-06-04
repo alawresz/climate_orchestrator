@@ -1,8 +1,9 @@
 """The Climate Orchestrator integration.
 
-Phase 1: the integration sets up a coordinator that resolves each managed
-device's area sensors and the home-wide averages, and exposes a whole-home
-climate entity plus diagnostic sensors. Control logic arrives in later phases.
+Entry setup wires a coordinator that resolves each managed device's area
+sensors and the home-wide averages and runs the control cycle, then forwards
+to the platforms: the whole-home climate entity, the tuning number/switch/
+select entities, and the diagnostic sensors.
 """
 
 from __future__ import annotations

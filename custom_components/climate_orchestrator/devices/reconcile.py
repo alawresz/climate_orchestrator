@@ -1,7 +1,8 @@
 """Update minimization: compute only the writes that actually change state.
 
 A service call is emitted only when the device isn't already in the requested
-mode, or the target differs by at least one step (DESIGN.md §6.3). Pure.
+mode, or the target differs by at least one step — see
+docs/internals/device-control.md. Pure.
 """
 
 from __future__ import annotations

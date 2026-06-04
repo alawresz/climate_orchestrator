@@ -2,7 +2,8 @@
 
 Heaters (TRVs) heat toward the band target. Coolers (ACs) cool toward a target
 biased *below* the real target so the AC's own sensor doesn't satisfy before the
-room does (DESIGN.md §6.2); an idle AC under the dew-point guard runs dry mode.
+room does (docs/internals/control-model.md); an idle AC under the dew-point
+guard runs dry mode.
 """
 
 from __future__ import annotations

@@ -2,7 +2,7 @@
 
 Forward-predicts the room temperature between sensor updates using the thermal
 model, and corrects on each measurement. Smooths noisy sensors and bridges
-slow-reporting devices (DESIGN.md §9). Pure.
+slow-reporting devices (docs/internals/mpc.md). Pure.
 """
 
 from __future__ import annotations

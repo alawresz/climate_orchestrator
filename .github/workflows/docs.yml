@@ -6,10 +6,9 @@ name: Docs
 # but that branch is only its version database (versions.json + per-version
 # trees); the deploy step uploads that tree as a Pages artifact.
 #
-# Only released versions are published — no rolling "dev" build of main:
+# Only released versions are published — no rolling build of main:
 # semantic-release cuts a release for nearly every change, so main never
-# drifts far ahead of the newest numbered version, and "dev" was just noise
-# in the version selector.
+# drifts far ahead of the newest numbered version.
 #
 # - Stable release   -> release.yml dispatches this workflow with version
 #                       "X.Y" + latest (GitHub doesn't fire `release` events

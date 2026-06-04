@@ -2,7 +2,8 @@
 
 Each cycle the controller observes the latest transition (feeding online system
 identification) and computes the valve opening for the next interval. Its
-learned state is serialisable so it survives restarts (DESIGN.md §9, §13). Pure.
+learned state is serialisable so it survives restarts (docs/internals/mpc.md
+and docs/internals/persistence.md). Pure.
 """
 
 from __future__ import annotations

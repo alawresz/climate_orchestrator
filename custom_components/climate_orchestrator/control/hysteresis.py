@@ -3,7 +3,7 @@
 Engage on *local OR home-average* crossing a band edge; release only when
 *both* are back at the target, or an early-out when the room nears the opposite
 edge. This OR-to-engage / AND-to-release asymmetry suppresses short-cycling
-(see DESIGN.md §5.2). Pure functions — no Home Assistant dependencies.
+(see docs/internals/control-model.md). Pure functions — no Home Assistant dependencies.
 """
 
 from __future__ import annotations

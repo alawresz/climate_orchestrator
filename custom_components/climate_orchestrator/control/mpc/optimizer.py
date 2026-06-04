@@ -2,7 +2,7 @@
 
 Picks the valve fraction that minimises predicted tracking error over a short
 horizon (with an optional control-effort penalty), bounded to the valve's range
-(DESIGN.md §9). A single held move is optimised per cycle, which suits a TRV
+(docs/internals/mpc.md). A single held move is optimised per cycle, which suits a TRV
 that keeps its opening until the next update. Pure.
 """
 

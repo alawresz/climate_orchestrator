@@ -4,8 +4,9 @@ Pure functions with no Home Assistant dependencies. The "feels-like" target is
 the Australian Bureau of Meteorology Apparent Temperature, evaluated indoors
 (wind speed = 0). Unlike the US Heat Index it is a single continuous function
 across the whole indoor range, so it works for both heating and cooling
-(see DESIGN.md §5.3). The whole-home feels-like value is also surfaced as a
-sensor so it's visible *why* the thermostat is (or isn't) running.
+(see docs/internals/control-model.md). The whole-home feels-like value is
+also surfaced as a sensor so it's visible *why* the thermostat is (or isn't)
+running.
 """
 
 from __future__ import annotations

@@ -88,10 +88,8 @@ CI is `.github/workflows/ci.yml`, which also unlocks HACS distribution. Jobs:
   flag, like coverage) and `HYPOTHESIS_PROFILE=ci` (no deadline —
   loaded-runner deadline flake protection).
 - **hassfest** — `home-assistant/actions/hassfest` validates the
-  manifest/structure (advisory via `continue-on-error` until one green run
-  with the synced `strings.json` is confirmed, then it becomes a gate).
-  hassfest also validates `strings.json`, which is kept byte-identical to
-  `translations/en.json` (sync-checked in CI and pre-commit).
+  manifest/structure, including `strings.json` — which is kept byte-identical
+  to `translations/en.json` (sync-checked in CI and pre-commit).
 - **hacs** — `hacs/action` with `category: integration`. `ignore: brands`
   stays: that check looks for the domain in `home-assistant/brands`, while
   since HA 2026.3 the icons ship *inside* the integration —
@@ -101,8 +99,9 @@ CI is `.github/workflows/ci.yml`, which also unlocks HACS distribution. Jobs:
 
 Two scheduled workflows complement CI:
 
-- A weekly **`links.yml`** runs lychee over README/DESIGN/CHANGELOG to catch
-  dead links.
+- A weekly **`links.yml`** runs lychee over the README, the changelog, the
+  docs chapters, and the issue/PR templates to catch dead *external* links
+  (internal docs links are gated per-PR by the strict MkDocs build).
 - A weekly **`ha-dev.yml`** canary re-runs the test suite against Home
   Assistant's latest *pre-release* (uv `--prerelease=allow` upgrade over the
   locked venv) to catch upstream breaking changes weeks before they reach

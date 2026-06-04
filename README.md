@@ -79,8 +79,8 @@ sensors*). Full steps, manual installation, upgrading, and removal:
 Standalone `uv` project: `uv sync --dev`, then `uv run pytest` / `uv run mypy` /
 `uv run ruff check .`. Docs preview: `uv run --group docs mkdocs serve`.
 Conventions, testing strategy, and the release process live in the docs'
-[Project chapters](https://alawresz.github.io/climate_orchestrator/project/contributing/)
-— the Internals chapters replace the old `DESIGN.md`. Versioning is automated
+[Project chapters](https://alawresz.github.io/climate_orchestrator/project/contributing/);
+the architecture and control maths in the Internals chapters. Versioning is automated
 with [python-semantic-release](https://python-semantic-release.readthedocs.io/)
 from [Conventional Commits](https://www.conventionalcommits.org/); every change
 ships code, tests, and docs together.

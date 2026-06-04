@@ -3,7 +3,7 @@
 Pure logic (no Home Assistant). For each managed device it applies, in priority
 order: master-off, availability, frost protection, window-open, the hysteresis
 demand, device-capability gating, outdoor-temp gating, and finally the AC
-dew-point dry-mode guard (see DESIGN.md §5.4, §5.5, §6.2).
+dew-point dry-mode guard (see docs/internals/control-model.md).
 """
 
 from __future__ import annotations

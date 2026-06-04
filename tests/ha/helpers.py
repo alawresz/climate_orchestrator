@@ -69,9 +69,9 @@ async def setup_trv_with_number(
 ) -> SmartClimateCoordinator:
     """Set up the integration with a TRV exposing a related ``number`` entity.
 
-    Registers the TRV in ``area_id`` with a device-level number entity named
-    so the valve/calibration hints can discover it — the registry dance that
-    used to be copy-pasted across three test files.
+    Registers the TRV in ``area_id`` together with a number entity on the
+    same device, named so the valve/calibration hints can discover it — the
+    full device/entity-registry wiring the mpc/offset test paths need.
     """
     config_entry.add_to_hass(hass)
     device = dr.async_get(hass).async_get_or_create(

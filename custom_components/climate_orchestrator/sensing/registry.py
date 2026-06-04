@@ -4,7 +4,7 @@ Each managed climate device is matched to the temperature/humidity sensor
 *configured on its Home Assistant area* (Settings -> Areas -> Related sensors),
 not by scanning entities. The home-wide average is taken over the available
 area sensors only; offline sensors and devices are handled gracefully
-(DESIGN.md §4 and §6.4).
+(docs/internals/sensing.md).
 """
 
 from __future__ import annotations
