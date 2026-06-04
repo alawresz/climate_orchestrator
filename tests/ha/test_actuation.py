@@ -14,6 +14,7 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, AREA_TEMP_SENSOR, TRV_ENTITY
+from tests.ha.helpers import set_desired_preset
 
 _TRV_ATTRS = {
     "hvac_modes": ["off", "heat"],
@@ -21,15 +22,6 @@ _TRV_ATTRS = {
     "max_temp": 35.0,
     "target_temp_step": 0.5,
 }
-
-
-def _set_desired(
-    hass: HomeAssistant, climate_id: str, mode: str, *, target: float = 22.5
-) -> None:
-    """Fake the whole-home entity's desired state read by the coordinator."""
-    hass.states.async_set(
-        climate_id, mode, {"temperature": target, "preset_mode": "home"}
-    )
 
 
 async def test_heating_demand_commands_the_trv(
@@ -44,7 +36,7 @@ async def test_heating_demand_commands_the_trv(
 
     hass.states.async_set(TRV_ENTITY, "off", _TRV_ATTRS)
     hass.states.async_set(AREA_TEMP_SENSOR, "19.0")
-    _set_desired(hass, climate_id, "heat_cool")
+    set_desired_preset(hass, climate_id, "heat_cool")
 
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     await coordinator.async_refresh()
@@ -69,7 +61,7 @@ async def test_no_redundant_writes_when_already_satisfied(
     # Already at the heat target (heat_edge 20.5 + tolerance 0.3 -> 20.8 -> 21.0).
     hass.states.async_set(TRV_ENTITY, "heat", {**_TRV_ATTRS, "temperature": 21.0})
     hass.states.async_set(AREA_TEMP_SENSOR, "19.0")
-    _set_desired(hass, climate_id, "heat_cool")
+    set_desired_preset(hass, climate_id, "heat_cool")
 
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     await coordinator.async_refresh()
@@ -117,7 +109,7 @@ async def test_ac_setpoint_is_throttled_between_cycles(
         },
     )
     hass.states.async_set(AREA_TEMP_SENSOR, "28.0", {"device_class": "temperature"})
-    _set_desired(hass, climate_id, "heat_cool")
+    set_desired_preset(hass, climate_id, "heat_cool")
 
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
 
@@ -148,7 +140,7 @@ async def test_unavailable_device_does_not_break_the_cycle(
     climate_id = entity_id_for("climate", init_integration.entry_id)
 
     hass.states.async_set(TRV_ENTITY, STATE_UNAVAILABLE)
-    _set_desired(hass, climate_id, "heat_cool")
+    set_desired_preset(hass, climate_id, "heat_cool")
 
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     await coordinator.async_refresh()
@@ -184,7 +176,7 @@ async def test_home_average_trigger_switch_wires_into_control(
 
     hass.states.async_set(TRV_ENTITY, "off", _TRV_ATTRS)
     hass.states.async_set(AREA_TEMP_SENSOR, "22.0")
-    _set_desired(hass, climate_id, "heat_cool")
+    set_desired_preset(hass, climate_id, "heat_cool")
 
     await coordinator.async_refresh()
     await hass.async_block_till_done()

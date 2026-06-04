@@ -679,7 +679,7 @@ wheels = [
 
 [[package]]
 name = "climate-orchestrator"
-version = "0.20.0"
+version = "0.20.2"
 source = { virtual = "." }
 
 [package.dev-dependencies]
