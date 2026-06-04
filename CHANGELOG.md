@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.22.0 (2026-06-04)
+
+### Features
+
+- Close quality-scale todos: translated errors, log-once outages, executor MPC, opt-in counters
+  ([`b156d1d`](https://github.com/alawresz/climate_orchestrator/commit/b156d1df5653bfa4aaf59e750afdda20ad174724))
+
+### Testing
+
+- Simplify error raising in actuation rejection test
+  ([`d07859e`](https://github.com/alawresz/climate_orchestrator/commit/d07859e46749f311913f4a94a52651ac502dd1a5))
+
+
 ## v0.21.0 (2026-06-04)
 
 ### Chores
