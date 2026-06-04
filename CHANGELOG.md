@@ -2,6 +2,34 @@
 
 <!-- version list -->
 
+## v0.21.0 (2026-06-04)
+
+### Chores
+
+- Add quality scale
+  ([`34aa36a`](https://github.com/alawresz/climate_orchestrator/commit/34aa36a89b5cf0e0d46184cbb85f1b96d8b6c2aa))
+
+### Continuous Integration
+
+- Update HACS brands handling for HA 2026.3 local icons
+  ([`9396af3`](https://github.com/alawresz/climate_orchestrator/commit/9396af337e2a0fc05ec2fc27bb0cdd9b6ac6ece4))
+
+### Features
+
+- Add entry removal cleanup and optimize entity updates
+  ([`782ff06`](https://github.com/alawresz/climate_orchestrator/commit/782ff066c6af0be068dd1aa15b41f225fbb782a3))
+
+### Refactoring
+
+- Shared state helpers, settings snapshot, pure runtime stats
+  ([`44f0886`](https://github.com/alawresz/climate_orchestrator/commit/44f0886daa526e9ea5e50c52171328886a05f24c))
+
+### Testing
+
+- Kill runtime-stats, Kalman, and preconditioning mutation survivors
+  ([`6304f01`](https://github.com/alawresz/climate_orchestrator/commit/6304f013c01b5e1a711b809648333beddf322725))
+
+
 ## v0.20.3 (2026-06-04)
 
 ### Bug Fixes
