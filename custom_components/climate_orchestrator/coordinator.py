@@ -28,6 +28,7 @@ from homeassistant.core import (
     HomeAssistant,
     callback,
 )
+from homeassistant.exceptions import UnsupportedStorageVersionError
 from homeassistant.helpers import (
     entity_registry as er,
 )
@@ -122,6 +123,34 @@ if TYPE_CHECKING:
     from collections.abc import Coroutine
 
 _MPC_STORE_VERSION = 1
+
+
+class _LearnedStateStore(Store[dict[str, Any]]):
+    """Learned-state store with explicit schema-migration semantics.
+
+    Everything persisted here is re-learnable in hours, so the migration
+    policy is deliberately blunt: a payload whose schema we don't positively
+    recognise is discarded rather than risk a mis-read. Same-major minor
+    drift reads forward-compatibly (loaders validate field-by-field anyway).
+    """
+
+    async def _async_migrate_func(
+        self,
+        old_major_version: int,
+        old_minor_version: int,
+        old_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        if old_major_version == _MPC_STORE_VERSION:
+            return old_data
+        _LOGGER.warning(
+            "climate_orchestrator: discarding persisted state with unknown"
+            " schema v%s (current v%s); it will be re-learned",
+            old_major_version,
+            _MPC_STORE_VERSION,
+        )
+        return {}
+
+
 # Skip number writes within this of the current value (update minimization).
 NUMBER_WRITE_EPSILON = 0.1
 _MPC_SAVE_DELAY = 30.0
@@ -247,10 +276,10 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         # forecast-based preconditioning, plus when it was last fetched.
         self._forecast_hourly: list[float] = []
         self._forecast_fetched_at = 0.0
-        self._mpc_store: Store[dict[str, Any]] = Store(
+        self._mpc_store: Store[dict[str, Any]] = _LearnedStateStore(
             hass, _MPC_STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.mpc"
         )
-        self._maint_store: Store[dict[str, Any]] = Store(
+        self._maint_store: Store[dict[str, Any]] = _LearnedStateStore(
             hass, _MPC_STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.maintenance"
         )
 
@@ -283,6 +312,26 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             self.hass, coro, name=f"{DOMAIN} {name}"
         )
 
+    @staticmethod
+    async def _load_store(
+        store: Store[dict[str, Any]], label: str
+    ) -> dict[str, Any] | None:
+        """Load a learned-state store; a newer-schema payload never breaks setup.
+
+        ``Store`` raises before our migrate hook when the stored *major*
+        version exceeds the current one (downgrade scenario) — learned state
+        is re-learnable, so discard it instead of failing the entry.
+        """
+        try:
+            return await store.async_load()
+        except UnsupportedStorageVersionError:
+            _LOGGER.warning(
+                "climate_orchestrator: persisted %s state was written by a"
+                " newer release; discarding it (it will be re-learned)",
+                label,
+            )
+            return None
+
     async def async_load_mpc(self) -> None:
         """Restore persisted MPC + maintenance state (call before first refresh).
 
@@ -291,7 +340,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         from the config would cycle store -> runtime -> store forever.
         """
         managed = set(self.device_ids)
-        data = await self._mpc_store.async_load()
+        data = await self._load_store(self._mpc_store, "MPC")
         if data:
             for trv_id, payload in data.items():
                 if trv_id not in managed:
@@ -310,7 +359,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                         "climate_orchestrator: discarding corrupt MPC state for %s",
                         trv_id,
                     )
-        maint = await self._maint_store.async_load()
+        maint = await self._load_store(self._maint_store, "maintenance")
         if maint:
             # isfinite: Python's json happily round-trips NaN/Infinity, so a
             # corrupted store could otherwise poison comparisons downstream.

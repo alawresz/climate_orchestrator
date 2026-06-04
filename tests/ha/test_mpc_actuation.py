@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import time
+from typing import Any
 from unittest.mock import patch
 
 from homeassistant.const import ATTR_ENTITY_ID
@@ -283,3 +284,49 @@ async def test_learned_state_saves_are_rate_limited(
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert delay_save.call_count == 1
+
+
+async def test_future_version_store_is_discarded_not_fatal(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    hass_storage: dict[str, Any],
+) -> None:
+    """A store written by a newer release (downgrade) must not break setup.
+
+    ``Store`` raises ``UnsupportedStorageVersionError`` for a newer major —
+    learned state is re-learnable, so it's discarded with a warning instead.
+    """
+    config_entry.add_to_hass(hass)
+    for suffix in ("mpc", "maintenance"):
+        key = f"climate_orchestrator.{config_entry.entry_id}.{suffix}"
+        hass_storage[key] = {
+            "version": 99,
+            "minor_version": 1,
+            "key": key,
+            "data": {"schema": "from the future"},
+        }
+
+    fresh = SmartClimateCoordinator(hass, config_entry)
+    await fresh.async_load_mpc()  # must not raise
+    assert fresh._runtime(TRV_ENTITY).mpc is None
+    assert fresh._last_maintenance is None
+
+
+async def test_unknown_older_schema_migrates_to_empty(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    hass_storage: dict[str, Any],
+) -> None:
+    """An unrecognised *older* major is discarded by the migrate hook."""
+    config_entry.add_to_hass(hass)
+    key = f"climate_orchestrator.{config_entry.entry_id}.mpc"
+    hass_storage[key] = {
+        "version": 0,
+        "minor_version": 1,
+        "key": key,
+        "data": {TRV_ENTITY: {"pre_release": True}},
+    }
+
+    fresh = SmartClimateCoordinator(hass, config_entry)
+    await fresh.async_load_mpc()  # must not raise
+    assert fresh._runtime(TRV_ENTITY).mpc is None
