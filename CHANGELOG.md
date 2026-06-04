@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v0.22.2 (2026-06-04)
+
+### Bug Fixes
+
+- Harden MPC numerics — fit bounds, variance ceiling, gap re-anchor, restore validation
+  ([`733dba2`](https://github.com/alawresz/climate_orchestrator/commit/733dba2bec70b125add4dd23a6675405826594fc))
+
+- Tie fire-and-forget tasks to the config entry lifecycle
+  ([`1016726`](https://github.com/alawresz/climate_orchestrator/commit/1016726a02eac7b513ffac7fe4d5f7d722a55479))
+
+### Code Style
+
+- Predict in test_observer.py
+  ([`4ffd68e`](https://github.com/alawresz/climate_orchestrator/commit/4ffd68ea03430a78152a4405d45073f7ad085103))
+
+
 ## v0.22.1 (2026-06-04)
 
 ### Bug Fixes
