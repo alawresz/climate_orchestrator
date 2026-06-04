@@ -255,3 +255,18 @@ async def test_command_failures_log_once_per_outage(
         "accepting commands again" in r.getMessage() and TRV_ENTITY in r.getMessage()
         for r in caplog.records
     )
+
+
+async def test_dead_window_timer_areas_are_pruned(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Window timers for areas no longer backing a device are evicted.
+
+    A registry area change doesn't reload the entry, so the per-area dict
+    must self-clean each cycle instead of holding dead keys forever.
+    """
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    coordinator._window_open_since["ghost_area"] = 123.0
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert "ghost_area" not in coordinator._window_open_since

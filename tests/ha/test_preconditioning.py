@@ -22,11 +22,15 @@ WEATHER = "weather.home"
 _FORECAST = [5.0, 4.0, 3.0, 2.0, 1.0]
 
 
-def _register_forecast_service(hass: HomeAssistant) -> None:
+def _register_forecast_service(
+    hass: HomeAssistant, temps: list[float] | None = None
+) -> None:
+    series = _FORECAST if temps is None else temps
+
     async def _get_forecasts(call: ServiceCall) -> dict:
         return {
             WEATHER: {
-                "forecast": [{"datetime": "x", "temperature": t} for t in _FORECAST]
+                "forecast": [{"datetime": "x", "temperature": t} for t in series]
             }
         }
 
@@ -80,3 +84,38 @@ async def test_forecast_is_fetched_cached_and_expanded(
     assert series is not None
     assert len(series) == 120  # 2 h default look-ahead at a 1-min step
     assert series[0] == 5.0
+
+
+async def test_hourly_forecast_cache_is_capped(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """A weather entity returning a huge forecast can't grow the cache."""
+    _register_forecast_service(hass, temps=[float(i) for i in range(200)])
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat", {"hvac_modes": ["off", "heat"]})
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=DEFAULT_TITLE,
+        data={CONF_TRVS: [TRV_ENTITY], CONF_WEATHER_ENTITY: WEATHER},
+        entry_id="sc_precond_cap",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    cid = entry.entry_id
+    coordinator: SmartClimateCoordinator = entry.runtime_data
+    await hass.services.async_call(
+        "switch",
+        "turn_on",
+        {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_forecast_preconditioning")},
+        blocking=True,
+    )
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert len(coordinator._forecast_hourly) == 48  # _FORECAST_MAX_HOURS
+    assert coordinator._forecast_hourly[0] == 0.0

@@ -218,3 +218,38 @@ async def test_corrupt_persisted_mpc_state_does_not_break_load(
 
     assert fresh._runtime(TRV_ENTITY).mpc is None  # corrupt entry discarded
     assert fresh._runtime(AC_ENTITY).mpc is not None  # valid entry restored
+
+
+async def test_persisted_state_for_unmanaged_devices_is_dropped(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """Store keys for devices no longer in the config don't resurrect.
+
+    The persist methods dump the runtime dict wholesale, so a stale key
+    restored once would otherwise cycle store -> runtime -> store forever.
+    """
+    config_entry.add_to_hass(hass)
+    saver = SmartClimateCoordinator(hass, config_entry)
+    await saver._mpc_store.async_save(
+        {
+            TRV_ENTITY: MpcController().to_dict(),
+            "climate.removed_trv": MpcController().to_dict(),
+        }
+    )
+    await saver._maint_store.async_save(
+        {
+            "last": 12345.0,
+            "rmot": 18.5,
+            "ac_bias_integral": {AC_ENTITY: 1.0, "climate.removed_ac": 2.0},
+            "last_demand": {TRV_ENTITY: "heat", "climate.removed_trv": "heat"},
+        }
+    )
+
+    fresh = SmartClimateCoordinator(hass, config_entry)
+    await fresh.async_load_mpc()
+    assert fresh._runtime(TRV_ENTITY).mpc is not None
+    assert "climate.removed_trv" not in fresh._devices
+    assert "climate.removed_ac" not in fresh._devices
+    # The next persist no longer carries the stale keys.
+    assert "climate.removed_trv" not in fresh._mpc_persist_data()
+    assert "climate.removed_ac" not in fresh._state_persist_data()["ac_bias_integral"]

@@ -129,6 +129,9 @@ _MPC_SAVE_DELAY = 30.0
 # Trailing window (seconds) and sample cap for the home temperature-slope figure.
 _SLOPE_WINDOW_SECONDS = 900.0
 _SLOPE_MAX_SAMPLES = 240
+# Cap on cached hourly forecast entries. The longest look-ahead is 8 h; two
+# days is already generous — a buggy weather entity must not grow the cache.
+_FORECAST_MAX_HOURS = 48
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -219,7 +222,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self._window_open_since: dict[str, float] = {}
         self._window_recheck_unsub: CALLBACK_TYPE | None = None
         # Trailing (time, home-avg-temp) samples and the latest slope (K/min).
-        self._temp_samples: deque[tuple[float, float]] = deque()
+        self._temp_samples: deque[tuple[float, float]] = deque(
+            maxlen=_SLOPE_MAX_SAMPLES
+        )
         self._temp_slope: float | None = None
         # Valve-maintenance bookkeeping (wall-clock epoch of the last run).
         self._maintenance_running = False
@@ -268,10 +273,23 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         )
 
     async def async_load_mpc(self) -> None:
-        """Restore persisted MPC + maintenance state (call before first refresh)."""
+        """Restore persisted MPC + maintenance state (call before first refresh).
+
+        Only currently-managed entities are restored: the persist methods dump
+        ``self._devices`` wholesale, so without this filter a device removed
+        from the config would cycle store -> runtime -> store forever.
+        """
+        managed = set(self.device_ids)
         data = await self._mpc_store.async_load()
         if data:
             for trv_id, payload in data.items():
+                if trv_id not in managed:
+                    _LOGGER.debug(
+                        "climate_orchestrator: dropping persisted MPC state for"
+                        " unmanaged %s",
+                        trv_id,
+                    )
+                    continue
                 try:
                     self._runtime(trv_id).mpc = MpcController.from_dict(payload)
                 except (KeyError, TypeError, ValueError):
@@ -295,12 +313,12 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                 self._rmot = float(maint["rmot"])
             if isinstance(integral := maint.get("ac_bias_integral"), dict):
                 for k, v in integral.items():
-                    if isinstance(v, int | float) and math.isfinite(v):
+                    if k in managed and isinstance(v, int | float) and math.isfinite(v):
                         self._runtime(k).ac_bias_integral = float(v)
             if isinstance(demand := maint.get("last_demand"), dict):
                 valid = {d.value for d in Demand}
                 for k, v in demand.items():
-                    if v in valid:
+                    if k in managed and v in valid:
                         self._runtime(k).demand = Demand(v)
 
     @callback
@@ -415,6 +433,15 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         data = replace(data, status=self._compute_status(data))
         self._update_temp_slope(data.home_avg_temperature)
         self._ensure_subscription(data.tracked_entities)
+        # Evict window timers for areas no longer backing any managed device
+        # (a registry area change doesn't reload the entry, so without this
+        # the dict would keep dead area keys for the coordinator's lifetime).
+        live_areas = {
+            r.area_id for r in data.readings.values() if r.area_id is not None
+        }
+        for area_id in list(self._window_open_since):
+            if area_id not in live_areas:
+                del self._window_open_since[area_id]
         # Actuation must never break the read-only snapshot/update — but a
         # *repeatedly* failing control loop must not stay silent in the log
         # either: count consecutive failures and raise a repair past the
@@ -485,8 +512,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         cutoff = now - _SLOPE_WINDOW_SECONDS
         while self._temp_samples and self._temp_samples[0][0] < cutoff:
             self._temp_samples.popleft()
-        while len(self._temp_samples) > _SLOPE_MAX_SAMPLES:
-            self._temp_samples.popleft()
+        # (The sample-count cap is the deque's maxlen — enforced even when
+        # this method isn't reached for a while.)
         self._temp_slope = temperature_slope_per_min(self._temp_samples)
 
     @property
@@ -866,7 +893,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                 ):
                     temps.append(float(temp))
         if temps:
-            self._forecast_hourly = temps
+            self._forecast_hourly = temps[:_FORECAST_MAX_HOURS]
             self._forecast_fetched_at = now
 
     @callback
