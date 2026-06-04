@@ -85,8 +85,8 @@ mode** only), a radiator can start warming a room *before* a cold spell arrives
 instead of only reacting once the room has already cooled. The MPC valve
 optimiser normally plans against the current outdoor temperature held flat; with
 this on, it instead plans against the configured **weather entity's** hourly
-forecast, interpolated onto the control step over the **Preconditioning look-ahead**
-(default 2 h). If the forecast shows it getting colder, the optimiser opens the
+forecast, interpolated onto the control step over the **Preconditioning
+look-ahead** — a tunable number (0.5–8 h, default 2 h). If the forecast shows it getting colder, the optimiser opens the
 valve more now to stay ahead of the loss.
 
 To keep comfort safe it only ever *raises* the valve: the commanded opening is the

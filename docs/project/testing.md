@@ -117,7 +117,9 @@ surfaces any mutant the suite fails to kill.
 
 ## Survivor ledger
 
-A clean run is **845 mutants, 25 surviving (~97% killed)**. Every survivor
+A clean run is **845 mutants, 25 surviving (~97% killed)** — measured on
+Python 3.14 with the locked HA stack; counts shift when `control/` or the
+dependency lock changes. Every survivor
 below has been triaged (rounds #98, #115, #127) and accepted as a residual;
 **any survivor not on this list is a regression** and must be either killed
 with a test or triaged onto this list with a rationale. Inspect any entry
