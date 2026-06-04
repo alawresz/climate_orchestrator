@@ -239,7 +239,15 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         data = await self._mpc_store.async_load()
         if data:
             for trv_id, payload in data.items():
-                self._runtime(trv_id).mpc = MpcController.from_dict(payload)
+                try:
+                    self._runtime(trv_id).mpc = MpcController.from_dict(payload)
+                except (KeyError, TypeError, ValueError):
+                    # A corrupt entry costs that TRV its learned state (it
+                    # re-learns in hours) — never the whole integration setup.
+                    _LOGGER.warning(
+                        "climate_orchestrator: discarding corrupt MPC state for %s",
+                        trv_id,
+                    )
         maint = await self._maint_store.async_load()
         if maint:
             if isinstance(maint.get("last"), int | float):

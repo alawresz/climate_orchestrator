@@ -203,3 +203,11 @@ def test_legacy_payload_without_kalman_restores_unfiltered() -> None:
     legacy = MpcController.from_dict({"gain": 0.1, "loss": 0.01})
     assert legacy.kalman is None
     assert legacy.estimated_temperature is None
+
+
+def test_from_dict_rejects_malformed_parameters() -> None:
+    """Corrupt persisted state raises instead of building a broken controller."""
+    with pytest.raises(TypeError):
+        MpcController.from_dict({"gain": "garbage", "loss": 0.01})
+    with pytest.raises(TypeError):
+        MpcController.from_dict({"loss": 0.01})  # gain missing entirely

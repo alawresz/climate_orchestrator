@@ -141,9 +141,16 @@ class MpcController:
     def from_dict(
         cls, data: dict[str, Any], *, max_history: int = DEFAULT_MAX_HISTORY
     ) -> MpcController:
-        """Restore a controller from :meth:`to_dict` output."""
+        """Restore a controller from :meth:`to_dict` output.
+
+        Raises ``TypeError``/``KeyError`` on malformed
+        payloads; the coordinator catches these per entry on restore.
+        """
+        gain, loss = data.get("gain"), data.get("loss")
+        if not isinstance(gain, int | float) or not isinstance(loss, int | float):
+            raise TypeError
         controller = cls(
-            ThermalParams(gain=data["gain"], loss=data["loss"]),
+            ThermalParams(gain=float(gain), loss=float(loss)),
             max_history=max_history,
         )
         for sample in data.get("history", []):

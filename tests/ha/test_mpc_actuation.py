@@ -201,3 +201,20 @@ async def test_mpc_fallback_without_valve_number(
     # No valve number on the TRV's (absent) device -> no valve writes, no crash.
     assert not [c for c in set_value if "valve" in c.data[ATTR_ENTITY_ID]]
     assert hass.states.get(entity_id_for("climate", cid)).state != "unavailable"
+
+
+async def test_corrupt_persisted_mpc_state_does_not_break_load(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """A corrupt store entry is discarded (fresh learning), not a setup crash."""
+    config_entry.add_to_hass(hass)
+    saver = SmartClimateCoordinator(hass, config_entry)
+    await saver._mpc_store.async_save(
+        {TRV_ENTITY: {"gain": "garbage"}, AC_ENTITY: MpcController().to_dict()}
+    )
+
+    fresh = SmartClimateCoordinator(hass, config_entry)
+    await fresh.async_load_mpc()
+
+    assert fresh._runtime(TRV_ENTITY).mpc is None  # corrupt entry discarded
+    assert fresh._runtime(AC_ENTITY).mpc is not None  # valid entry restored
