@@ -51,7 +51,6 @@ from .const import (
     CALIBRATION_MPC,
     CALIBRATION_OFFSET,
     CALIBRATION_TARGET,
-    COMFORT_HUMIDITY_INFLUENCE_DEFAULT,
     CONF_ACS,
     CONF_CALIBRATION_HINTS,
     CONF_HOME_HUMIDITY_SENSOR,
@@ -68,7 +67,6 @@ from .const import (
     PRECONDITION_MAX_STEPS,
     RMOT_TAU_SECONDS,
     RUNTIME_WINDOW_SECONDS,
-    SENSOR_MAX_AGE_DEFAULT,
     STARTUP_GRACE_SECONDS,
     UPDATE_INTERVAL_SECONDS,
     VALVE_MAINTENANCE_DWELL_SECONDS,
@@ -114,7 +112,7 @@ from .sensing.registry import build_snapshot
 from .settings import (
     RuntimeSettings,
     area_band_offset,
-    number_value,
+    clamped_number_value,
     resolve_settings,
 )
 from .util import as_float, float_state
@@ -507,8 +505,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
     async def _async_update_data(self) -> SmartClimateData:
         """Resolve sensors and aggregates, keep listeners in sync, and actuate."""
-        max_age_min = number_value(
-            self.hass, self.entry.entry_id, "sensor_max_age", SENSOR_MAX_AGE_DEFAULT
+        max_age_min = clamped_number_value(
+            self.hass, self.entry.entry_id, "sensor_max_age"
         )
         data = build_snapshot(
             self.hass,
@@ -1004,11 +1002,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     @property
     def comfort_influence(self) -> float:
         """The comfort-index humidity influence factor (live)."""
-        return number_value(
-            self.hass,
-            self.entry.entry_id,
-            "comfort_humidity_influence",
-            COMFORT_HUMIDITY_INFLUENCE_DEFAULT,
+        return clamped_number_value(
+            self.hass, self.entry.entry_id, "comfort_humidity_influence"
         )
 
     @property
@@ -1467,6 +1462,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if not settings.auto_valve_maintenance or self._maintenance_running:
             return
         now = time.time()
+        if self._last_maintenance is not None and self._last_maintenance > now:
+            # Wall-clock skew (NTP correction, restored backup from another
+            # box): a future timestamp would silently defer maintenance for
+            # up to a full interval past the lie — restart the clock instead.
+            self._last_maintenance = now
         if self._last_maintenance is None:
             # First run after install: start the clock rather than acting now.
             self._last_maintenance = now

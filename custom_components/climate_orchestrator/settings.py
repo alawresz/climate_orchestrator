@@ -27,6 +27,7 @@ from .const import (
     ADAPTIVE_COMFORT_MAX_SHIFT_DEFAULT,
     ADAPTIVE_COMFORT_RESPONSE_DEFAULT,
     AREA_BAND_OFFSET_DEFAULT,
+    AREA_BAND_OFFSET_LIMIT,
     CALIBRATION_MODES,
     COMFORT_HUMIDITY_INFLUENCE_DEFAULT,
     COOL_OFF_OUTDOOR_DEFAULT,
@@ -46,6 +47,7 @@ from .const import (
     VALVE_MAINTENANCE_INTERVAL_DEFAULT,
     WINDOW_OPEN_DELAY_DEFAULT,
 )
+from .control.numeric import clamp
 from .util import float_state
 
 _CALIBRATION_MODE_KEY = "calibration_mode"
@@ -246,7 +248,19 @@ def number_value(hass: HomeAssistant, entry_id: str, key: str, default: float) -
 
 @callback
 def _number_value(hass: HomeAssistant, entry_id: str, setting: NumberSetting) -> float:
-    return number_value(hass, entry_id, setting.key, setting.default)
+    # Clamp to the declared bounds: Developer Tools (and a restored state from
+    # an older release with wider limits) can hold values the UI would refuse.
+    value = number_value(hass, entry_id, setting.key, setting.default)
+    return clamp(value, setting.min_value, setting.max_value)
+
+
+_NUMBER_SETTINGS_BY_KEY = {s.key: s for s in NUMBER_SETTINGS}
+
+
+@callback
+def clamped_number_value(hass: HomeAssistant, entry_id: str, key: str) -> float:
+    """Read a registry number setting, clamped to its declared bounds."""
+    return _number_value(hass, entry_id, _NUMBER_SETTINGS_BY_KEY[key])
 
 
 @callback
@@ -259,7 +273,7 @@ def preset_band(
         return None
     low = number_value(hass, entry_id, preset_number_key(preset, "heat"), edges[0])
     high = number_value(hass, entry_id, preset_number_key(preset, "cool"), edges[1])
-    return (low, high)
+    return (clamp(low, MIN_TEMP, MAX_TEMP), clamp(high, MIN_TEMP, MAX_TEMP))
 
 
 @callback
@@ -267,9 +281,10 @@ def area_band_offset(hass: HomeAssistant, entry_id: str, area_id: str | None) ->
     """Live comfort band offset (°C) for an area, ``0`` when none is set."""
     if area_id is None:
         return AREA_BAND_OFFSET_DEFAULT
-    return number_value(
+    offset = number_value(
         hass, entry_id, area_offset_key(area_id), AREA_BAND_OFFSET_DEFAULT
     )
+    return clamp(offset, -AREA_BAND_OFFSET_LIMIT, AREA_BAND_OFFSET_LIMIT)
 
 
 @callback

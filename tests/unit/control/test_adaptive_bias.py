@@ -97,3 +97,11 @@ def test_bias_decay_multiplies_the_integral() -> None:
         )
         == 0.4
     )
+
+
+def test_effective_bias_cap_never_undercuts_the_base() -> None:
+    """A misconfigured max below the base disables the add-on, not the base."""
+    assert effective_bias(3.0, 5.0, 1.0) == 3.0
+    assert effective_bias(3.0, 0.0, 1.0) == 3.0
+    # Sane configuration still caps the combined value.
+    assert effective_bias(1.0, 5.0, 2.5) == 2.5

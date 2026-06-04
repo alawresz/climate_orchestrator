@@ -134,3 +134,36 @@ async def test_valve_maintenance_without_valves_raises_translated_error(
             blocking=True,
         )
     assert err.value.translation_key == "no_maintenance_valves"
+
+
+async def test_future_maintenance_timestamp_is_reset_not_trusted(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Wall-clock skew (NTP jump, restored backup) can't defer maintenance.
+
+    A last-maintenance timestamp in the future is reset to now instead of
+    silently postponing the next run by up to a full interval past the lie.
+    """
+    coordinator = await setup_trv_with_number(
+        hass, config_entry, living_area, number_value="50"
+    )
+    set_value = async_mock_service(hass, "number", "set_value")
+    cid = config_entry.entry_id
+    await hass.services.async_call(
+        "switch",
+        "turn_on",
+        {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_auto_valve_maintenance")},
+        blocking=True,
+    )
+    coordinator._last_maintenance = time.time() + 365 * 86400  # a year ahead
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    # The clock restarted from now: no maintenance ran, timestamp is sane.
+    assert not [c for c in set_value if c.data[ATTR_ENTITY_ID] == VALVE_NUMBER]
+    assert coordinator._last_maintenance is not None
+    assert coordinator._last_maintenance <= time.time()

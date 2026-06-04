@@ -47,5 +47,10 @@ def update_bias_integral(
 
 
 def effective_bias(base: float, integral: float, max_total: float) -> float:
-    """Combine the manual base bias and the learned add-on, capped at the max."""
-    return min(base + max(0.0, integral), max_total)
+    """Combine the manual base bias and the learned add-on, capped at the max.
+
+    The cap never undercuts the manual base: a misconfigured ``max_total``
+    smaller than ``base`` disables the learned add-on instead of silently
+    shrinking the user's own setting.
+    """
+    return min(base + max(0.0, integral), max(max_total, base))

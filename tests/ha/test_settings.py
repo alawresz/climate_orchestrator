@@ -9,7 +9,10 @@ from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.climate_orchestrator.const import RELEASE_OFFSET_DEFAULT
-from custom_components.climate_orchestrator.settings import resolve_settings
+from custom_components.climate_orchestrator.settings import (
+    NUMBER_SETTINGS,
+    resolve_settings,
+)
 
 
 async def test_resolve_returns_defaults(
@@ -48,3 +51,24 @@ async def test_resolve_reflects_entity_changes(
     settings = resolve_settings(hass, cid)
     assert settings.ac_setpoint_bias == 2.5
     assert settings.comfort_index_targeting is False
+
+
+async def test_out_of_range_entity_states_are_clamped(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Developer Tools can set a number past its bounds; the resolver clamps.
+
+    The number platform enforces min/max on service calls, but a raw state
+    write (or a state restored from a release with wider limits) bypasses it.
+    """
+    cid = init_integration.entry_id
+    by_key = {s.key: s for s in NUMBER_SETTINGS}
+    # Bypass the number platform, as Developer Tools' state writer would.
+    hass.states.async_set(entity_id_for("number", f"{cid}_window_open_delay"), "-10")
+    hass.states.async_set(entity_id_for("number", f"{cid}_ac_setpoint_bias"), "999")
+
+    settings = resolve_settings(hass, cid)
+    assert settings.window_open_delay == by_key["window_open_delay"].min_value
+    assert settings.ac_setpoint_bias == by_key["ac_setpoint_bias"].max_value
