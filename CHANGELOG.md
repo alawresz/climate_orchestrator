@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.22.5 (2026-06-04)
+
+### Bug Fixes
+
+- Clamp runtime settings to declared bounds + guard maintenance clock skew
+  ([`1158ce0`](https://github.com/alawresz/climate_orchestrator/commit/1158ce0502aa110f3a8edec59eec617cc54ba4b4))
+
+
 ## v0.22.4 (2026-06-04)
 
 ### Bug Fixes
