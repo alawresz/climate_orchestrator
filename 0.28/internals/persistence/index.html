@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -1403,11 +1403,16 @@ bounded.</p>
 tunable persists via <code>RestoreNumber</code>/<code>RestoreEntity</code> and re-runs control on
 change, and the whole-home <code>climate</code> entity restores its mode, preset, and
 manual band across restarts (<code>RestoreEntity</code>) — a restart no longer silently
-turns the system off.</p>
+turns the system off. An active <a href="../../guides/comfort-features/#boost">boost</a>
+also resumes: its deadline, direction, and the preset to revert to ride along
+as restored attributes, so a restart mid-boost keeps the original end time.</p>
 <p>What is <em>not</em> persisted: the rolling runtime/cycle samples behind the
 per-device runtime and cycles-per-hour diagnostics are transient and reset on
-restart, and the per-AC adaptive-bias accumulator's in-memory component
-re-learns in minutes.</p>
+restart, the per-AC adaptive-bias accumulator's in-memory component re-learns
+in minutes, and a <a href="../../guides/how-it-controls/#manual-override-takeover">manual-override
+takeover</a> deliberately
+does not survive a restart — its deadline lives on the monotonic clock, and
+after a restart reasserting the configured band is the safer default.</p>
 <h2 id="schema-versioning">Schema versioning<a class="headerlink" href="#schema-versioning" title="Permanent link">&para;</a></h2>
 <p>The store subclass <code>_LearnedStateStore</code> (<code>coordinator.py</code>) carries explicit
 schema-migration semantics. Everything persisted is re-learnable in hours, so
@@ -1468,7 +1473,7 @@ per-controller checks), and runtime state is bounded:</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 4, 2026 13:52:32 UTC">June 4, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 4, 2026 22:29:22 UTC">June 4, 2026</span>
   </span>
 
     

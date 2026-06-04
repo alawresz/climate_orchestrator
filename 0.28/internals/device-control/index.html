@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -1659,14 +1659,17 @@ Each managed device and sensor is tracked independently:</p>
 <p>A tri-state <code>status</code> (<code>initializing</code> / <code>ok</code> / <code>degraded</code>) gates startup noise.
 Right after a restart, devices and their area sensors typically haven't
 reported in yet, so the coordinator reports <code>initializing</code> for a grace window
-(<code>STARTUP_GRACE_SECONDS</code>, 120 s) until a managed device first yields a usable
-temperature. While <code>initializing</code>, the <strong>transient</strong> repairs
-(<code>no_temperature_source</code>, <code>stale_sensor</code>) are held back and <code>status</code> reads
-<code>initializing</code> rather than <code>degraded</code> — they would otherwise flash on every
-restart. The instant a usable reading arrives the warm-up ends for good (<code>ok</code>,
-or <code>degraded</code> if a device is unavailable); if the window elapses with still no
-reading the gap is real, so <code>status</code> becomes <code>degraded</code> and the missing-source
-repair fires. Static misconfigurations (inverted band, adaptive comfort without
+(<code>STARTUP_GRACE_SECONDS</code>, 120 s). The warm-up has two independent legs, and
+both must land before the status settles: a usable home temperature, and every
+managed device having reported in at least once. Area sensors usually beat the
+devices by tens of seconds, so a device still joining keeps <code>initializing</code>
+rather than flashing <code>degraded</code> (and its notification) on every restart — but
+a device that <em>was</em> seen and then went away is genuine degradation, grace
+window or not. While <code>initializing</code>, the <strong>transient</strong> repairs
+(<code>no_temperature_source</code>, <code>stale_sensor</code>) are also held back. If the window
+elapses with something still missing the gap is real: <code>status</code> becomes
+<code>degraded</code> and, when there's no reading at all, the missing-source repair
+fires. Static misconfigurations (inverted band, adaptive comfort without
 an outdoor sensor) are <em>not</em> startup-transient and fire immediately.
 <code>build_snapshot</code> sets a warm-up-unaware best-effort status; the coordinator
 refines it. The <code>degraded</code> property is <code>status is DEGRADED</code>.</p>
@@ -1691,7 +1694,7 @@ refines it. The <code>degraded</code> property is <code>status is DEGRADED</code
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 4, 2026 21:49:11 UTC">June 4, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 4, 2026 22:35:05 UTC">June 4, 2026</span>
   </span>
 
     
