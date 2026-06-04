@@ -1,0 +1,118 @@
+rules:
+  # --- Bronze ---------------------------------------------------------------
+  action-setup:
+    status: done
+    comment: Only entity services; registered on the climate platform.
+  appropriate-polling:
+    status: done
+    comment: Event-driven on tracked entities, with a 60 s keepalive cycle.
+  brands:
+    status: done
+    comment: In-integration brand/ images (HA >= 2026.3 local brand images).
+  common-modules: done
+  config-flow-test-coverage: done
+  config-flow: done
+  dependency-transparency: done
+  docs-actions: done
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  entity-event-setup: done
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure:
+    status: exempt
+    comment: >-
+      Nothing to connect to: the flow selects existing Home Assistant
+      entities, which need not be available at setup time.
+  test-before-setup: done
+  unique-config-entry:
+    status: done
+    comment: Single instance; the flow aborts when an entry exists.
+
+  # --- Silver ---------------------------------------------------------------
+  action-exceptions:
+    status: todo
+    comment: >-
+      Valve maintenance silently no-ops when no valve numbers are
+      discoverable; it should raise ServiceValidationError instead.
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable:
+    status: todo
+    comment: >-
+      Failed device commands are logged every cycle while a device stays
+      down; needs once-per-outage logging (state is already surfaced via the
+      Status sensor and repairs).
+  parallel-updates: done
+  reauthentication-flow:
+    status: exempt
+    comment: No authentication — orchestrates local Home Assistant entities.
+  test-coverage:
+    status: todo
+    comment: The enforced gate is 90% (branch); raise to 95% after measuring.
+
+  # --- Gold -----------------------------------------------------------------
+  devices: done
+  diagnostics: done
+  discovery:
+    status: exempt
+    comment: >-
+      No discoverable hardware of its own — the integration orchestrates
+      entities the user explicitly selects.
+  discovery-update-info:
+    status: exempt
+    comment: See discovery.
+  docs-data-update: done
+  docs-examples:
+    status: todo
+    comment: No automation examples in the README yet.
+  docs-known-limitations:
+    status: todo
+    comment: Limitations are scattered through the README; needs a section.
+  docs-supported-devices: done
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices:
+    status: exempt
+    comment: >-
+      Managed devices are explicitly user-selected; changing them via the
+      options flow reloads the entry.
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default:
+    status: todo
+    comment: >-
+      The per-device runtime/cycle diagnostic sensors could default to
+      disabled.
+  entity-translations: done
+  exception-translations:
+    status: exempt
+    comment: >-
+      No user-facing exceptions are raised (config-flow errors use
+      translation keys). Revisit together with action-exceptions.
+  icon-translations: done
+  reconfiguration-flow:
+    status: done
+    comment: The options flow edits every setup input (devices, sensors, hints).
+  repair-issues: done
+  stale-devices:
+    status: exempt
+    comment: A single hub device per entry; nothing can go stale.
+
+  # --- Platinum ---------------------------------------------------------------
+  async-dependency:
+    status: todo
+    comment: >-
+      scipy is synchronous and the MPC identification/optimisation currently
+      runs in the event loop (millisecond-scale, but should move to an
+      executor job).
+  inject-websession:
+    status: exempt
+    comment: No HTTP dependency.
+  strict-typing: done
