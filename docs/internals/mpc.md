@@ -139,7 +139,7 @@ driven to **0%** rather than left at its last commanded opening — see
 [Device control](device-control.md#trv-controller-mpc-offset-target).
 
 **Multi-TRV distribution:** one room/zone-level command is distributed to
-individual TRVs with per-valve deficit compensation (keeping a prior-art integration's idea, cleaner implementation).
+individual TRVs with per-valve deficit compensation.
 
 ## Forecast preconditioning
 

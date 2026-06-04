@@ -104,6 +104,15 @@ Two scheduled workflows complement CI:
 - A weekly **`links.yml`** runs lychee over README/DESIGN/CHANGELOG to catch
   dead links.
 - A weekly **`ha-dev.yml`** canary re-runs the test suite against Home
+
+**`docs.yml` (documentation deploy):** builds the versioned MkDocs site with
+mike and publishes it to GitHub Pages through the Actions deploy path. A push
+to `main` touching `docs/` updates the **dev** version; a stable release
+deploys **X.Y** and re-points **latest** (dispatched explicitly from
+`release.yml`, because GitHub fires no `release` events for releases created
+with the workflow token); `workflow_dispatch` can bootstrap or repair any
+version. The PR gate (`mkdocs build --strict`) lives in `ci.yml`; see
+[Releases](releases.md) for where the dispatch hooks into the release flow.
   Assistant's latest *pre-release* (uv `--prerelease=allow` upgrade over the
   locked venv) to catch upstream breaking changes weeks before they reach
   users — scheduled, so it never gates PRs.
