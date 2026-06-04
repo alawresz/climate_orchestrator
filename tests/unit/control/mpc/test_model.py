@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
+from custom_components.climate_orchestrator.control.mpc import model
 from custom_components.climate_orchestrator.control.mpc.model import (
     DEFAULT_PARAMS,
     MAX_GAIN,
@@ -112,3 +114,36 @@ def test_identify_accepts_out_of_bounds_prior() -> None:
     params = identify_parameters(samples, ThermalParams(gain=50.0, loss=20.0))
     assert 0.0 <= params.gain <= MAX_GAIN
     assert 0.0 <= params.loss <= MAX_LOSS
+
+
+def test_identify_rejects_unconverged_fit(monkeypatch) -> None:
+    """A failed solve keeps the prior even when the outputs look plausible."""
+    monkeypatch.setattr(
+        model,
+        "least_squares",
+        lambda *a, **k: SimpleNamespace(success=False, x=np.array([0.5, 0.5])),
+    )
+    samples = [
+        Sample(dt=1.0, temp=20.0, next_temp=20.1, valve=0.5, outdoor=10.0)
+        for _ in range(8)
+    ]
+    prior = ThermalParams(gain=0.2, loss=0.02)
+    assert identify_parameters(samples, prior) == prior
+
+
+@pytest.mark.parametrize(
+    "x", [[float("nan"), 0.5], [0.5, float("nan")]], ids=["nan-gain", "nan-loss"]
+)
+def test_identify_rejects_partially_non_finite_fit(monkeypatch, x) -> None:
+    """One non-finite parameter is enough to keep the prior (not 'any finite')."""
+    monkeypatch.setattr(
+        model,
+        "least_squares",
+        lambda *a, **k: SimpleNamespace(success=True, x=np.array(x)),
+    )
+    samples = [
+        Sample(dt=1.0, temp=20.0, next_temp=20.1, valve=0.5, outdoor=10.0)
+        for _ in range(8)
+    ]
+    prior = ThermalParams(gain=0.2, loss=0.02)
+    assert identify_parameters(samples, prior) == prior

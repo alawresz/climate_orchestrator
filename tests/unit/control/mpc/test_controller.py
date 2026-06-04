@@ -7,6 +7,7 @@ import math
 import pytest
 
 from custom_components.climate_orchestrator.control.mpc.controller import (
+    MAX_SAMPLE_DT_MIN,
     MpcController,
     preconditioned_valve_pct,
 )
@@ -311,3 +312,19 @@ def test_from_dict_drops_non_finite_kalman_state() -> None:
         {"gain": 0.1, "loss": 0.01, "kalman": {"temp": float("inf"), "variance": 0.04}}
     )
     assert ctrl.kalman is None  # re-learns from the next measurement
+
+
+def test_observe_bridges_exactly_at_the_dt_cap() -> None:
+    """dt == MAX_SAMPLE_DT_MIN is still a usable transition (mutation pin).
+
+    Pins both boundary comparisons: the sample is learned (``<=`` not ``<``)
+    and the estimate is projected rather than re-anchored (``>`` not ``>=``).
+    """
+    ctrl = MpcController()
+    ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=1.0)
+    n = len(ctrl.history)
+
+    ctrl.observe(temp=20.5, valve=0.5, outdoor=10.0, dt=MAX_SAMPLE_DT_MIN)
+    assert len(ctrl.history) == n + 1  # learned, not skipped
+    assert ctrl.kalman is not None
+    assert ctrl.kalman.variance != MEASUREMENT_VAR  # projected, not re-anchored
