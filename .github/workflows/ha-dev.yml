@@ -1,0 +1,40 @@
+name: HA pre-release
+
+# Weekly canary: run the test suite against Home Assistant's latest
+# *pre-release* (beta) instead of the locked stable version. The integration
+# leans on HA internals (coordinator patterns, restore, storage, service
+# calls), so upstream breaking changes are caught here weeks before they ship
+# to users. Scheduled runs never gate PRs — a red run is a heads-up, not a
+# blocker.
+on:
+  schedule:
+    - cron: "0 6 * * 2" # Tuesdays 06:00 UTC (HA betas branch on Wednesdays)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest-ha-prerelease:
+    name: pytest against HA pre-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Install uv (with Python 3.14, HA's runtime)
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: "3.14"
+      - name: Install dependencies (locked)
+        run: uv sync --dev
+      - name: Upgrade homeassistant to the latest pre-release
+        # Overrides the PHACC-pinned HA inside the synced venv. If no beta is
+        # newer than stable, this is a no-op and the run mirrors regular CI.
+        run: |
+          uv pip install --prerelease=allow --upgrade homeassistant
+          uv run python -c "import homeassistant.const as c; print('HA', c.__version__)"
+      - name: pytest
+        env:
+          HYPOTHESIS_PROFILE: ci
+        run: uv run pytest --timeout=120
