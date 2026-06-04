@@ -226,6 +226,7 @@ SWITCH_SETTINGS: tuple[SwitchSetting, ...] = (
     SwitchSetting("auto_valve_maintenance", False),
     SwitchSetting("adaptive_cooling_comfort", False),
     SwitchSetting("forecast_preconditioning", False),
+    SwitchSetting("event_notifications", True),
 )
 
 
@@ -267,6 +268,7 @@ class RuntimeSettings:
     auto_valve_maintenance: bool
     adaptive_cooling_comfort: bool
     forecast_preconditioning: bool
+    event_notifications: bool
     calibration_mode: str
 
 

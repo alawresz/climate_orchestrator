@@ -74,6 +74,7 @@ instead it gets two tunables (when selected):
 | Adaptive cooling comfort | Off | Relax the cool setpoint upward when it's hot outside (see [Comfort features](../guides/comfort-features.md)). Needs an outdoor sensor. |
 | Forecast preconditioning | Off | Feed the weather entity's hourly forecast into the MPC valve optimisation so radiators pre-heat ahead of a cold spell (see [Comfort features](../guides/comfort-features.md)). MPC calibration mode + a weather entity only; can only raise the valve, never under-heat the present. |
 | Automatic valve maintenance | Off | Periodically exercise the TRV valves (full open → closed) every **Valve maintenance interval** days. Skipped while a room is actively heating. |
+| Event notifications | On | Raise self-clearing notifications in HA's notification panel for frost protection and a degraded status. [Bus events](../guides/services-automations.md#events) fire regardless of this switch. |
 
 ## Numbers: tuning
 

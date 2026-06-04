@@ -38,6 +38,9 @@ from .const import (
     DEFAULT_PRESET,
     DEFAULT_PRESETS,
     DOMAIN,
+    EVENT_CLIMATE_ORCHESTRATOR,
+    EVENT_TYPE_BOOST_ENDED,
+    EVENT_TYPE_BOOST_STARTED,
     MAX_TEMP,
     MIN_TEMP,
     PRESET_BOOST,
@@ -492,7 +495,7 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
             if temp is None:
                 return
             self._set_single_manual(float(temp))
-        self._cancel_boost()
+        self._cancel_boost_with_event(reverted_to=PRESET_MANUAL)
         self._attr_preset_mode = PRESET_MANUAL
         await self._apply_and_control()
 
@@ -506,15 +509,30 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         if preset_mode == PRESET_BOOST:
             self._start_boost()
         else:
-            self._cancel_boost()
+            self._cancel_boost_with_event(reverted_to=preset_mode)
             self._attr_preset_mode = preset_mode
         await self._apply_and_control()
 
+    def _cancel_boost_with_event(self, *, reverted_to: str) -> None:
+        """Cancel a running boost (user takeover), announcing it on the bus."""
+        if self._attr_preset_mode == PRESET_BOOST:
+            self._fire_boost_event(
+                EVENT_TYPE_BOOST_ENDED,
+                {"reason": "cancelled", "reverted_to": reverted_to},
+            )
+        self._cancel_boost()
+
     # --- Boost ----------------------------------------------------------------
+
+    def _fire_boost_event(self, event_type: str, data: dict[str, Any]) -> None:
+        self.hass.bus.async_fire(
+            EVENT_CLIMATE_ORCHESTRATOR, {"type": event_type, **data}
+        )
 
     def _start_boost(self) -> None:
         """Activate (or restart) the boost: fix the direction, arm the timer."""
-        if self._attr_preset_mode != PRESET_BOOST:
+        starting = self._attr_preset_mode != PRESET_BOOST
+        if starting:
             self._boost_previous = self._attr_preset_mode
             self._boost_demand = self._boost_direction()
             self._attr_preset_mode = PRESET_BOOST
@@ -524,6 +542,15 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         )
         self._boost_until = dt_util.utcnow() + timedelta(seconds=duration)
         self._schedule_boost_end(duration)
+        if starting:
+            self._fire_boost_event(
+                EVENT_TYPE_BOOST_STARTED,
+                {
+                    "direction": self._boost_demand,
+                    "previous_preset": self._boost_previous,
+                    "until": self._boost_until.isoformat(),
+                },
+            )
 
     def _boost_direction(self) -> str:
         """Which edge the boost pushes, fixed at activation.
@@ -564,6 +591,9 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
             fallback = DEFAULT_PRESET if DEFAULT_PRESET in modes else PRESET_MANUAL
         self._attr_preset_mode = fallback
         self._cancel_boost()
+        self._fire_boost_event(
+            EVENT_TYPE_BOOST_ENDED, {"reason": "expired", "reverted_to": fallback}
+        )
 
     def _cancel_boost(self) -> None:
         """Drop all boost state; the caller decides the next preset."""

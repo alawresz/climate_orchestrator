@@ -18,6 +18,7 @@ import math
 import time
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.components import persistent_notification as pn
 from homeassistant.components.climate import HVACMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
@@ -64,6 +65,16 @@ from .const import (
     DEFAULT_PRESET,
     DEFAULT_PRESETS,
     DOMAIN,
+    EVENT_CLIMATE_ORCHESTRATOR,
+    EVENT_TYPE_DEHUMIDIFYING_ENDED,
+    EVENT_TYPE_DEHUMIDIFYING_STARTED,
+    EVENT_TYPE_FROST_ENDED,
+    EVENT_TYPE_FROST_STARTED,
+    EVENT_TYPE_IGNORING_ENDED,
+    EVENT_TYPE_IGNORING_STARTED,
+    EVENT_TYPE_STATUS_CHANGED,
+    EVENT_TYPE_WINDOW_PAUSE_ENDED,
+    EVENT_TYPE_WINDOW_PAUSE_STARTED,
     PRECONDITION_FORECAST_REFRESH_SECONDS,
     PRECONDITION_MAX_STEPS,
     RMOT_TAU_SECONDS,
@@ -212,6 +223,9 @@ class DeviceRuntime:
     ignored_since: float | None = None
     """Monotonic time the current non-compliance streak started (watchdog)."""
 
+    ignoring: bool = False
+    """Whether the watchdog currently flags this device (edge for the event)."""
+
 
 @dataclass(frozen=True, slots=True)
 class CycleContext:
@@ -283,6 +297,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         # forecast-based preconditioning, plus when it was last fetched.
         self._forecast_hourly: list[float] = []
         self._forecast_fetched_at = 0.0
+        # Edge detection for bus events: last cycle's home-wide flags, the
+        # devices whose heating/cooling was window-paused, and the status.
+        self._event_flags: dict[str, bool] = {}
+        self._window_paused: frozenset[str] = frozenset()
+        self._last_status: Status | None = None
         self._mpc_store: Store[dict[str, Any]] = _LearnedStateStore(
             hass, _MPC_STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.mpc"
         )
@@ -875,15 +894,36 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             runtime.ignored_mode = None
             runtime.ignored_since = None
             self._command_ignored_issue(entity_id, active=False)
+            self._set_ignoring(entity_id, runtime, active=False)
             return
         now = time.monotonic()
         if runtime.ignored_mode != desired or runtime.ignored_since is None:
             runtime.ignored_mode = desired
             runtime.ignored_since = now
-        self._command_ignored_issue(
-            entity_id,
-            active=now - runtime.ignored_since >= COMMAND_IGNORED_SECONDS,
-        )
+        active = now - runtime.ignored_since >= COMMAND_IGNORED_SECONDS
+        self._command_ignored_issue(entity_id, active=active)
+        self._set_ignoring(entity_id, runtime, active=active, mode=desired)
+
+    @callback
+    def _set_ignoring(
+        self,
+        entity_id: str,
+        runtime: DeviceRuntime,
+        *,
+        active: bool,
+        mode: str | None = None,
+    ) -> None:
+        """Latch the watchdog verdict and fire a bus event on each edge."""
+        if active == runtime.ignoring:
+            return
+        runtime.ignoring = active
+        if active:
+            self._fire_event(
+                EVENT_TYPE_IGNORING_STARTED,
+                {"entity_id": entity_id, "commanded_mode": mode},
+            )
+        else:
+            self._fire_event(EVENT_TYPE_IGNORING_ENDED, {"entity_id": entity_id})
 
     @callback
     def _command_ignored_issue(self, entity_id: str, *, active: bool) -> None:
@@ -1208,6 +1248,126 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         """Whether any AC is currently running dry mode for the dew-point guard."""
         return any(d.dry_mode for d in self.last_decisions.values())
 
+    # --- Events & notifications -----------------------------------------------
+
+    @callback
+    def _fire_event(self, event_type: str, data: dict[str, Any]) -> None:
+        """Fire one bus event (single event type, discriminated by ``type``)."""
+        self.hass.bus.async_fire(
+            EVENT_CLIMATE_ORCHESTRATOR, {"type": event_type, **data}
+        )
+
+    @callback
+    def _sync_notification(
+        self, key: str, *, rising: bool, clear: bool, title: str, message: str
+    ) -> None:
+        """Keep one self-clearing bell notification in step with its condition.
+
+        Created only on the rising edge (so a manually dismissed notice stays
+        dismissed while the condition persists) and dismissed whenever the
+        condition is gone — dismissing an absent id is a no-op.
+        """
+        notification_id = f"{DOMAIN}_{self.entry.entry_id}_{key}"
+        if clear:
+            pn.async_dismiss(self.hass, notification_id)
+        elif rising:
+            pn.async_create(
+                self.hass, message, title=title, notification_id=notification_id
+            )
+
+    @callback
+    def _fire_transition_events(
+        self,
+        data: SmartClimateData,
+        window_state: dict[str, bool],
+        settings: RuntimeSettings,
+    ) -> None:
+        """Fire bus events (and sync notifications) on operational transitions.
+
+        Edge-triggered against the previous cycle, reusing exactly the
+        predicates behind the binary sensors and the status sensor, so events
+        can never disagree with what the dashboard shows. Watchdog and boost
+        transitions are fired at their own edges (`_watch_command_compliance`,
+        the climate entity), not here.
+        """
+        frost = self.frost_active()
+        if frost != self._event_flags.get("frost", False):
+            frosty = sorted(
+                key
+                for key, d in self.last_decisions.items()
+                if d.reason == "frost_protection"
+            )
+            self._fire_event(
+                EVENT_TYPE_FROST_STARTED if frost else EVENT_TYPE_FROST_ENDED,
+                {"entities": frosty},
+            )
+            self._sync_notification(
+                "frost_protection",
+                rising=frost and settings.event_notifications,
+                clear=not frost,
+                title="Climate Orchestrator: frost protection",
+                message=(
+                    "A room is at or below the frost-protection temperature; "
+                    "forced heating is engaged for: " + ", ".join(frosty)
+                ),
+            )
+
+        dew = self.dew_point_active()
+        if dew != self._event_flags.get("dew", False):
+            drying = sorted(key for key, d in self.last_decisions.items() if d.dry_mode)
+            self._fire_event(
+                EVENT_TYPE_DEHUMIDIFYING_STARTED
+                if dew
+                else EVENT_TYPE_DEHUMIDIFYING_ENDED,
+                {"entities": drying},
+            )
+        self._event_flags = {"frost": frost, "dew": dew}
+
+        paused = frozenset(eid for eid, blocked in window_state.items() if blocked)
+        for started, entities in (
+            (True, paused - self._window_paused),
+            (False, self._window_paused - paused),
+        ):
+            for entity_id in sorted(entities):
+                reading = data.readings.get(entity_id)
+                self._fire_event(
+                    EVENT_TYPE_WINDOW_PAUSE_STARTED
+                    if started
+                    else EVENT_TYPE_WINDOW_PAUSE_ENDED,
+                    {
+                        "entity_id": entity_id,
+                        "area_id": reading.area_id if reading else None,
+                    },
+                )
+        self._window_paused = paused
+
+        status = data.status
+        # _last_status is None on the first cycle after setup: report only
+        # *changes*, not the initial state, so restarts stay quiet.
+        if self._last_status is not None and status is not self._last_status:
+            self._fire_event(
+                EVENT_TYPE_STATUS_CHANGED,
+                {
+                    "from": self._last_status.value,
+                    "to": status.value,
+                    "unavailable_devices": sorted(data.unavailable_devices),
+                },
+            )
+            self._sync_notification(
+                "degraded",
+                rising=(status is Status.DEGRADED) and settings.event_notifications,
+                clear=status is not Status.DEGRADED,
+                title="Climate Orchestrator: degraded",
+                message=(
+                    "Some managed devices or sensors are not usable: "
+                    + (
+                        ", ".join(sorted(data.unavailable_devices))
+                        or "no temperature source"
+                    )
+                ),
+            )
+        self._last_status = status
+
     @callback
     def _ac_bias(
         self,
@@ -1323,6 +1483,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             runtime.ignored_mode = None
             runtime.ignored_since = None
             self._command_ignored_issue(entity_id, active=False)
+            self._set_ignoring(entity_id, runtime, active=False)
             return decision, []
         adapter = ClimateAdapter(self.hass, entity_id)
         device_state = adapter.read()
@@ -1459,6 +1620,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                         "climate_orchestrator: %s is accepting commands again",
                         entity_id,
                     )
+        self._fire_transition_events(data, window_state, settings)
         self._maybe_persist()
         self._maybe_auto_maintenance(settings, decisions)
 

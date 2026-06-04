@@ -84,6 +84,23 @@ CONTROL_FAILURE_ISSUE_THRESHOLD: Final = 3
 # updates must not fast-forward a device that simply reports back slowly.
 COMMAND_IGNORED_SECONDS: Final = 300.0
 
+# --- Events --------------------------------------------------------------------
+# Edge-triggered bus events for automations: one event type, discriminated by
+# a `type` field in the data (the zha_event pattern). Fired on transitions
+# only — never once per cycle — so they're safe to notify on directly.
+EVENT_CLIMATE_ORCHESTRATOR: Final = f"{DOMAIN}_event"
+EVENT_TYPE_FROST_STARTED: Final = "frost_protection_started"
+EVENT_TYPE_FROST_ENDED: Final = "frost_protection_ended"
+EVENT_TYPE_DEHUMIDIFYING_STARTED: Final = "dehumidifying_started"
+EVENT_TYPE_DEHUMIDIFYING_ENDED: Final = "dehumidifying_ended"
+EVENT_TYPE_WINDOW_PAUSE_STARTED: Final = "window_pause_started"
+EVENT_TYPE_WINDOW_PAUSE_ENDED: Final = "window_pause_ended"
+EVENT_TYPE_STATUS_CHANGED: Final = "status_changed"
+EVENT_TYPE_IGNORING_STARTED: Final = "device_ignoring_commands"
+EVENT_TYPE_IGNORING_ENDED: Final = "device_commands_applied"
+EVENT_TYPE_BOOST_STARTED: Final = "boost_started"
+EVENT_TYPE_BOOST_ENDED: Final = "boost_ended"
+
 # Post-restart warm-up window. Until a managed device first reports a usable
 # temperature, the orchestrator reports ``initializing`` for this long and holds
 # back transient repairs (no temperature source, stale sensor) — sensors often

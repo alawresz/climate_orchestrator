@@ -29,6 +29,46 @@ data:
     - climate.bedroom_trv
 ```
 
+## Events
+
+Operational transitions are announced on the event bus as
+`climate_orchestrator_event`, discriminated by a `type` field — one event per
+*edge*, never one per cycle, so they're safe to notify on directly:
+
+| `type` | When | Extra data |
+|--------|------|------------|
+| `frost_protection_started` / `_ended` | A room crosses the frost-protection temperature (either way). | `entities` — the devices in forced heating. |
+| `dehumidifying_started` / `_ended` | The dew-point guard puts an AC in (or out of) dry mode. | `entities` |
+| `window_pause_started` / `_ended` | An open window starts/stops suppressing one device (after the grace delay). | `entity_id`, `area_id` |
+| `status_changed` | The status sensor moves between `ok` / `degraded` / `initializing`. | `from`, `to`, `unavailable_devices` |
+| `device_ignoring_commands` / `device_commands_applied` | The [command-ignored watchdog](../reference/troubleshooting.md#repairs) trips / the device complies again. | `entity_id`, `commanded_mode` |
+| `boost_started` / `boost_ended` | The boost preset engages / reverts. | started: `direction`, `previous_preset`, `until`; ended: `reason` (`expired`/`cancelled`), `reverted_to` |
+
+Trigger on them like any bus event:
+
+```yaml
+automation:
+  - alias: "Frost protection engaged"
+    triggers:
+      - trigger: event
+        event_type: climate_orchestrator_event
+        event_data:
+          type: frost_protection_started
+    actions:
+      - action: notify.mobile_app_your_phone
+        data:
+          title: "Frost protection!"
+          message: "Forced heating: {{ trigger.event.data.entities | join(', ') }}"
+```
+
+## Bell notifications
+
+The two conditions worth interrupting you for — **frost protection active**
+and **status degraded** — also raise a notification in Home Assistant's
+notification panel (the sidebar bell), and dismiss it again by themselves
+when the condition clears. The **Event notifications** switch turns this off;
+bus events keep firing regardless, so your own automations are unaffected.
+
 ## Automation recipes
 
 Get notified when the orchestrator degrades (a device went offline or the

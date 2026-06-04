@@ -193,7 +193,8 @@
       "self_tuning_ac_bias": { "name": "Self-tuning AC bias" },
       "auto_valve_maintenance": { "name": "Automatic valve maintenance" },
       "adaptive_cooling_comfort": { "name": "Adaptive cooling comfort" },
-      "forecast_preconditioning": { "name": "Forecast preconditioning" }
+      "forecast_preconditioning": { "name": "Forecast preconditioning" },
+      "event_notifications": { "name": "Event notifications" }
     },
     "select": {
       "calibration_mode": {

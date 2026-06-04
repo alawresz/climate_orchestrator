@@ -39,7 +39,8 @@
       "self_tuning_ac_bias": { "default": "mdi:air-conditioner" },
       "auto_valve_maintenance": { "default": "mdi:wrench-clock" },
       "adaptive_cooling_comfort": { "default": "mdi:thermometer-auto" },
-      "forecast_preconditioning": { "default": "mdi:weather-partly-snowy" }
+      "forecast_preconditioning": { "default": "mdi:weather-partly-snowy" },
+      "event_notifications": { "default": "mdi:bell-ring-outline" }
     },
     "select": {
       "calibration_mode": { "default": "mdi:tune-variant" }
