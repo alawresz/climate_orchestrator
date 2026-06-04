@@ -69,7 +69,5 @@ def test_kalman_predict_variance_scales_quadratically() -> None:
 def test_predict_variance_is_capped() -> None:
     """The variance ceiling holds even from an already-saturated state."""
     state = KalmanState(temp=20.0, variance=MAX_VARIANCE)
-    grown = predict(
-        state, 0.5, 10.0, ThermalParams(gain=0.1, loss=0.0), 5.0
-    )
+    grown = predict(state, 0.5, 10.0, ThermalParams(gain=0.1, loss=0.0), 5.0)
     assert grown.variance <= MAX_VARIANCE
