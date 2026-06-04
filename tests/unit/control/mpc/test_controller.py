@@ -211,3 +211,34 @@ def test_from_dict_rejects_malformed_parameters() -> None:
         MpcController.from_dict({"gain": "garbage", "loss": 0.01})
     with pytest.raises(TypeError):
         MpcController.from_dict({"loss": 0.01})  # gain missing entirely
+
+
+def test_observe_with_zero_dt_updates_without_prediction() -> None:
+    """dt=0 has no transition to project across — measurement-only correction."""
+    ctrl = _params_controller()
+    ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=5.0)
+    ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=5.0)
+    ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=0.0)
+    assert ctrl.kalman is not None
+    assert ctrl.kalman.variance == pytest.approx(0.0139485628, abs=1e-9)
+
+
+def test_observe_with_subminute_dt_still_predicts() -> None:
+    """Any positive dt projects the estimate forward; only dt <= 0 skips."""
+    ctrl = _params_controller()
+    ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=5.0)
+    ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=5.0)
+    ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=0.5)
+    assert ctrl.kalman is not None
+    assert ctrl.kalman.variance == pytest.approx(0.0175291386, abs=1e-9)
+
+
+def test_precondition_sees_cold_beyond_the_default_horizon() -> None:
+    """A 12-step series is optimised over 12 steps, not the default 6 —
+    otherwise a cold spell arriving after 6 steps would be invisible."""
+    ctrl = _params_controller()
+    series = [25.0] * 6 + [5.0] * 6
+    pct = preconditioned_valve_pct(
+        ctrl, temp=20.5, target=21.0, outdoor=25.0, series=series, dt=5.0
+    )
+    assert pct == pytest.approx(42.6, abs=2.0)
