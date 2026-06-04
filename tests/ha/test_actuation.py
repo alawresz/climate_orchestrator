@@ -215,7 +215,7 @@ async def test_command_failures_log_once_per_outage(
 
     async def _device_rejects(call: ServiceCall) -> None:
         if failing:
-            raise HomeAssistantError("device rejected the command")
+            raise HomeAssistantError
 
     hass.services.async_register("climate", "set_hvac_mode", _device_rejects)
     hass.services.async_register("climate", "set_temperature", _device_rejects)
