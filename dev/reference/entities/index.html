@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -1823,16 +1823,8 @@ won't accept.</p>
 </thead>
 <tbody>
 <tr>
-<td>{TRV} MPC heating power / heat loss</td>
-<td>The learned <code>gain</code> (K/min at full valve) and <code>loss</code> (1/min). Populated only in <code>mpc</code> mode.</td>
-</tr>
-<tr>
 <td>{TRV} MPC learning status</td>
-<td><code>idle</code> (no model / not in MPC mode), <code>learning</code> (collecting samples), or <code>ready</code>.</td>
-</tr>
-<tr>
-<td>{TRV} MPC model error</td>
-<td>RMS residual (K) of the learned fit over its history — lower means a better-trusted model.</td>
+<td><code>idle</code> (no model / not in MPC mode), <code>learning</code> (collecting samples), or <code>ready</code>. The learned model rides along as attributes: <code>heating_gain</code> (K/min at full valve), <code>heat_loss</code> (1/min), <code>model_error</code> (RMS residual of the fit, K — lower means a better-trusted model), and <code>samples</code>.</td>
 </tr>
 <tr>
 <td>{device} action</td>

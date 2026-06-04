@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -1363,8 +1363,8 @@ mode</strong> select chooses how Climate Orchestrator handles that:</p>
 <li><strong>Learning (system identification)</strong> — fits <code>gain</code> and <code>loss</code> from observed
    <code>(valve, temperature change, outdoor)</code> samples with a least-squares solver
    (SciPy), regularised toward sane priors. After ~6 samples it moves from
-   <strong>learning</strong> to <strong>ready</strong>; the fitted values show as the <strong>MPC heating
-   power</strong> / <strong>MPC heat loss</strong> diagnostics and persist across restarts.</li>
+   <strong>learning</strong> to <strong>ready</strong>; the fitted values show as attributes on the
+   <strong>MPC learning status</strong> diagnostic and persist across restarts.</li>
 <li><strong>A Kalman filter</strong> smooths the noisy, slow-reporting sensor between updates.</li>
 <li><strong>Receding-horizon optimisation</strong> — simulates the room a few steps ahead
    under the learned model and writes the <strong>valve opening percentage</strong> that best

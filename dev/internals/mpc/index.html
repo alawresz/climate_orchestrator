@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -1551,8 +1551,9 @@ estimates plus residual diagnostics.</p>
 </ul>
 <p>The fit's quality is surfaced per TRV: <code>MpcController.fit_rmse()</code> returns the
 root-mean-square residual (K/step) of the current <code>(gain, loss)</code> over the
-sample history, feeding the <code>&lt;trv&gt;_mpc_model_error</code> diagnostic sensor as a
-model-confidence figure.</p>
+sample history, exposed as the <code>model_error</code> attribute on the
+<code>&lt;trv&gt;_mpc_learning_status</code> diagnostic sensor (alongside <code>heating_gain</code>,
+<code>heat_loss</code>, and <code>samples</code>) as a model-confidence figure.</p>
 <h2 id="kalman-observer">Kalman observer<a class="headerlink" href="#kalman-observer" title="Permanent link">&para;</a></h2>
 <p>A small in-house scalar Kalman filter (<code>control/mpc/observer.py</code>) is wired into
 <code>MpcController.observe()</code>: each observation <strong>projects</strong> the previous estimate
