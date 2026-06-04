@@ -259,6 +259,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         # plus a one-shot timer to re-run control when the grace delay expires.
         self._window_open_since: dict[str, float] = {}
         self._window_recheck_unsub: CALLBACK_TYPE | None = None
+        self._window_recheck_at: float | None = None  # monotonic deadline
         # Trailing (time, home-avg-temp) samples and the latest slope (K/min).
         self._temp_samples: deque[tuple[float, float]] = deque(
             maxlen=_SLOPE_MAX_SAMPLES
@@ -666,13 +667,26 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
     @callback
     def _schedule_window_recheck(self, delay_seconds: float) -> None:
-        """Re-run control shortly after a window's grace delay expires."""
+        """Re-run control shortly after a window's grace delay expires.
+
+        One timer, earliest deadline wins: a window opening later must not
+        postpone an earlier window's recheck (the keepalive would still catch
+        it, but up to a minute late). The recheck refresh re-evaluates every
+        area, so the earliest deadline serves all pending windows.
+        """
+        now = time.monotonic()
+        deadline = now + delay_seconds
         if self._window_recheck_unsub is not None:
+            pending = self._window_recheck_at
+            if pending is not None and pending <= deadline:
+                return  # an earlier (or equal) recheck is already pending
             self._window_recheck_unsub()
+        self._window_recheck_at = deadline
 
         @callback
         def _fire(_now: object) -> None:
             self._window_recheck_unsub = None
+            self._window_recheck_at = None
             self._background(self.async_request_refresh(), "window recheck refresh")
 
         # A small margin ensures the elapsed check passes when it fires.
@@ -1447,7 +1461,12 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                 )
                 await asyncio.sleep(dwell)
             self._last_maintenance = time.time()
-            await self._maint_store.async_save(self._state_persist_data())
+            state = self._state_persist_data()
+            await self._maint_store.async_save(state)
+            # Sync the flash-wear rate limiter: this payload is on disk, so
+            # the next due cycle must not schedule a redundant write of it.
+            self._state_scheduled = state
+            self._last_persist = time.monotonic()
         finally:
             self._maintenance_running = False
             # Restore normal valve positions on the next cycle.
@@ -1490,6 +1509,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if self._window_recheck_unsub is not None:
             self._window_recheck_unsub()
             self._window_recheck_unsub = None
+            self._window_recheck_at = None
         if any(rt.mpc is not None for rt in self._devices.values()):
             await self._mpc_store.async_save(self._mpc_persist_data())
         # The rate limiter may be holding back up to _PERSIST_INTERVAL of
