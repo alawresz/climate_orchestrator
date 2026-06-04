@@ -248,6 +248,21 @@ flow: only selected presets appear in `preset_modes` and get setpoint numbers
 last. Restoring (or defaulting to) a preset that is no longer selected falls
 back to `home`, else `manual`.
 
+### Boost
+
+`boost` is an override preset, not a stored band: while active,
+`_base_band_edges` derives the band from the *previous* preset's edges with
+the demanded edge pushed by the **Boost offset** number. The direction is
+resolved once at activation (single-purpose setups can only go one way;
+heat_cool picks the side of the band midpoint the home average sits on) and
+held, so a heat boost can't flip into cooling as the room warms past the
+midpoint. A timer (`async_call_later`, **Boost duration**) reverts to the
+previous preset; the deadline rides in the entity's `boost_until` attribute,
+which RestoreEntity replays so a restart mid-boost re-arms the remaining time
+(or reverts immediately when it expired while down). Everything downstream —
+engine, guards, MPC, AC drive — sees only the boosted band; the adaptive
+cooling-comfort shift is skipped during a boost.
+
 ### What the climate entity displays vs. controls
 
 To keep the thermostat card consistent with the control loop, the entity shows

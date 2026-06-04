@@ -29,9 +29,9 @@ from .const import (
     CONF_VALVE_HINTS,
     CONF_WEATHER_ENTITY,
     CONFIG_ENTRY_VERSION,
-    DEFAULT_PRESETS,
     DEFAULT_TITLE,
     DOMAIN,
+    SELECTABLE_PRESETS,
 )
 from .devices.trv import LOCAL_CALIBRATION_HINTS, VALVE_OPENING_HINTS
 
@@ -53,7 +53,7 @@ _WEATHER_SELECTOR = selector.EntitySelector(
 _TEXT_SELECTOR = selector.TextSelector()
 _PRESET_SELECTOR = selector.SelectSelector(
     selector.SelectSelectorConfig(
-        options=list(DEFAULT_PRESETS),
+        options=list(SELECTABLE_PRESETS),
         multiple=True,
         mode=selector.SelectSelectorMode.LIST,
         translation_key="presets",
@@ -95,7 +95,7 @@ def _build_schema(defaults: dict[str, Any]) -> vol.Schema:
             ): _HUMIDITY_SENSOR_SELECTOR,
             vol.Optional(
                 CONF_PRESETS,
-                default=list(defaults.get(CONF_PRESETS, list(DEFAULT_PRESETS))),
+                default=list(defaults.get(CONF_PRESETS, SELECTABLE_PRESETS)),
             ): _PRESET_SELECTOR,
             _optional(
                 CONF_VALVE_HINTS,

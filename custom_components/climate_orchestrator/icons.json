@@ -23,7 +23,9 @@
       "preset_home_heat": { "default": "mdi:fire" },
       "preset_home_cool": { "default": "mdi:snowflake" },
       "preset_sleep_heat": { "default": "mdi:fire" },
-      "preset_sleep_cool": { "default": "mdi:snowflake" }
+      "preset_sleep_cool": { "default": "mdi:snowflake" },
+      "boost_offset": { "default": "mdi:thermometer-plus" },
+      "boost_duration": { "default": "mdi:timer-outline" }
     },
     "switch": {
       "comfort_index_targeting": { "default": "mdi:emoticon-happy-outline" },

@@ -13,9 +13,9 @@ from custom_components.climate_orchestrator.const import (
     CONF_PRESETS,
     CONF_TRVS,
     CONF_VALVE_HINTS,
-    DEFAULT_PRESETS,
     DEFAULT_TITLE,
     DOMAIN,
+    SELECTABLE_PRESETS,
 )
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from custom_components.climate_orchestrator.devices.trv import VALVE_OPENING_HINTS
@@ -112,7 +112,7 @@ async def test_options_flow_stores_preset_selection(
 ) -> None:
     """The preset multi-select round-trips into options and the coordinator."""
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
-    assert coordinator.enabled_presets == list(DEFAULT_PRESETS)  # default: all
+    assert coordinator.enabled_presets == list(SELECTABLE_PRESETS)  # default: all
 
     result = await hass.config_entries.options.async_init(init_integration.entry_id)
     await hass.config_entries.options.async_configure(

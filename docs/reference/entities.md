@@ -50,6 +50,14 @@ these numbers; the manual band needs no preset.
 | Home (default) | 20.5 °C | 24.5 °C |
 | Sleep | 19.5 °C | 23.5 °C |
 
+The [boost preset](../guides/comfort-features.md#boost) has no edge pair;
+instead it gets two tunables (when selected):
+
+| Number | Default | Range | What it does |
+|--------|---------|-------|--------------|
+| Boost offset | 2.0 °C | 0.5–5 °C | How far boost pushes the demanded band edge. |
+| Boost duration | 30 min | 5–240 min | How long until the boost auto-reverts. |
+
 ## Switches: feature toggles
 
 | Switch | Default | Description |

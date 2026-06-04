@@ -73,7 +73,8 @@
       "options": {
         "away": "Away",
         "home": "Home",
-        "sleep": "Sleep"
+        "sleep": "Sleep",
+        "boost": "Boost (timed band push)"
       }
     }
   },
@@ -176,7 +177,9 @@
       "preset_home_heat": { "name": "Preset Home heat setpoint" },
       "preset_home_cool": { "name": "Preset Home cool setpoint" },
       "preset_sleep_heat": { "name": "Preset Sleep heat setpoint" },
-      "preset_sleep_cool": { "name": "Preset Sleep cool setpoint" }
+      "preset_sleep_cool": { "name": "Preset Sleep cool setpoint" },
+      "boost_offset": { "name": "Boost offset" },
+      "boost_duration": { "name": "Boost duration" }
     },
     "switch": {
       "comfort_index_targeting": { "name": "Comfort index targeting" },

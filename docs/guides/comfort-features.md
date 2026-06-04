@@ -21,12 +21,32 @@ is editable within 7–35 °C.
 The preset edges live as `number` entities on the hub device (e.g. *Preset Home
 heat setpoint*), so automations can edit them too.
 
-Don't need all three? The **Presets** multi-select in the integration's
+Don't need them all? The **Presets** multi-select in the integration's
 Configure dialog narrows the offering: deselected presets disappear from the
 thermostat and their setpoint numbers aren't created (existing ones are cleaned
 up). The manual band is always available. If the *active* preset is
 deselected, the thermostat falls back to Home — or to manual when Home isn't
 selected either.
+
+## Boost
+
+**Boost** (HA's standard boost preset) is a temporary override, not a band of
+its own: select it and the current preset's band gets its *demanded* edge
+pushed by **Boost offset** (default 2 °C) for **Boost duration** (default
+30 min), then the previous preset comes back automatically. The direction is
+fixed when you select it:
+
+- heat-only setup → heat boost (heat edge up); cool-only → cool boost (cool
+  edge down);
+- heat/cool setup → whichever side of the band midpoint the home currently
+  sits on: a cold home gets a heat boost, a hot one a cool boost.
+
+The big band error makes the MPC valves open wide and the AC drive hard — but
+it's still just a band, so every guard (window-open, frost, outdoor gating,
+per-area offsets) keeps working, and the adaptive cooling-comfort shift is
+suspended so it can't water the boost down. Selecting any preset or touching
+the setpoints ends the boost early; re-selecting Boost restarts the clock; a
+restart mid-boost resumes it with the original deadline.
 
 ## The manual band
 

@@ -23,6 +23,7 @@ from custom_components.climate_orchestrator.const import (
     CONF_PRESETS,
     DEFAULT_PRESETS,
     DOMAIN,
+    SELECTABLE_PRESETS,
 )
 from custom_components.climate_orchestrator.settings import enabled_presets
 from tests.conftest import TRV_ENTITY
@@ -192,8 +193,8 @@ async def test_deselected_preset_numbers_are_pruned(
 
 def test_enabled_presets_defaults_and_filtering() -> None:
     """Unset/malformed selections mean all; unknowns drop; order is canonical."""
-    assert enabled_presets({}) == list(DEFAULT_PRESETS)
-    assert enabled_presets({CONF_PRESETS: "home"}) == list(DEFAULT_PRESETS)
+    assert enabled_presets({}) == list(SELECTABLE_PRESETS)
+    assert enabled_presets({CONF_PRESETS: "home"}) == list(SELECTABLE_PRESETS)
     assert enabled_presets({CONF_PRESETS: ["sleep", "bogus", "home"]}) == [
         "home",
         "sleep",

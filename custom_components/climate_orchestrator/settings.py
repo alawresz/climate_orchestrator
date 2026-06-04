@@ -28,6 +28,10 @@ from .const import (
     ADAPTIVE_COMFORT_RESPONSE_DEFAULT,
     AREA_BAND_OFFSET_DEFAULT,
     AREA_BAND_OFFSET_LIMIT,
+    BOOST_DURATION_DEFAULT,
+    BOOST_DURATION_MAX,
+    BOOST_OFFSET_DEFAULT,
+    BOOST_OFFSET_MAX,
     CALIBRATION_MODES,
     COMFORT_HUMIDITY_INFLUENCE_DEFAULT,
     CONF_PRESETS,
@@ -42,6 +46,7 @@ from .const import (
     MIN_TEMP,
     PRECONDITION_HORIZON_DEFAULT,
     RELEASE_OFFSET_DEFAULT,
+    SELECTABLE_PRESETS,
     SENSOR_MAX_AGE_DEFAULT,
     TARGET_TEMP_STEP,
     TOLERANCE_DEFAULT,
@@ -66,15 +71,15 @@ def enabled_presets(options: Mapping[str, Any]) -> list[str]:
     """Named presets the user chose to expose (merged entry data + options).
 
     Unset (or anything malformed) means **all** — preset selection is opt-in
-    narrowing. Order and validity come from ``DEFAULT_PRESETS``, so unknown
+    narrowing. Order and validity come from ``SELECTABLE_PRESETS``, so unknown
     values are dropped and the result is stable regardless of how the
     selection was stored. ``manual`` is not listed here; it is always
     available on the climate entity.
     """
     value = options.get(CONF_PRESETS)
     if not isinstance(value, list):
-        return list(DEFAULT_PRESETS)
-    return [preset for preset in DEFAULT_PRESETS if preset in value]
+        return list(SELECTABLE_PRESETS)
+    return [preset for preset in SELECTABLE_PRESETS if preset in value]
 
 
 def area_offset_key(area_id: str) -> str:
@@ -187,6 +192,27 @@ PRESET_NUMBER_SETTINGS: tuple[NumberSetting, ...] = tuple(
     for edge in ("heat", "cool")
 )
 
+# Boost tunables (created only when the boost preset is selected): how far the
+# demanded band edge is pushed, and how long until the auto-revert.
+BOOST_NUMBER_SETTINGS: tuple[NumberSetting, ...] = (
+    NumberSetting(
+        "boost_offset",
+        BOOST_OFFSET_DEFAULT,
+        0.5,
+        BOOST_OFFSET_MAX,
+        TARGET_TEMP_STEP,
+        unit=UnitOfTemperature.CELSIUS,
+    ),
+    NumberSetting(
+        "boost_duration",
+        BOOST_DURATION_DEFAULT,
+        5.0,
+        BOOST_DURATION_MAX,
+        5.0,
+        unit=UnitOfTime.MINUTES,
+    ),
+)
+
 SWITCH_SETTINGS: tuple[SwitchSetting, ...] = (
     SwitchSetting("comfort_index_targeting", True),
     SwitchSetting("home_average_trigger", True),
@@ -273,7 +299,7 @@ def _number_value(hass: HomeAssistant, entry_id: str, setting: NumberSetting) ->
     return clamp(value, setting.min_value, setting.max_value)
 
 
-_NUMBER_SETTINGS_BY_KEY = {s.key: s for s in NUMBER_SETTINGS}
+_NUMBER_SETTINGS_BY_KEY = {s.key: s for s in (*NUMBER_SETTINGS, *BOOST_NUMBER_SETTINGS)}
 
 
 @callback

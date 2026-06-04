@@ -94,7 +94,21 @@ DEFAULT_PRESETS: Final[dict[str, tuple[float, float]]] = {
     "sleep": (19.5, 23.5),
 }
 DEFAULT_PRESET: Final = "home"
-PRESET_MODES: Final[list[str]] = [*DEFAULT_PRESETS, PRESET_MANUAL]
+
+# Boost: a temporary override preset (HA's standard "boost"), not a band of its
+# own — it takes the previous preset's band and pushes the demanded edge by
+# **Boost offset** for **Boost duration**, then reverts automatically. The big
+# band error makes MPC/AC drive hard while every guard (window, frost, outdoor
+# gating) stays active.
+PRESET_BOOST: Final = "boost"
+BOOST_OFFSET_DEFAULT: Final = 2.0  # °C the demanded edge is pushed
+BOOST_OFFSET_MAX: Final = 5.0
+BOOST_DURATION_DEFAULT: Final = 30.0  # minutes until auto-revert
+BOOST_DURATION_MAX: Final = 240.0
+
+# Everything offered in the config flow's preset multi-select ("manual" is not
+# selectable: it's just "the user touched the setpoints" and always available).
+SELECTABLE_PRESETS: Final[list[str]] = [*DEFAULT_PRESETS, PRESET_BOOST]
 
 # --- Control defaults --------------------------------------------------------
 RELEASE_OFFSET_DEFAULT: Final = 0.5

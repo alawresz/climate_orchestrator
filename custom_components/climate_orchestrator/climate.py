@@ -7,6 +7,7 @@ When a managed AC exposes fan/swing, those are surfaced here and forwarded.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.climate import (
@@ -28,7 +29,9 @@ from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE, UnitOfTemperat
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
 from .const import (
@@ -37,6 +40,7 @@ from .const import (
     DOMAIN,
     MAX_TEMP,
     MIN_TEMP,
+    PRESET_BOOST,
     PRESET_MANUAL,
     SERVICE_RESET_MPC_LEARNING,
     SERVICE_RUN_VALVE_MAINTENANCE,
@@ -46,11 +50,13 @@ from .control.adaptive_comfort import adaptive_band
 from .control.comfort import effective_temperature
 from .control.hysteresis import Demand
 from .entity import SmartClimateBaseEntity
-from .settings import preset_band
+from .settings import clamped_number_value, preset_band
 from .util import as_float
 
 if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant, State
+    from datetime import datetime
+
+    from homeassistant.core import CALLBACK_TYPE, HomeAssistant, State
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
     from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
@@ -114,6 +120,13 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         self._manual_high = high
         self._attr_fan_mode: str | None = None
         self._attr_swing_mode: str | None = None
+        # Boost bookkeeping: the preset to revert to, the demanded direction
+        # (fixed at activation so a heat boost can't flip to cooling as the
+        # room crosses the band midpoint), the deadline, and its timer.
+        self._boost_previous: str | None = None
+        self._boost_demand: str = "heat"
+        self._boost_until: datetime | None = None
+        self._boost_unsub: CALLBACK_TYPE | None = None
 
     @property
     def _can_heat(self) -> bool:
@@ -192,9 +205,36 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
             self._manual_high = high
         elif temp is not None:
             self._set_single_manual(temp)
+        if self._attr_preset_mode == PRESET_BOOST:
+            self._restore_boost(last)
         # Reflect the restored mode and re-run control so it takes effect.
         self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
+
+    def _restore_boost(self, last: State) -> None:
+        """Re-arm (or finish) a boost that was running before the restart."""
+        previous = last.attributes.get("boost_previous_preset")
+        if previous in (self._attr_preset_modes or []):
+            self._boost_previous = previous
+        if last.attributes.get("boost_direction") == "cool":
+            self._boost_demand = "cool"
+        until = dt_util.parse_datetime(last.attributes.get("boost_until") or "")
+        remaining = (
+            (until - dt_util.utcnow()).total_seconds() if until is not None else 0.0
+        )
+        if remaining > 0.0:
+            self._boost_until = until
+            self._schedule_boost_end(remaining)
+        else:
+            # Expired (or unreadable) while we were down: revert immediately.
+            self._end_boost()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Stop the boost timer with the entity (options reload, removal)."""
+        if self._boost_unsub is not None:
+            self._boost_unsub()
+            self._boost_unsub = None
+        await super().async_will_remove_from_hass()
 
     def _set_single_manual(self, temp: float) -> None:
         """Store a single-setpoint manual value on the edge the hardware uses."""
@@ -203,6 +243,29 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         else:
             self._manual_low = temp
 
+    def _band_for(self, preset: str) -> tuple[float, float]:
+        """Return a preset's live edges, or the manual pair for ``manual``."""
+        band = preset_band(self.hass, self.coordinator.entry.entry_id, preset)
+        return band if band is not None else (self._manual_low, self._manual_high)
+
+    def _boosted_band(self) -> tuple[float, float]:
+        """Return the previous preset's band with the demanded edge pushed.
+
+        Heat boost raises the heat edge by **Boost offset** (the other edge is
+        dragged along when it would invert); cool boost lowers the cool edge
+        symmetrically. Only the band changes — the control engine and all its
+        guards (window, frost, outdoor gating) act on it as usual.
+        """
+        heat, cool = self._band_for(self._boost_previous or DEFAULT_PRESET)
+        offset = clamped_number_value(
+            self.hass, self.coordinator.entry.entry_id, "boost_offset"
+        )
+        if self._boost_demand == "cool":
+            cool = max(cool - offset, MIN_TEMP)
+            return min(heat, cool), cool
+        heat = min(heat + offset, MAX_TEMP)
+        return heat, max(cool, heat)
+
     def _base_band_edges(self) -> tuple[float, float]:
         """User-set band: the preset's live edges or the manual pair.
 
@@ -210,12 +273,11 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         limit, so the one real setpoint behaves like a normal thermostat target
         (heat below it / cool above it) and the band never looks inverted.
         """
-        band = preset_band(
-            self.hass,
-            self.coordinator.entry.entry_id,
-            self._attr_preset_mode or DEFAULT_PRESET,
-        )
-        heat, cool = band if band is not None else (self._manual_low, self._manual_high)
+        preset = self._attr_preset_mode or DEFAULT_PRESET
+        if preset == PRESET_BOOST:
+            heat, cool = self._boosted_band()
+        else:
+            heat, cool = self._band_for(preset)
         if self._can_heat and not self._can_cool:
             return heat, MAX_TEMP
         if self._can_cool and not self._can_heat:
@@ -233,6 +295,10 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         """
         heat, cool = self._base_band_edges()
         settings = self.coordinator.current_settings()
+        # A boost is an explicit "drive hard now" — don't let the adaptive
+        # cool-edge relaxation water it back down.
+        if self._attr_preset_mode == PRESET_BOOST:
+            return heat, cool
         if not settings.adaptive_cooling_comfort:
             return heat, cool
         return adaptive_band(
@@ -382,6 +448,11 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         dry_bulb = self.coordinator.data.home_avg_temperature
         if dry_bulb is not None:
             attrs["dry_bulb_temperature"] = dry_bulb
+        if self._attr_preset_mode == PRESET_BOOST and self._boost_until is not None:
+            # Also what RestoreEntity replays so a boost survives a restart.
+            attrs["boost_until"] = self._boost_until.isoformat()
+            attrs["boost_previous_preset"] = self._boost_previous
+            attrs["boost_direction"] = self._boost_demand
         return attrs
 
     @property
@@ -421,6 +492,7 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
             if temp is None:
                 return
             self._set_single_manual(float(temp))
+        self._cancel_boost()
         self._attr_preset_mode = PRESET_MANUAL
         await self._apply_and_control()
 
@@ -431,8 +503,75 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Select a preset; its (editable) band edges then drive the setpoints."""
-        self._attr_preset_mode = preset_mode
+        if preset_mode == PRESET_BOOST:
+            self._start_boost()
+        else:
+            self._cancel_boost()
+            self._attr_preset_mode = preset_mode
         await self._apply_and_control()
+
+    # --- Boost ----------------------------------------------------------------
+
+    def _start_boost(self) -> None:
+        """Activate (or restart) the boost: fix the direction, arm the timer."""
+        if self._attr_preset_mode != PRESET_BOOST:
+            self._boost_previous = self._attr_preset_mode
+            self._boost_demand = self._boost_direction()
+            self._attr_preset_mode = PRESET_BOOST
+        # (Re-)selecting boost restarts the clock.
+        duration = 60.0 * clamped_number_value(
+            self.hass, self.coordinator.entry.entry_id, "boost_duration"
+        )
+        self._boost_until = dt_util.utcnow() + timedelta(seconds=duration)
+        self._schedule_boost_end(duration)
+
+    def _boost_direction(self) -> str:
+        """Which edge the boost pushes, fixed at activation.
+
+        Single-purpose setups can only go one way. In heat_cool the side of
+        the current band's midpoint decides: a cold home wants a heat boost, a
+        hot one a cool boost. With no reading yet, heat — by far the common
+        boost intent for radiator hardware.
+        """
+        if self._on_mode is HVACMode.COOL:
+            return "cool"
+        if self._on_mode is HVACMode.HEAT:
+            return "heat"
+        heat, cool = self._band_for(self._attr_preset_mode or DEFAULT_PRESET)
+        temp = self.current_temperature
+        if temp is not None and temp > (heat + cool) / 2.0:
+            return "cool"
+        return "heat"
+
+    def _schedule_boost_end(self, delay_seconds: float) -> None:
+        if self._boost_unsub is not None:
+            self._boost_unsub()
+        self._boost_unsub = async_call_later(
+            self.hass, delay_seconds, self._async_boost_timeout
+        )
+
+    async def _async_boost_timeout(self, _now: datetime) -> None:
+        """Timer callback: the boost ran its course, revert."""
+        self._boost_unsub = None
+        self._end_boost()
+        await self._apply_and_control()
+
+    def _end_boost(self) -> None:
+        """Revert to the pre-boost preset (or the safest fallback) and clean up."""
+        modes = self._attr_preset_modes or []
+        fallback = self._boost_previous
+        if fallback not in modes:
+            fallback = DEFAULT_PRESET if DEFAULT_PRESET in modes else PRESET_MANUAL
+        self._attr_preset_mode = fallback
+        self._cancel_boost()
+
+    def _cancel_boost(self) -> None:
+        """Drop all boost state; the caller decides the next preset."""
+        if self._boost_unsub is not None:
+            self._boost_unsub()
+            self._boost_unsub = None
+        self._boost_previous = None
+        self._boost_until = None
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Forward a fan mode to every AC that supports it."""

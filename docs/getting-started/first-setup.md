@@ -56,7 +56,7 @@ stale — is covered in [How it controls](../guides/how-it-controls.md).
 
 | Field | Default | What it is |
 |-------|---------|------------|
-| **Presets** | Home, Away, Sleep | Which presets the thermostat offers. Only selected presets get editable setpoint `number` entities; the manual band is always available. |
+| **Presets** | Home, Away, Sleep, Boost | Which presets the thermostat offers. Only selected presets get their tuning `number` entities; the manual band is always available. |
 
 ### Advanced: TRV discovery hints
 

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.helpers import entity_registry as er
 
-from .const import CONFIG_ENTRY_VERSION, DEFAULT_PRESETS, PLATFORMS
+from .const import CONFIG_ENTRY_VERSION, DEFAULT_PRESETS, PLATFORMS, PRESET_BOOST
 from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 from .settings import enabled_presets, preset_number_key
 
@@ -45,6 +45,10 @@ def _async_remove_retired_entities(
         if preset not in selected
         for edge in ("heat", "cool")
     }
+    if PRESET_BOOST not in selected:
+        deselected_ids.update(
+            (f"{entry.entry_id}_boost_offset", f"{entry.entry_id}_boost_duration")
+        )
     registry = er.async_get(hass)
     for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
         if (
