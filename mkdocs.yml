@@ -58,6 +58,11 @@ plugins:
       full_screen: true
 
 extra:
+  # One browser-storage scope for the whole site instead of one per mike
+  # version path: palette choice and the cached GitHub repo facts (the header
+  # stars/tag card) carry across version switches, rather than each version
+  # keeping its own — increasingly stale — copy.
+  scope: /climate_orchestrator/
   # Version selector in the header, fed by mike's versions.json on gh-pages.
   version:
     provider: mike
