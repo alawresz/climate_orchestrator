@@ -157,9 +157,17 @@ version_variables = [
 ]
 tag_format = "v{version}"
 commit_message = "chore(release): {version} [skip ci]"
-# No build artifact: HACS installs from the source tree / release zip.
-build_command = ""
+build_command = """
+mkdir -p dist
+python -c "import shutil; shutil.make_archive('dist/climate_orchestrator', 'zip', 'custom_components/climate_orchestrator')"
+"""
 allow_zero_version = true
+
+[tool.semantic_release.publish]
+# Attach the built zip to the GitHub Release (these are the defaults, pinned
+# explicitly because HACS zip_release installs depend on the asset existing).
+dist_glob_patterns = ["dist/*"]
+upload_to_vcs_release = true
 
 [tool.semantic_release.changelog]
 mode = "update"

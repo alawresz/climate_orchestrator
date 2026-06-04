@@ -406,7 +406,7 @@ Versioning is automated with **python-semantic-release** driven by Conventional 
 
 Prereleases are **branch-based** (PSR's native model — it releases from the branch it runs on). `[tool.semantic_release.branches]` marks `main` as stable and any `feat/*` or `fix/*` branch as prerelease (`prerelease_token = "rc"`). A single workflow handles both:
 
-- **`release.yml`** — triggered by a *successful* CI run on `main`, `feat/**`, or `fix/**` (`workflow_run`), so we never tag a red commit. It checks out whichever branch CI ran on and runs PSR, which reads the branch config to decide stable vs prerelease, bumps `pyproject.toml` + `manifest.json`, updates `CHANGELOG.md`, commits (`chore(release): … [skip ci]`), tags, and publishes the GitHub Release.
+- **`release.yml`** — triggered by a *successful* CI run on `main`, `feat/**`, or `fix/**` (`workflow_run`), so we never tag a red commit. It checks out whichever branch CI ran on and runs PSR, which reads the branch config to decide stable vs prerelease, bumps `pyproject.toml` + `manifest.json`, updates `CHANGELOG.md`, runs `build_command` to produce `dist/climate_orchestrator.zip` (the integration directory's contents, manifest at the zip root), commits (`chore(release): … [skip ci]`), tags, publishes the GitHub Release, and attaches the zip (`[tool.semantic_release.publish]`). HACS installs that exact asset (`zip_release` + `filename` in `hacs.json`), and `actions/attest-build-provenance` records verifiable provenance for it (`gh attestation verify climate_orchestrator.zip -R <repo>`).
   - Push to a **`feat/*` / `fix/*`** branch → `X.Y.Z-rc.N` prerelease (testers enable *Show beta versions* in HACS).
   - Merge that branch into **`main`** → the stable `X.Y.Z` release HACS serves by default.
 

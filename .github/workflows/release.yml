@@ -11,6 +11,9 @@ on:
 # Needs write access to push the version-bump commit + tag and create the release.
 permissions:
   contents: write
+  # For the build-provenance attestation of the HACS zip asset.
+  id-token: write
+  attestations: write
 
 concurrency:
   group: release-${{ github.event.workflow_run.head_branch }}
@@ -36,9 +39,17 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Python Semantic Release
+        id: release
         # Reads [tool.semantic_release] branch config to decide stable vs
         # prerelease, bumps pyproject.toml + manifest.json, updates the
         # changelog, commits + tags, and publishes the GitHub Release.
         uses: python-semantic-release/python-semantic-release@350c48fcb3ffcdfd2e0a235206bc2ecea6b69df0 # v10.5.3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attest build provenance of the HACS zip
+        # Verifiable provenance for the exact artifact HACS installs:
+        #   gh attestation verify climate_orchestrator.zip -R <owner>/<repo>
+        if: steps.release.outputs.released == 'true'
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: dist/climate_orchestrator.zip
