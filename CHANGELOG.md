@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.28.0 (2026-06-04)
+
+### Documentation
+
+- Unify browser-storage scope across versions for consistent cache management
+  ([`e940af1`](https://github.com/alawresz/climate_orchestrator/commit/e940af1cbd52751b0772a43dcb3ff13f46734275))
+
+### Features
+
+- Manual-override takeover honors external device changes
+  ([`8660158`](https://github.com/alawresz/climate_orchestrator/commit/866015826b7d21e2accdc9caaada845b6c1cf244))
+
+
 ## v0.27.0 (2026-06-04)
 
 ### Chores
