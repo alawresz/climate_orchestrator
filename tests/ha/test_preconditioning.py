@@ -29,9 +29,7 @@ def _register_forecast_service(
 
     async def _get_forecasts(call: ServiceCall) -> dict:
         return {
-            WEATHER: {
-                "forecast": [{"datetime": "x", "temperature": t} for t in series]
-            }
+            WEATHER: {"forecast": [{"datetime": "x", "temperature": t} for t in series]}
         }
 
     hass.services.async_register(
