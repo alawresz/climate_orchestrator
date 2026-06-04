@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v0.28.2 (2026-06-04)
+
+### Bug Fixes
+
+- Keep status initializing while devices are still joining after restart
+  ([`19f9f82`](https://github.com/alawresz/climate_orchestrator/commit/19f9f82e073ccaf34b284c1d4131e61ab3a861bd))
+
+### Documentation
+
+- Sync feature tour, persistence, and entity reference with recent features
+  ([`d8275bc`](https://github.com/alawresz/climate_orchestrator/commit/d8275bc0fa178d808c315d0920e2e34eff6c22a4))
+
+### Refactoring
+
+- Centralize refresh helper and isolate write operations in coordinator
+  ([`5c23a48`](https://github.com/alawresz/climate_orchestrator/commit/5c23a489566f4ce0445e1723f07630d2638cb2ac))
+
+
 ## v0.28.1 (2026-06-04)
 
 ### Bug Fixes
