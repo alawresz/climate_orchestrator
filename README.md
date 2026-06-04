@@ -505,6 +505,24 @@ Developer Tools → Actions (target the whole-home `climate` entity):
   temperature, and the per-device demand latch) is persisted, so a restart resumes
   where it left off.
 
+### Enable debug logging
+
+For a per-cycle trace of what the orchestrator is doing (and why) — sensor
+snapshots, per-device decisions, command writes, MPC learning, forecast
+fetches — turn on debug logging for the integration. Either at runtime via
+**Settings → Devices & Services → Climate Orchestrator → ⋮ → Enable debug
+logging** (downloads the captured log when disabled again), or persistently in
+`configuration.yaml`:
+
+```yaml
+logger:
+  logs:
+    custom_components.climate_orchestrator: debug
+```
+
+When reporting an issue, a debug log covering a few control cycles plus the
+diagnostics JSON (above) is usually everything needed to reproduce it.
+
 ## Automation examples
 
 Get notified when the orchestrator degrades (a device went offline or the
