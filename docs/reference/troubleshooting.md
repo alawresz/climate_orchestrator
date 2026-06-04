@@ -38,6 +38,16 @@ A separate notice appears if the control cycle itself fails several times in
 a row — devices stop receiving fresh commands while readings continue — and
 clears on the next successful cycle.
 
+A per-device **command-ignored** notice catches the opposite failure mode: the
+service calls *succeed*, but the device's state never reflects the commanded
+HVAC mode for five minutes straight — it's silently ignoring them, so its room
+isn't actually being controlled. Typical culprits: a child/temperature lock
+engaged on the device, a weak Zigbee/radio link, a dying battery, or its
+integration no longer talking to the hardware. The notice clears as soon as
+the device applies a command (and isn't raised for *loudly* failing devices —
+those are covered above — or unavailable ones, which the **Status** sensor
+reports).
+
 Learned state (MPC models, the adaptive bias, the running-mean outdoor
 temperature, and the per-device demand latch) is persisted, so a restart resumes
 where it left off.

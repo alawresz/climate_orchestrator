@@ -51,6 +51,7 @@ from .const import (
     CALIBRATION_MPC,
     CALIBRATION_OFFSET,
     CALIBRATION_TARGET,
+    COMMAND_IGNORED_SECONDS,
     CONF_ACS,
     CONF_CALIBRATION_HINTS,
     CONF_HOME_HUMIDITY_SENSOR,
@@ -204,6 +205,12 @@ class DeviceRuntime:
 
     command_failing: bool = False
     """Whether commands to this device are currently failing (log-once latch)."""
+
+    ignored_mode: str | None = None
+    """Commanded HVAC mode of the current non-compliance streak (watchdog)."""
+
+    ignored_since: float | None = None
+    """Monotonic time the current non-compliance streak started (watchdog)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -851,6 +858,51 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             ir.async_delete_issue(self.hass, DOMAIN, issue_id)
 
     @callback
+    def _watch_command_compliance(
+        self, entity_id: str, runtime: DeviceRuntime, mode: str | None, desired: str
+    ) -> None:
+        """Watchdog: flag a device whose service calls succeed but do nothing.
+
+        A child lock, a weak radio link, a dying battery, or a wedged upstream
+        integration all look the same from here: ``set_hvac_mode`` returns
+        fine, yet the entity's state never becomes the commanded mode. When
+        one *unchanged* commanded mode stays unreflected past
+        ``COMMAND_IGNORED_SECONDS``, raise a per-device repair; it clears the
+        moment the device converges. Loud failures are excluded — those are
+        the control-failure repair's job.
+        """
+        if mode == desired or runtime.command_failing:
+            runtime.ignored_mode = None
+            runtime.ignored_since = None
+            self._command_ignored_issue(entity_id, active=False)
+            return
+        now = time.monotonic()
+        if runtime.ignored_mode != desired or runtime.ignored_since is None:
+            runtime.ignored_mode = desired
+            runtime.ignored_since = now
+        self._command_ignored_issue(
+            entity_id,
+            active=now - runtime.ignored_since >= COMMAND_IGNORED_SECONDS,
+        )
+
+    @callback
+    def _command_ignored_issue(self, entity_id: str, *, active: bool) -> None:
+        """Raise/clear the per-device "commands ignored" repair issue."""
+        issue_id = f"device_ignoring_commands_{entity_id}"
+        if active:
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                issue_id,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="device_ignoring_commands",
+                translation_placeholders={"entity_id": entity_id},
+            )
+        else:
+            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+
+    @callback
     def _toggle_issue(self, issue_id: str, active: bool, key: str) -> None:
         """Create or clear a static (no-placeholder) repair issue."""
         if active:
@@ -1265,8 +1317,15 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         )
         runtime.demand = decision.demand
         if not reading.available:
-            return decision, []  # excluded this cycle, but its latch is preserved
+            # Excluded this cycle, but its latch is preserved. An offline
+            # device can't comply with anything: drop any watchdog streak so
+            # the unavailability is reported as such, not as "ignoring".
+            runtime.ignored_mode = None
+            runtime.ignored_since = None
+            self._command_ignored_issue(entity_id, active=False)
+            return decision, []
         adapter = ClimateAdapter(self.hass, entity_id)
+        device_state = adapter.read()
         command = build_command(
             decision,
             kind,
@@ -1274,11 +1333,14 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             ac_setpoint_bias=self._ac_bias(entity_id, kind, decision, reading, ctx),
             caps=adapter.capabilities(),
             tolerance=ctx.settings.tolerance,
-            device_current_temp=adapter.read().current_temp,
+            device_current_temp=device_state.current_temp,
             room_temp=self._room_effective(reading, ctx),
         )
         command = self._throttle_ac_setpoint(entity_id, command)
         runtime.command = command
+        self._watch_command_compliance(
+            entity_id, runtime, device_state.hvac_mode, command.hvac_mode.value
+        )
         writes: list[tuple[str, Coroutine[Any, Any, None]]] = [
             (entity_id, adapter.apply(command))
         ]

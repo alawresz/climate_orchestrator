@@ -76,6 +76,14 @@ PRECONDITION_MAX_STEPS: Final = 600
 # commanded at all — surface a repair instead of failing silently in the log.
 CONTROL_FAILURE_ISSUE_THRESHOLD: Final = 3
 
+# Command-ignored watchdog: a device whose service calls *succeed* but whose
+# state never reflects the commanded HVAC mode for this long is silently
+# ignoring us (child lock engaged, weak radio link, dying battery, a stuck
+# integration) — surface a repair. Time-based rather than cycle-counted:
+# refreshes also fire on every state change, and a burst of unrelated sensor
+# updates must not fast-forward a device that simply reports back slowly.
+COMMAND_IGNORED_SECONDS: Final = 300.0
+
 # Post-restart warm-up window. Until a managed device first reports a usable
 # temperature, the orchestrator reports ``initializing`` for this long and holds
 # back transient repairs (no temperature source, stale sensor) — sensors often

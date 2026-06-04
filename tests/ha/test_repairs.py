@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import time
 
 from homeassistant.const import ATTR_ENTITY_ID, STATE_UNAVAILABLE
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_mock_service,
+)
 
 from custom_components.climate_orchestrator.const import (
     CONTROL_FAILURE_ISSUE_THRESHOLD,
@@ -127,3 +132,85 @@ async def test_repeated_control_failures_raise_and_clear(
     monkeypatch.undo()
     await _refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, "control_loop_failing") is None
+
+
+_IGNORED_ISSUE = f"device_ignoring_commands_{TRV_ENTITY}"
+
+
+async def _start_ignored_streak(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> SmartClimateCoordinator:
+    """Mock succeeding climate services and run until the watchdog is armed.
+
+    The fixture TRV reports ``heat`` while a 21 °C room (inside the band)
+    commands ``off`` — with the service calls now *succeeding*, that's a
+    silently non-compliant device. Two cycles: the first still sees the
+    setup-phase command_failing latch (the fixture had no climate services),
+    the second starts the streak.
+    """
+    async_mock_service(hass, "climate", "set_hvac_mode")
+    async_mock_service(hass, "climate", "set_temperature")
+    await _refresh(hass, entry)
+    await _refresh(hass, entry)
+    coordinator: SmartClimateCoordinator = entry.runtime_data
+    assert coordinator._runtime(TRV_ENTITY).ignored_since is not None
+    return coordinator
+
+
+async def test_command_ignored_watchdog_raises_and_clears(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """A device that takes commands but never applies them raises a repair."""
+    registry = ir.async_get(hass)
+    coordinator = await _start_ignored_streak(hass, init_integration)
+    # Streak running but young: no issue yet.
+    assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
+
+    # Pretend the divergence has persisted past the watchdog threshold.
+    coordinator._runtime(TRV_ENTITY).ignored_since = time.monotonic() - 999.0
+    await _refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is not None
+
+    # The device finally applies the commanded mode -> issue clears.
+    hass.states.async_set(TRV_ENTITY, "off")
+    await _refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
+    assert coordinator._runtime(TRV_ENTITY).ignored_since is None
+
+
+async def test_loud_command_failures_do_not_raise_ignored_issue(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Failing service calls are the log-once latch's job, not the watchdog's."""
+    registry = ir.async_get(hass)
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+
+    # Deterministic outage: the climate services exist but reject every command
+    # (a missing entity alone only warns — the call itself would succeed).
+    async def _device_rejects(call: ServiceCall) -> None:
+        raise HomeAssistantError
+
+    hass.services.async_register("climate", "set_hvac_mode", _device_rejects)
+    hass.services.async_register("climate", "set_temperature", _device_rejects)
+    await _refresh(hass, init_integration)
+    await _refresh(hass, init_integration)
+
+    assert coordinator._runtime(TRV_ENTITY).command_failing
+    assert coordinator._runtime(TRV_ENTITY).ignored_since is None
+    assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
+
+
+async def test_unavailable_device_clears_ignored_issue(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """A device dropping offline is 'unavailable', not 'ignoring commands'."""
+    registry = ir.async_get(hass)
+    coordinator = await _start_ignored_streak(hass, init_integration)
+    coordinator._runtime(TRV_ENTITY).ignored_since = time.monotonic() - 999.0
+    await _refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is not None
+
+    hass.states.async_set(TRV_ENTITY, STATE_UNAVAILABLE)
+    await _refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
+    assert coordinator._runtime(TRV_ENTITY).ignored_since is None

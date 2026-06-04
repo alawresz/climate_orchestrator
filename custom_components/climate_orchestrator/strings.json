@@ -232,6 +232,10 @@
       "title": "Climate Orchestrator: control cycle repeatedly failing",
       "description": "The control cycle has failed several times in a row, so your devices are no longer receiving fresh commands (sensor readings still update). Check the Home Assistant log for the underlying error — it usually points at an unresponsive device or integration. This notice clears itself on the next successful cycle."
     },
+    "device_ignoring_commands": {
+      "title": "Climate Orchestrator: device ignoring commands",
+      "description": "Commands to `{entity_id}` are being accepted, but the device's state has not reflected the requested HVAC mode for several minutes — it is silently ignoring them. Common causes: a child/temperature lock engaged on the device, a weak Zigbee/radio link, a dying battery, or its integration no longer talking to the hardware. Until it complies, this room is not actually being controlled. This notice clears itself as soon as the device applies a command."
+    },
     "inverted_band": {
       "title": "Climate Orchestrator: comfort band inverted",
       "description": "The active comfort band has its cool setpoint *below* its heat setpoint, leaving no neutral zone — the system will heat below the cool edge and cool above it, running almost constantly. Check the active preset's heat/cool setpoints (the heat setpoint should be the lower of the two)."

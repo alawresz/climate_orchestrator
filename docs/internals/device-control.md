@@ -148,6 +148,17 @@ Each managed device and sensor is tracked independently:
 - Every device command is isolated: dispatched per-device and gathered with
   `return_exceptions=True`, so a timeout or error talking to one device is
   caught, logged, and contained — it can never abort the cycle for the others.
+- A **command-ignored watchdog** catches the silent failure mode the above
+  can't: service calls that *succeed* while the device's state never becomes
+  the commanded HVAC mode (child lock, weak radio link, dying battery, a
+  wedged integration). Each cycle compares the entity's reported mode to the
+  just-built command; one unchanged commanded mode left unreflected past
+  `COMMAND_IGNORED_SECONDS` (5 min) raises a per-device repair, cleared the
+  moment the device converges. The threshold is time-based, not cycle-counted
+  — refreshes also fire on every state change, and a burst of unrelated
+  sensor updates must not fast-forward a device that merely reports slowly.
+  Loudly failing devices (the bullet above) and unavailable ones are
+  excluded; those have their own surfaces.
 - Degraded status is surfaced for visibility: the diagnostic `status` sensor
   reads `degraded` and lists which devices are currently excluded in its
   `unavailable_devices` attribute. Devices rejoin automatically when they
