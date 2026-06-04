@@ -1,0 +1,24 @@
+# Component split mirroring the architecture: the pure control math is held
+# visibly separate from the HA shell in Codecov's UI and PR comments. The
+# hard 90% gate stays in pytest (--cov fail_under); these are visibility-only.
+comment:
+  layout: "condensed_header, diff, components"
+
+component_management:
+  individual_components:
+    - component_id: control
+      name: control (pure math)
+      paths:
+        - custom_components/climate_orchestrator/control/**
+    - component_id: devices
+      name: devices (pure command/reconcile)
+      paths:
+        - custom_components/climate_orchestrator/devices/**
+    - component_id: sensing
+      name: sensing (aggregation)
+      paths:
+        - custom_components/climate_orchestrator/sensing/**
+    - component_id: shell
+      name: HA shell (coordinator + platforms)
+      paths:
+        - custom_components/climate_orchestrator/*.py

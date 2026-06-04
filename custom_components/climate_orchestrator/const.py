@@ -22,6 +22,10 @@ PLATFORMS: Final[list[Platform]] = [
     Platform.SWITCH,
 ]
 
+# Config entry schema version (kept in lock-step with the config flow's
+# VERSION; bump together with a migration step in __init__.async_migrate_entry).
+CONFIG_ENTRY_VERSION: Final = 1
+
 # --- Configuration keys (stored in entry.data / entry.options) ---------------
 CONF_TRVS: Final = "trvs"
 CONF_ACS: Final = "acs"

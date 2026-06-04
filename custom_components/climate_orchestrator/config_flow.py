@@ -27,6 +27,7 @@ from .const import (
     CONF_TRVS,
     CONF_VALVE_HINTS,
     CONF_WEATHER_ENTITY,
+    CONFIG_ENTRY_VERSION,
     DEFAULT_TITLE,
     DOMAIN,
 )
@@ -102,7 +103,7 @@ def _has_device(user_input: dict[str, Any]) -> bool:
 class SmartClimateConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle the Climate Orchestrator config flow."""
 
-    VERSION = 1
+    VERSION = CONFIG_ENTRY_VERSION
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None

@@ -9,11 +9,25 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .const import PLATFORMS
+from .const import CONFIG_ENTRY_VERSION, PLATFORMS
 from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
+
+
+async def async_migrate_entry(
+    hass: HomeAssistant, entry: SmartClimateConfigEntry
+) -> bool:
+    """Migrate a config entry created by an older (or newer) version.
+
+    The schema is still v1 — every option added so far has been optional with
+    a compatible default, which needs no migration. This scaffold exists so
+    the first breaking schema change only adds a step here instead of
+    wiring. Returning ``False`` for a *newer* major version blocks downgrades
+    cleanly instead of mis-reading an unknown schema.
+    """
+    return not entry.version > CONFIG_ENTRY_VERSION
 
 
 async def async_setup_entry(

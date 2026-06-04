@@ -40,8 +40,11 @@ jobs:
       - name: mypy
         run: uv run mypy custom_components/climate_orchestrator
       - name: pytest (with coverage + JUnit results)
+        env:
+          HYPOTHESIS_PROFILE: ci
         run: >-
           uv run pytest
+          --timeout=120
           --cov=custom_components/climate_orchestrator
           --cov-report=xml --cov-report=term-missing
           --junitxml=junit.xml -o junit_family=legacy

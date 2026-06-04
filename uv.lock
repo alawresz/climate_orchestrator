@@ -679,7 +679,7 @@ wheels = [
 
 [[package]]
 name = "climate-orchestrator"
-version = "0.19.2"
+version = "0.20.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -689,6 +689,7 @@ dev = [
     { name = "mypy" },
     { name = "pytest-homeassistant-custom-component" },
     { name = "pytest-randomly" },
+    { name = "pytest-timeout" },
     { name = "python-semantic-release" },
     { name = "ruff" },
     { name = "scipy" },
@@ -703,6 +704,7 @@ dev = [
     { name = "mypy", specifier = ">=1.11" },
     { name = "pytest-homeassistant-custom-component", specifier = ">=0.13" },
     { name = "pytest-randomly", specifier = ">=3.15" },
+    { name = "pytest-timeout", specifier = ">=2.3" },
     { name = "python-semantic-release", specifier = ">=10.5,<11" },
     { name = "ruff", specifier = "==0.15.15" },
     { name = "scipy", specifier = ">=1.11" },
