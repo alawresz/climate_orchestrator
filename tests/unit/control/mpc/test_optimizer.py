@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.climate_orchestrator.control.mpc.model import ThermalParams
+from custom_components.climate_orchestrator.control.mpc.model import (
+    DEFAULT_PARAMS,
+    ThermalParams,
+)
 from custom_components.climate_orchestrator.control.mpc.optimizer import optimize_valve
 
 PARAMS = ThermalParams(gain=0.25, loss=0.02)
@@ -73,3 +76,14 @@ def test_short_series_equals_explicitly_held_tail() -> None:
     )
     assert short == pytest.approx(explicit, abs=1e-9)
     assert short > 0.9  # the cold tail demands heat; a warm hold would not
+
+
+def test_short_forecast_series_holds_its_tail() -> None:
+    """A series shorter than the horizon behaves as if padded with its last value."""
+    short = optimize_valve(
+        15.0, 21.0, [5.0, 4.0, 3.0], DEFAULT_PARAMS, dt=1.0, horizon=6
+    )
+    padded = optimize_valve(
+        15.0, 21.0, [5.0, 4.0, 3.0, 3.0, 3.0, 3.0], DEFAULT_PARAMS, dt=1.0, horizon=6
+    )
+    assert short == pytest.approx(padded, abs=1e-9)

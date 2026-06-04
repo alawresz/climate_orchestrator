@@ -20,6 +20,7 @@ from custom_components.climate_orchestrator.control.mpc.model import (
 from custom_components.climate_orchestrator.control.mpc.observer import (
     MAX_VARIANCE,
     MEASUREMENT_VAR,
+    KalmanState,
 )
 
 
@@ -328,3 +329,45 @@ def test_observe_bridges_exactly_at_the_dt_cap() -> None:
     assert len(ctrl.history) == n + 1  # learned, not skipped
     assert ctrl.kalman is not None
     assert ctrl.kalman.variance != MEASUREMENT_VAR  # projected, not re-anchored
+
+
+@pytest.mark.parametrize(
+    ("dt", "bridges"),
+    [
+        (MAX_SAMPLE_DT_MIN - 0.001, True),
+        (MAX_SAMPLE_DT_MIN, True),
+        (MAX_SAMPLE_DT_MIN + 0.001, False),
+    ],
+    ids=["just-under", "exactly-at", "just-over"],
+)
+def test_dt_cap_boundary_separates_bridge_from_reanchor(dt, bridges) -> None:
+    """Pin both comparisons around the cap: <= learns/projects, > re-anchors."""
+    ctrl = MpcController()
+    ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=1.0)
+    n = len(ctrl.history)
+
+    ctrl.observe(temp=20.5, valve=0.5, outdoor=10.0, dt=dt)
+    assert (len(ctrl.history) == n + 1) is bridges
+    assert ctrl.kalman is not None
+    anchored = ctrl.kalman.variance == MEASUREMENT_VAR and ctrl.kalman.temp == 20.5
+    assert anchored is not bridges
+
+
+def test_kalman_recovers_after_cap_and_reanchor() -> None:
+    """Saturated variance -> long-gap re-anchor -> normal steps shrink it again."""
+    ctrl = MpcController()
+    ctrl.observe(temp=20.0, valve=0.5, outdoor=10.0, dt=1.0)
+    ctrl.kalman = KalmanState(temp=20.0, variance=MAX_VARIANCE)  # saturated
+
+    ctrl.observe(temp=25.0, valve=0.5, outdoor=10.0, dt=500.0)  # unbridgeable gap
+    assert ctrl.kalman == KalmanState(temp=25.0, variance=MEASUREMENT_VAR)
+
+    ctrl.observe(temp=25.1, valve=0.5, outdoor=10.0, dt=1.0)
+    assert ctrl.kalman.variance < MEASUREMENT_VAR  # converging again
+
+
+def test_negative_max_opening_yields_closed_valve() -> None:
+    pct = MpcController().compute_valve_pct(
+        temp=15.0, target=25.0, outdoor=-10.0, dt=1.0, max_opening_pct=-50.0
+    )
+    assert pct == 0.0
