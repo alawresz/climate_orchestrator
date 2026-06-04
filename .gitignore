@@ -6,7 +6,6 @@ __pycache__/
 
 # Virtual envs / uv
 .venv/
-# uv.lock IS committed (dev/CI reproducibility + Dependabot uv updates it).
 
 # Test / coverage
 .pytest_cache/
@@ -25,6 +24,7 @@ test-results/
 .idea/
 .vscode/
 *.iml
+.cache
 
 # mutmut work dir
 mutants/

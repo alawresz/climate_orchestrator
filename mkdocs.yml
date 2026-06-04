@@ -17,8 +17,12 @@ theme:
     - navigation.sections
     - navigation.top
     - navigation.footer
+    - navigation.instant # SPA-style page loads (no full reload per page)
+    - navigation.instant.progress
+    - toc.follow # the TOC sidebar tracks the reading position
     - search.suggest
     - search.highlight
+    - search.share # deep-linkable search URLs
     - content.code.copy
     - content.action.edit
   palette:
@@ -43,6 +47,11 @@ theme:
 
 plugins:
   - search # declared explicitly: a plugins key replaces the implicit default
+  - privacy # self-host external assets (the theme's Google Fonts), no 3rd-party calls
+  - git-revision-date-localized:
+      # "Last updated" per page from git history (needs fetch-depth: 0 in CI).
+      type: date
+      fallback_to_build_date: true # local shallow/exported trees still build
   - panzoom:
       # Pan/zoom + fullscreen on mermaid diagrams (hover a diagram for the
       # hint; the button in its corner goes fullscreen).
