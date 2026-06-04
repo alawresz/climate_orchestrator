@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.22.1 (2026-06-04)
+
+### Bug Fixes
+
+- Reject non-finite sensor values (nan/inf) in every numeric read
+  ([`ea29985`](https://github.com/alawresz/climate_orchestrator/commit/ea299853e75f618bb240cd30b1dae845a49ef9b5))
+
+
 ## v0.22.0 (2026-06-04)
 
 ### Features
