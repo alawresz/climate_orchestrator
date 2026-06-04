@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.24.0 (2026-06-04)
+
+### Features
+
+- Configurable preset selection in the config and options flows
+  ([`6dbc29e`](https://github.com/alawresz/climate_orchestrator/commit/6dbc29ebd734de63ecc69e247f8f5ea82616474f))
+
+
 ## v0.23.0 (2026-06-04)
 
 ### Bug Fixes
