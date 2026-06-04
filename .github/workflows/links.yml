@@ -1,8 +1,11 @@
 name: Links
 
-# Weekly (not per-push: external links rate-limit and flake) docs link check.
-# README/DESIGN/CHANGELOG are the load-bearing user docs, and the GitLab->
-# GitHub migration is exactly the kind of event that leaves dead links behind.
+# Weekly (not per-push: external links rate-limit and flake) link check over
+# everything reader-facing: README/CHANGELOG, the docs-site chapters, and the
+# issue/PR templates. Internal docs links and anchors are already gated
+# per-PR by `mkdocs build --strict` in ci.yml — lychee's job is the
+# *external* links those builds can't verify (and the repo-level files
+# mkdocs never sees).
 on:
   schedule:
     - cron: "0 6 * * 1" # Mondays 06:00 UTC
@@ -24,5 +27,10 @@ jobs:
         with:
           # --include-fragments: also verify #anchor targets (the docs
           # cross-link section anchors between pages).
-          args: --no-progress --include-fragments README.md DESIGN.md CHANGELOG.md "docs/**/*.md"
+          args: >-
+            --no-progress --include-fragments
+            README.md CHANGELOG.md
+            "docs/**/*.md"
+            ".github/ISSUE_TEMPLATE/*.yml"
+            ".github/PULL_REQUEST_TEMPLATE.md"
           fail: true
