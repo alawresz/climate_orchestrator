@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.22.7 (2026-06-04)
+
+### Bug Fixes
+
+- Re-arm window recheck timer mid-grace
+  ([`2f73a17`](https://github.com/alawresz/climate_orchestrator/commit/2f73a1767e1b35df175a93e161a8c46e8a4126b0))
+
+
 ## v0.22.6 (2026-06-04)
 
 ### Bug Fixes
