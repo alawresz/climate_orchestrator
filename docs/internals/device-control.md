@@ -130,6 +130,30 @@ actually changes**:
 
 This minimises Zigbee/RF and cloud traffic and extends TRV battery life.
 
+## Manual-override takeover
+
+The coordinator caches its last command per device, which makes external
+intent detectable in the state listener: a state event whose *old* state
+matched the active command and whose *new* state doesn't (mode, or target
+setpoint by ≥ one device step) can only be a human or an external automation
+— our own write echoes match the command, and a device that never reached it
+is the watchdog's case instead. The ambiguous race (a human change while our
+command is in flight) deliberately degrades into the watchdog path rather
+than a wrong takeover.
+
+While `DeviceRuntime.override_until` is set, `_control_one` still runs
+`decide()` (the hysteresis latch stays current for the handback) but returns
+the decision re-tagged `manual_override` with no writes — so the adapter
+command, MPC observe/valve writes (no poisoned samples; the
+`MAX_SAMPLE_DT_MIN` gap logic re-anchors on resume), the AC bias integral,
+and the compliance watchdog are all suspended together. Starting an override
+clears any watchdog streak for the same reason in reverse. The override ends
+on expiry (checked per cycle), on the device going unavailable, on frost
+protection (punches through unconditionally), or when the user interacts
+with the whole-home climate entity (`clear_manual_overrides` — global intent
+reasserts every device). Deadlines are monotonic and deliberately not
+persisted: a restart reasserts control.
+
 ## Availability and graceful degradation
 
 The single whole-home entity must never go dark because one device dropped off.

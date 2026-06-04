@@ -53,6 +53,7 @@ _REASON_OPTIONS = [
     "frost_protection",
     "window_open",
     "outdoor_gating",
+    "manual_override",
     "unavailable",
     "no_data",
 ]

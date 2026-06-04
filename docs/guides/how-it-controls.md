@@ -82,6 +82,27 @@ feels-like temperature* sensor reads `unknown` and the dew-point guard never
 engages. The moment a humidity sensor appears in an area, the comfort index
 starts applying there — no toggling needed.
 
+## Manual override takeover
+
+Someone turns a radiator dial or points the AC remote — and most orchestrators
+silently fight them back within a minute. Climate Orchestrator notices instead:
+a device that *was* at its commanded state and then moved away (in mode, or in
+target setpoint by at least one device step) without a command from us was
+adjusted by a human (or an external automation), and the orchestrator **stands
+back from that device** for the **Manual override duration** (default 60 min,
+`0` disables the takeover).
+
+While a device is overridden it receives no commands at all, its MPC learning
+pauses (so the model isn't poisoned by samples it can't explain), and the
+*HVAC action reason* sensor reports `Paused — manual override` for it (the
+device's action sensor carries the remaining minutes). The override ends when
+the timer runs out, when the device drops offline, when **frost protection**
+needs it (safety always punches through), or the moment you touch the
+whole-home thermostat — changing the preset, mode, or setpoints means "I'm in
+charge again" and reasserts control over *every* device at once. Each start
+and end is also announced as a
+[bus event](services-automations.md#events).
+
 ## Safety guards
 
 Layered over the decision, highest priority first: **frost protection** (force

@@ -219,13 +219,30 @@ async def test_command_failures_log_once_per_outage(
 
     hass.services.async_register("climate", "set_hvac_mode", _device_rejects)
     hass.services.async_register("climate", "set_temperature", _device_rejects)
+    # Faking the TRV state back and forth below looks exactly like a
+    # compliant -> deviating transition to the manual-override takeover; an
+    # override would suppress the very writes whose failure logging is under
+    # test, so turn the takeover off.
+    await hass.services.async_call(
+        "number",
+        "set_value",
+        {
+            ATTR_ENTITY_ID: entity_id_for(
+                "number", f"{init_integration.entry_id}_manual_override_duration"
+            ),
+            "value": 0,
+        },
+        blocking=True,
+    )
     hass.states.async_set(TRV_ENTITY, "off", TRV_ATTRS)
     hass.states.async_set(AREA_TEMP_SENSOR, "19.0")
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     # Setup's very first cycle already tripped the latch (no climate services
     # existed yet, in caplog's setup phase); reset it so the outage below
-    # starts from a healthy device.
+    # starts from a healthy device. Likewise drop any takeover the state
+    # faking above already started.
     coordinator._runtime(TRV_ENTITY).command_failing = False
+    coordinator._runtime(TRV_ENTITY).override_until = None
     caplog.clear()
 
     async def _cycle() -> None:

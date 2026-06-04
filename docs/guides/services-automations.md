@@ -43,6 +43,7 @@ Operational transitions are announced on the event bus as
 | `status_changed` | The status sensor moves between `ok` / `degraded` / `initializing`. | `from`, `to`, `unavailable_devices` |
 | `device_ignoring_commands` / `device_commands_applied` | The [command-ignored watchdog](../reference/troubleshooting.md#repairs) trips / the device complies again. | `entity_id`, `commanded_mode` |
 | `boost_started` / `boost_ended` | The boost preset engages / reverts. | started: `direction`, `previous_preset`, `until`; ended: `reason` (`expired`/`cancelled`), `reverted_to` |
+| `manual_override_started` / `_ended` | A [manual takeover](how-it-controls.md#manual-override-takeover) of one device begins / ends. | `entity_id`; started: `duration_minutes`; ended: `reason` (`expired`/`reasserted`/`unavailable`/`frost_protection`) |
 
 Trigger on them like any bus event:
 

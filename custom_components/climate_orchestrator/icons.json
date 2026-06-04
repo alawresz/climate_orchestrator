@@ -18,6 +18,7 @@
       "valve_maintenance_interval": { "default": "mdi:calendar-refresh" },
       "sensor_max_age": { "default": "mdi:timer-sand" },
       "preconditioning_horizon": { "default": "mdi:clock-fast" },
+      "manual_override_duration": { "default": "mdi:hand-back-right-outline" },
       "preset_away_heat": { "default": "mdi:fire" },
       "preset_away_cool": { "default": "mdi:snowflake" },
       "preset_home_heat": { "default": "mdi:fire" },

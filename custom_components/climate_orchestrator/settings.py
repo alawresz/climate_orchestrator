@@ -42,6 +42,8 @@ from .const import (
     DOMAIN,
     FROST_TEMP_DEFAULT,
     HEAT_OFF_OUTDOOR_DEFAULT,
+    MANUAL_OVERRIDE_DURATION_DEFAULT,
+    MANUAL_OVERRIDE_DURATION_MAX,
     MAX_TEMP,
     MIN_TEMP,
     PRECONDITION_HORIZON_DEFAULT,
@@ -177,6 +179,14 @@ NUMBER_SETTINGS: tuple[NumberSetting, ...] = (
         0.5,
         unit=UnitOfTime.HOURS,
     ),
+    NumberSetting(
+        "manual_override_duration",
+        MANUAL_OVERRIDE_DURATION_DEFAULT,
+        0.0,
+        MANUAL_OVERRIDE_DURATION_MAX,
+        5.0,
+        unit=UnitOfTime.MINUTES,
+    ),
 )
 
 # Editable per-preset band edges: heat-below and cool-above for each preset.
@@ -256,6 +266,7 @@ class RuntimeSettings:
     valve_maintenance_interval: float
     sensor_max_age: float
     preconditioning_horizon: float
+    manual_override_duration: float
     comfort_index_targeting: bool
     home_average_trigger: bool
     dew_point_guard: bool

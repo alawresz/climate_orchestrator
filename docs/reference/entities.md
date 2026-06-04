@@ -97,6 +97,7 @@ instead it gets two tunables (when selected):
 | Window open delay | 0 min | 0–30 | Grace period an open window may stay open before its area stops. `0` stops immediately. Frost protection ignores it. |
 | Valve maintenance interval | 30 days | 1–60 | Days between automatic valve-exercise runs (when Automatic valve maintenance is on). |
 | Sensor staleness timeout | 6 h (the UI shows minutes: 360) | 0–12 h (0–720 min) | Treat an area sensor that hasn't reported for longer than this as missing (falls back to the home average) and raise a repair. `0` disables the guard. |
+| Manual override duration | 60 min | 0–480 | How long to stand back from a device after a [manual takeover](../guides/how-it-controls.md#manual-override-takeover) is detected. `0` disables the takeover (external changes are reconciled away on the next cycle). |
 
 !!! note
     Every commanded AC setpoint is clamped to the device's own min/max and

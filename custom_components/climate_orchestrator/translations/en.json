@@ -116,6 +116,7 @@
           "frost_protection": "Frost protection",
           "window_open": "Paused — window open",
           "outdoor_gating": "Paused — outdoor temperature",
+          "manual_override": "Paused — manual override",
           "unavailable": "Device unavailable",
           "no_data": "No sensor data"
         }
@@ -172,6 +173,7 @@
       "valve_maintenance_interval": { "name": "Valve maintenance interval" },
       "sensor_max_age": { "name": "Sensor staleness timeout" },
       "preconditioning_horizon": { "name": "Preconditioning look-ahead" },
+      "manual_override_duration": { "name": "Manual override duration" },
       "preset_away_heat": { "name": "Preset Away heat setpoint" },
       "preset_away_cool": { "name": "Preset Away cool setpoint" },
       "preset_home_heat": { "name": "Preset Home heat setpoint" },

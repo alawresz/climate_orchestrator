@@ -72,6 +72,8 @@ from .const import (
     EVENT_TYPE_FROST_STARTED,
     EVENT_TYPE_IGNORING_ENDED,
     EVENT_TYPE_IGNORING_STARTED,
+    EVENT_TYPE_OVERRIDE_ENDED,
+    EVENT_TYPE_OVERRIDE_STARTED,
     EVENT_TYPE_STATUS_CHANGED,
     EVENT_TYPE_WINDOW_PAUSE_ENDED,
     EVENT_TYPE_WINDOW_PAUSE_STARTED,
@@ -80,6 +82,7 @@ from .const import (
     RMOT_TAU_SECONDS,
     RUNTIME_WINDOW_SECONDS,
     STARTUP_GRACE_SECONDS,
+    TARGET_TEMP_STEP,
     UPDATE_INTERVAL_SECONDS,
     VALVE_MAINTENANCE_DWELL_SECONDS,
 )
@@ -132,6 +135,8 @@ from .util import as_float, float_state
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
+
+    from homeassistant.core import State
 
 _MPC_STORE_VERSION = 1
 
@@ -225,6 +230,9 @@ class DeviceRuntime:
 
     ignoring: bool = False
     """Whether the watchdog currently flags this device (edge for the event)."""
+
+    override_until: float | None = None
+    """Monotonic deadline of a manual-override takeover (None = not active)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -1156,7 +1164,13 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             return "cooling"
         if any(d.dry_mode for d in decisions):
             return "dehumidifying"
-        for reason in ("window_open", "outdoor_gating", "unavailable", "no_data"):
+        for reason in (
+            "window_open",
+            "outdoor_gating",
+            "manual_override",
+            "unavailable",
+            "no_data",
+        ):
             if reason in reasons:
                 return reason
         return "idle"
@@ -1200,16 +1214,24 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         return "idle"
 
     @callback
-    def device_command_attrs(self, entity_id: str) -> dict[str, str | float | None]:
+    def device_command_attrs(
+        self, entity_id: str
+    ) -> dict[str, str | float | bool | None]:
         """Return the last command sent to a device (mode + setpoint)."""
         runtime = self._devices.get(entity_id)
         command = runtime.command if runtime else None
-        if command is None:
+        if command is None or runtime is None:
             return {}
-        return {
+        attrs: dict[str, str | float | bool | None] = {
             "commanded_mode": command.hvac_mode.value,
             "commanded_setpoint": command.target_temp,
         }
+        if (until := runtime.override_until) is not None:
+            attrs["manual_override"] = True
+            attrs["manual_override_remaining_min"] = round(
+                max(until - time.monotonic(), 0.0) / 60.0, 1
+            )
+        return attrs
 
     @callback
     def valve_position(self, entity_id: str) -> float | None:
@@ -1479,12 +1501,28 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if not reading.available:
             # Excluded this cycle, but its latch is preserved. An offline
             # device can't comply with anything: drop any watchdog streak so
-            # the unavailability is reported as such, not as "ignoring".
+            # the unavailability is reported as such, not as "ignoring" —
+            # and a manual override on a device that vanished is moot.
             runtime.ignored_mode = None
             runtime.ignored_since = None
             self._command_ignored_issue(entity_id, active=False)
             self._set_ignoring(entity_id, runtime, active=False)
+            if runtime.override_until is not None:
+                self._end_override(entity_id, runtime, "unavailable")
             return decision, []
+        if self._override_active(entity_id, runtime, decision):
+            # A human adjusted this device: keep deciding (the hysteresis
+            # latch stays current for the handback) but write nothing — no
+            # command, no MPC observe/valve, no bias update, no watchdog.
+            return (
+                replace(
+                    decision,
+                    demand=Demand.IDLE,
+                    dry_mode=False,
+                    reason="manual_override",
+                ),
+                [],
+            )
         adapter = ClimateAdapter(self.hass, entity_id)
         device_state = adapter.read()
         command = build_command(
@@ -1641,7 +1679,114 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     @callback
     def _handle_state_event(self, event: Event[EventStateChangedData]) -> None:
         """Trigger a (debounced) refresh when a tracked entity changes."""
+        self._detect_manual_override(event)
         self._background(self.async_request_refresh(), "state-change refresh")
+
+    # --- Manual-override takeover ----------------------------------------------
+
+    @callback
+    def _detect_manual_override(self, event: Event[EventStateChangedData]) -> None:
+        """Spot a human (or external automation) adjusting a managed device.
+
+        Our own writes echo back *matching* the active command, and a device
+        that never reached the command is the watchdog's case — the takeover
+        signature is a device that **was** at the commanded state and then
+        moved away (in mode, or in target setpoint by at least one device
+        step) with no new command from us.
+        """
+        entity_id = event.data["entity_id"]
+        if entity_id not in self.device_ids:
+            return  # an area sensor, not a managed device
+        runtime = self._devices.get(entity_id)
+        if runtime is None or (command := runtime.command) is None:
+            return
+        duration_min = clamped_number_value(
+            self.hass, self.entry.entry_id, "manual_override_duration"
+        )
+        if duration_min <= 0.0:
+            return  # takeover disabled
+        old = event.data["old_state"]
+        new = event.data["new_state"]
+        if (
+            old is None
+            or new is None
+            or old.state in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+            or new.state in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+        ):
+            return  # (un)availability churn is never a human
+
+        step = as_float(new.attributes.get("target_temp_step")) or TARGET_TEMP_STEP
+
+        def _matches(state: State) -> bool:
+            if state.state != command.hvac_mode.value:
+                return False
+            if command.target_temp is None or command.hvac_mode is Mode.OFF:
+                return True
+            target = as_float(state.attributes.get("temperature"))
+            return target is None or abs(target - command.target_temp) < step
+
+        if _matches(old) and not _matches(new):
+            self._start_override(entity_id, runtime, duration_min)
+
+    @callback
+    def _start_override(
+        self, entity_id: str, runtime: DeviceRuntime, duration_min: float
+    ) -> None:
+        """Stop driving a device the user just adjusted, for the set duration."""
+        runtime.override_until = time.monotonic() + duration_min * 60.0
+        # The device will now intentionally diverge from our last command —
+        # that must not look like non-compliance when the override ends.
+        runtime.ignored_mode = None
+        runtime.ignored_since = None
+        self._command_ignored_issue(entity_id, active=False)
+        self._set_ignoring(entity_id, runtime, active=False)
+        _LOGGER.info(
+            "climate_orchestrator: manual change detected on %s; "
+            "standing back for %.0f min",
+            entity_id,
+            duration_min,
+        )
+        self._fire_event(
+            EVENT_TYPE_OVERRIDE_STARTED,
+            {"entity_id": entity_id, "duration_minutes": duration_min},
+        )
+
+    @callback
+    def _end_override(
+        self, entity_id: str, runtime: DeviceRuntime, reason: str
+    ) -> None:
+        """Resume driving a device (next cycle reconciles it to the band)."""
+        runtime.override_until = None
+        self._fire_event(
+            EVENT_TYPE_OVERRIDE_ENDED, {"entity_id": entity_id, "reason": reason}
+        )
+
+    @callback
+    def clear_manual_overrides(self, reason: str) -> None:
+        """End every active override (the user reasserted whole-home intent)."""
+        for entity_id, runtime in self._devices.items():
+            if runtime.override_until is not None:
+                self._end_override(entity_id, runtime, reason)
+
+    @callback
+    def _override_active(
+        self, entity_id: str, runtime: DeviceRuntime, decision: DeviceDecision
+    ) -> bool:
+        """Whether the device's override still holds this cycle.
+
+        Expiry is checked here (per cycle, so within a keepalive of the
+        deadline) and frost protection punches through unconditionally —
+        safety beats courtesy.
+        """
+        if runtime.override_until is None:
+            return False
+        if decision.reason == "frost_protection":
+            self._end_override(entity_id, runtime, "frost_protection")
+            return False
+        if time.monotonic() >= runtime.override_until:
+            self._end_override(entity_id, runtime, "expired")
+            return False
+        return True
 
     # --- Services / maintenance ---------------------------------------------
 

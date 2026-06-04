@@ -100,6 +100,18 @@ EVENT_TYPE_IGNORING_STARTED: Final = "device_ignoring_commands"
 EVENT_TYPE_IGNORING_ENDED: Final = "device_commands_applied"
 EVENT_TYPE_BOOST_STARTED: Final = "boost_started"
 EVENT_TYPE_BOOST_ENDED: Final = "boost_ended"
+EVENT_TYPE_OVERRIDE_STARTED: Final = "manual_override_started"
+EVENT_TYPE_OVERRIDE_ENDED: Final = "manual_override_ended"
+
+# Manual-override takeover: a device that *was* at its commanded state and
+# then moved away — with no write from us — was adjusted by a human (or their
+# automation). Stop driving it for this long instead of silently fighting the
+# change back within a cycle. 0 disables the takeover entirely. Expiry is
+# checked per control cycle, so it resolves within a keepalive (~1 min) of
+# the deadline. Frost protection always punches through; any interaction with
+# the whole-home climate entity reasserts control over every device at once.
+MANUAL_OVERRIDE_DURATION_DEFAULT: Final = 60.0  # minutes
+MANUAL_OVERRIDE_DURATION_MAX: Final = 480.0
 
 # Post-restart warm-up window. Until a managed device first reports a usable
 # temperature, the orchestrator reports ``initializing`` for this long and holds

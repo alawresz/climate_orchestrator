@@ -473,7 +473,12 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
     # --- Commands ------------------------------------------------------------
 
     async def _apply_and_control(self) -> None:
-        """Persist the new desired state, then run a control cycle."""
+        """Persist the new desired state, then run a control cycle.
+
+        Interacting with the whole-home entity is the user reasserting
+        intent, so any per-device manual-override takeovers end here.
+        """
+        self.coordinator.clear_manual_overrides("reasserted")
         self.async_write_ha_state()
         await self.coordinator.async_refresh()
 
