@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.28.1 (2026-06-04)
+
+### Bug Fixes
+
+- Missing release zip
+  ([`d231d69`](https://github.com/alawresz/climate_orchestrator/commit/d231d69be199197190f6f9fe71da97de5ed41835))
+
+### Refactoring
+
+- Extract events, supervision, and repairs from the coordinator
+  ([`311cc73`](https://github.com/alawresz/climate_orchestrator/commit/311cc730a3935e8d237876ea4fa058a7d578306b))
+
+
 ## v0.28.0 (2026-06-04)
 
 ### Documentation
