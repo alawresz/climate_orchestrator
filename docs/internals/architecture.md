@@ -46,8 +46,8 @@ flowchart TD
 (`SmartClimateCoordinator`) owns the shared runtime state (current sensor
 readings, aggregates, learned MPC state, feature-flag values) and runs one
 control cycle per trigger. All entities (the climate entity, switches, numbers,
-sensors) read from the coordinator. This avoids the a prior-art integration
-"god-object" by keeping the `ClimateEntity` thin and pushing logic into
+sensors) read from the coordinator. This keeps the `ClimateEntity` thin —
+no god-object entity — and pushes the logic into
 testable, dependency-light modules (the pure `control/` package, the `sensing/`
 snapshot builder, and per-TRV `MpcController`s), with all device I/O behind a
 `ClimateAdapter`.
