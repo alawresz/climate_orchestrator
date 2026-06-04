@@ -73,6 +73,15 @@ then engages a little earlier in humid weather and a little later in dry weather
 it, `1` = full feels-like, `>1` = amplify). A separate **dew-point guard** can put
 the AC in dry mode when humidity is high.
 
+No humidity sensors? Nothing breaks — the switch expresses *intent*, not a
+requirement. Every consumer falls back to the plain dry-bulb temperature when
+humidity is missing, and it degrades per room: a room with a humidity sensor
+is judged on its feels-like value, a room without one on dry-bulb. Without any
+humidity at all you simply get an ordinary dry-bulb thermostat: the *Home
+feels-like temperature* sensor reads `unknown` and the dew-point guard never
+engages. The moment a humidity sensor appears in an area, the comfort index
+starts applying there — no toggling needed.
+
 ## Safety guards
 
 Layered over the decision, highest priority first: **frost protection** (force
