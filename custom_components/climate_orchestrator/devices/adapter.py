@@ -25,6 +25,7 @@ from homeassistant.const import (
 )
 
 from ..const import MAX_TEMP, MIN_TEMP, TARGET_TEMP_STEP
+from ..util import as_float
 from .model import AdapterCapabilities, DeviceCommand, DeviceState
 from .reconcile import reconcile
 
@@ -50,8 +51,8 @@ class ClimateAdapter:
         return DeviceState(
             available=True,
             hvac_mode=state.state,
-            current_temp=state.attributes.get("current_temperature"),
-            target_temp=state.attributes.get("temperature"),
+            current_temp=as_float(state.attributes.get("current_temperature")),
+            target_temp=as_float(state.attributes.get("temperature")),
         )
 
     def capabilities(self) -> AdapterCapabilities:

@@ -58,12 +58,31 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class SmartClimateNumber(RestoreNumber):
-    """A persisted, runtime-adjustable control parameter (unit per setting)."""
+class _RestoredSettingNumber(RestoreNumber):
+    """Shared restore/write behaviour for the persisted setting numbers."""
 
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
     _attr_mode = NumberMode.BOX
+
+    _coordinator: SmartClimateCoordinator
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the last set value across restarts."""
+        await super().async_added_to_hass()
+        last = await self.async_get_last_number_data()
+        if last is not None and last.native_value is not None:
+            self._attr_native_value = last.native_value
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Persist a new value and re-run control."""
+        self._attr_native_value = value
+        self.async_write_ha_state()
+        await self._coordinator.async_refresh()
+
+
+class SmartClimateNumber(_RestoredSettingNumber):
+    """A persisted, runtime-adjustable control parameter (unit per setting)."""
 
     def __init__(
         self, coordinator: SmartClimateCoordinator, setting: NumberSetting
@@ -80,26 +99,10 @@ class SmartClimateNumber(RestoreNumber):
         self._attr_native_value = setting.default
         self._attr_device_info = hub_device_info(coordinator.entry.entry_id)
 
-    async def async_added_to_hass(self) -> None:
-        """Restore the last set value across restarts."""
-        await super().async_added_to_hass()
-        last = await self.async_get_last_number_data()
-        if last is not None and last.native_value is not None:
-            self._attr_native_value = last.native_value
 
-    async def async_set_native_value(self, value: float) -> None:
-        """Persist a new value and re-run control."""
-        self._attr_native_value = value
-        self.async_write_ha_state()
-        await self._coordinator.async_refresh()
-
-
-class SmartClimateAreaOffsetNumber(RestoreNumber):
+class SmartClimateAreaOffsetNumber(_RestoredSettingNumber):
     """Per-area comfort band offset (°C); positive runs the area warmer."""
 
-    _attr_has_entity_name = True
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_mode = NumberMode.BOX
     _attr_translation_key = "area_band_offset"
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
     _attr_native_min_value = -AREA_BAND_OFFSET_LIMIT
@@ -119,16 +122,3 @@ class SmartClimateAreaOffsetNumber(RestoreNumber):
         self._attr_translation_placeholders = {"area": area_name}
         self._attr_native_value = AREA_BAND_OFFSET_DEFAULT
         self._attr_device_info = hub_device_info(coordinator.entry.entry_id)
-
-    async def async_added_to_hass(self) -> None:
-        """Restore the last set value across restarts."""
-        await super().async_added_to_hass()
-        last = await self.async_get_last_number_data()
-        if last is not None and last.native_value is not None:
-            self._attr_native_value = last.native_value
-
-    async def async_set_native_value(self, value: float) -> None:
-        """Persist a new value and re-run control."""
-        self._attr_native_value = value
-        self.async_write_ha_state()
-        await self._coordinator.async_refresh()

@@ -46,6 +46,7 @@ from .const import (
     VALVE_MAINTENANCE_INTERVAL_DEFAULT,
     WINDOW_OPEN_DELAY_DEFAULT,
 )
+from .util import float_state
 
 _CALIBRATION_MODE_KEY = "calibration_mode"
 
@@ -239,13 +240,8 @@ def number_value(hass: HomeAssistant, entry_id: str, key: str, default: float) -
     entity_id = er.async_get(hass).async_get_entity_id(
         "number", DOMAIN, f"{entry_id}_{key}"
     )
-    state = hass.states.get(entity_id) if entity_id else None
-    if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-        return default
-    try:
-        return float(state.state)
-    except (TypeError, ValueError):
-        return default
+    value = float_state(hass, entity_id)
+    return default if value is None else value
 
 
 @callback

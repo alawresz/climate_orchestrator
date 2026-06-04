@@ -14,14 +14,7 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, AREA_TEMP_SENSOR, TRV_ENTITY
-from tests.ha.helpers import set_desired_preset
-
-_TRV_ATTRS = {
-    "hvac_modes": ["off", "heat"],
-    "min_temp": 7.0,
-    "max_temp": 35.0,
-    "target_temp_step": 0.5,
-}
+from tests.ha.helpers import TRV_ATTRS, set_desired_preset
 
 
 async def test_heating_demand_commands_the_trv(
@@ -34,7 +27,7 @@ async def test_heating_demand_commands_the_trv(
     async_mock_service(hass, "climate", "set_temperature")
     climate_id = entity_id_for("climate", init_integration.entry_id)
 
-    hass.states.async_set(TRV_ENTITY, "off", _TRV_ATTRS)
+    hass.states.async_set(TRV_ENTITY, "off", TRV_ATTRS)
     hass.states.async_set(AREA_TEMP_SENSOR, "19.0")
     set_desired_preset(hass, climate_id, "heat_cool")
 
@@ -59,7 +52,7 @@ async def test_no_redundant_writes_when_already_satisfied(
     climate_id = entity_id_for("climate", init_integration.entry_id)
 
     # Already at the heat target (heat_edge 20.5 + tolerance 0.3 -> 20.8 -> 21.0).
-    hass.states.async_set(TRV_ENTITY, "heat", {**_TRV_ATTRS, "temperature": 21.0})
+    hass.states.async_set(TRV_ENTITY, "heat", {**TRV_ATTRS, "temperature": 21.0})
     hass.states.async_set(AREA_TEMP_SENSOR, "19.0")
     set_desired_preset(hass, climate_id, "heat_cool")
 
@@ -98,7 +91,7 @@ async def test_ac_setpoint_is_throttled_between_cycles(
     hass.services.async_register("climate", "set_hvac_mode", _set_mode)
 
     climate_id = entity_id_for("climate", init_integration.entry_id)
-    hass.states.async_set(TRV_ENTITY, "off", _TRV_ATTRS)
+    hass.states.async_set(TRV_ENTITY, "off", TRV_ATTRS)
     hass.states.async_set(
         AC_ENTITY,
         "off",
@@ -174,7 +167,7 @@ async def test_home_average_trigger_switch_wires_into_control(
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     climate_id = entity_id_for("climate", cid)
 
-    hass.states.async_set(TRV_ENTITY, "off", _TRV_ATTRS)
+    hass.states.async_set(TRV_ENTITY, "off", TRV_ATTRS)
     hass.states.async_set(AREA_TEMP_SENSOR, "22.0")
     set_desired_preset(hass, climate_id, "heat_cool")
 
@@ -191,7 +184,7 @@ async def test_home_average_trigger_switch_wires_into_control(
         "switch", "turn_off", {ATTR_ENTITY_ID: switch}, blocking=True
     )
     await hass.async_block_till_done()
-    hass.states.async_set(TRV_ENTITY, "off", _TRV_ATTRS)
+    hass.states.async_set(TRV_ENTITY, "off", TRV_ATTRS)
     set_hvac.clear()
 
     await coordinator.async_refresh()

@@ -285,7 +285,7 @@ Per the requirement to keep behaviour as device entities rather than config. The
 
 **Sensors (per-TRV MPC diagnostics):** `<trv>_mpc_heating_gain` (K/min), `<trv>_mpc_heat_loss` (1/min), `<trv>_mpc_learning_status` (`idle`/`learning`/`ready`), `<trv>_mpc_model_error` (RMS fit residual in K, from `MpcController.fit_rmse()` — a model-confidence figure) — read straight from the learned `MpcController`; only populated in `mpc` mode.
 
-**Sensors (per-device diagnostics, all managed devices):** `<device>_device_action` (ENUM idle/heating/cooling/drying/off/unavailable, with the last commanded mode + setpoint as attributes), `<device>_device_runtime` (% of the trailing hour the device ran), `<device>_device_cycles_per_hour` (off→on starts/hour over that window — surfaces short-cycling), and `<trv>_valve_position` (last commanded valve %, TRV-only). The runtime/cycle counters are computed from a rolling deque of `(monotonic, running?)` samples kept per device in the coordinator (window `RUNTIME_WINDOW_SECONDS`, transient — not persisted).
+**Sensors (per-device diagnostics, all managed devices):** `<device>_device_action` (ENUM idle/heating/cooling/drying/off/unavailable, with the last commanded mode + setpoint as attributes), `<device>_device_runtime` (% of the trailing hour the device ran), `<device>_device_cycles_per_hour` (off→on starts/hour over that window — surfaces short-cycling), and `<trv>_valve_position` (last commanded valve %, TRV-only). The runtime/cycle counters are computed from a rolling deque of `(monotonic, running?)` samples kept per device in the coordinator and integrated by the pure (mutation-tested) `control/runtime_stats.py` (window `RUNTIME_WINDOW_SECONDS`, transient — not persisted).
 
 **Sensor (diagnostic):** `hvac_action_reason` — an ENUM headline of *why* the home is heating/cooling/idle (`heating`, `cooling`, `dehumidifying`, `frost_protection`, `window_open`, `outdoor_gating`, `unavailable`, `idle`, `off`), with per-device reasons as attributes. The engine's `DeviceDecision.reason` feeds it; the coordinator aggregates a headline.
 
@@ -347,6 +347,7 @@ climate_orchestrator/
 │       │   ├── throttle.py        # AC setpoint write throttling (pure)
 │       │   ├── forecast.py        # hourly→per-step forecast expansion for preconditioning (pure)
 │       │   ├── numeric.py         # shared clamp() helper (pure)
+│       │   ├── runtime_stats.py   # runtime-fraction + cycles/hour integrals (pure)
 │       │   └── mpc/
 │       │       ├── model.py       # first-order thermal model + system ID (scipy)
 │       │       ├── observer.py    # Kalman state estimate

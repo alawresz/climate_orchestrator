@@ -45,7 +45,7 @@ from .control.adaptive_comfort import adaptive_band
 from .control.comfort import effective_temperature
 from .control.hysteresis import Demand
 from .entity import SmartClimateBaseEntity
-from .settings import preset_band, resolve_settings
+from .settings import preset_band
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant, State
@@ -115,9 +115,7 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
             return True
         if not self.coordinator.ac_ids:
             return False
-        return resolve_settings(
-            self.hass, self.coordinator.entry.entry_id
-        ).ac_heating_assist
+        return self.coordinator.current_settings().ac_heating_assist
 
     @property
     def _can_cool(self) -> bool:
@@ -221,7 +219,7 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         the shift here is display-only and never re-applied to itself.
         """
         heat, cool = self._base_band_edges()
-        settings = resolve_settings(self.hass, self.coordinator.entry.entry_id)
+        settings = self.coordinator.current_settings()
         if not settings.adaptive_cooling_comfort:
             return heat, cool
         return adaptive_band(
@@ -338,7 +336,7 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         temp = data.home_avg_temperature
         if temp is None:
             return None
-        settings = resolve_settings(self.hass, self.coordinator.entry.entry_id)
+        settings = self.coordinator.current_settings()
         if settings.comfort_index_targeting and data.home_avg_humidity is not None:
             return effective_temperature(
                 temp,

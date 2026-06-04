@@ -87,7 +87,7 @@ from .control.engine import (
 from .control.forecast import expand_forecast
 from .control.hysteresis import Demand
 from .control.mpc.controller import MpcController, preconditioned_valve_pct
-from .control.numeric import clamp
+from .control.runtime_stats import cycles_per_hour, runtime_fraction
 from .control.slope import temperature_slope_per_min
 from .control.throttle import throttle_setpoint
 from .control.window import window_suppresses
@@ -115,11 +115,14 @@ from .settings import (
     number_value,
     resolve_settings,
 )
+from .util import as_float, float_state
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
 
 _MPC_STORE_VERSION = 1
+# Skip number writes within this of the current value (update minimization).
+NUMBER_WRITE_EPSILON = 0.1
 _MPC_SAVE_DELAY = 30.0
 
 # Trailing window (seconds) and sample cap for the home temperature-slope figure.
@@ -199,6 +202,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self._ever_ready = False
         # Consecutive control-cycle failures (drives the repair issue).
         self._control_failures = 0
+        # The last control cycle's resolved settings (see current_settings).
+        self._cycle_settings: RuntimeSettings | None = None
         # All mutable per-device state, one DeviceRuntime per managed entity.
         self._devices: dict[str, DeviceRuntime] = {}
         # The last cycle's decisions, replaced wholesale every control run (so
@@ -228,6 +233,18 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self._maint_store: Store[dict[str, Any]] = Store(
             hass, _MPC_STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.maintenance"
         )
+
+    @callback
+    def current_settings(self) -> RuntimeSettings:
+        """Return the latest control cycle's resolved settings.
+
+        Entities read this instead of re-resolving ~29 entity states per
+        property access; settings changes re-run control immediately, which
+        refreshes the snapshot.
+        """
+        if self._cycle_settings is None:
+            self._cycle_settings = resolve_settings(self.hass, self.entry.entry_id)
+        return self._cycle_settings
 
     @callback
     def _runtime(self, entity_id: str) -> DeviceRuntime:
@@ -414,23 +431,18 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         high = state.attributes.get(
             "base_target_temp_high", state.attributes.get("target_temp_high")
         )
-        if low is None or high is None:
+        low_f, high_f = as_float(low), as_float(high)
+        if low_f is None or high_f is None:
+            # Missing *or* garbage attributes fall back to the preset band —
+            # this read previously trusted float() blindly.
             preset = state.attributes.get("preset_mode", DEFAULT_PRESET)
-            low, high = DEFAULT_PRESETS.get(preset, DEFAULT_PRESETS[DEFAULT_PRESET])
-        return state.state, Band(heat_edge=float(low), cool_edge=float(high))
+            low_f, high_f = DEFAULT_PRESETS.get(preset, DEFAULT_PRESETS[DEFAULT_PRESET])
+        return state.state, Band(heat_edge=low_f, cool_edge=high_f)
 
     @callback
     def _outdoor_temp(self) -> float | None:
         """Read the configured outdoor temperature sensor, if any."""
-        if self.outdoor_sensor is None:
-            return None
-        state = self.hass.states.get(self.outdoor_sensor)
-        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-            return None
-        try:
-            return float(state.state)
-        except (TypeError, ValueError):
-            return None
+        return float_state(self.hass, self.outdoor_sensor)
 
     @callback
     def _update_temp_slope(self, home_temp: float | None) -> None:
@@ -524,15 +536,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             self.hass, delay_seconds + 0.5, _fire
         )
 
-    async def _set_number(self, entity_id: str, value: float) -> None:
+    async def _write_number_if_changed(self, entity_id: str, value: float) -> None:
         """Write a number entity, skipping no-op changes (update minimization)."""
-        state = self.hass.states.get(entity_id)
-        if state is not None:
-            try:
-                if abs(float(state.state) - value) < 0.1:
-                    return
-            except (TypeError, ValueError):
-                pass
+        current = float_state(self.hass, entity_id)
+        if current is not None and abs(current - value) < NUMBER_WRITE_EPSILON:
+            return
         await self.hass.services.async_call(
             "number",
             "set_value",
@@ -573,7 +581,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if number is None:
             return []
         self._runtime(entity_id).valve = 0.0
-        return [self._set_number(number, 0.0)]
+        return [self._write_number_if_changed(number, 0.0)]
 
     def _mpc_valve_writes(
         self, entity_id: str, area_temp: float | None, ctx: CycleContext
@@ -605,7 +613,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             dt=ctx.dt_min,
         )
         runtime.valve = pct / 100.0
-        return [self._set_number(number, pct)]
+        return [self._write_number_if_changed(number, pct)]
 
     def _offset_writes(
         self, entity_id: str, area_temp: float | None, adapter: ClimateAdapter
@@ -616,7 +624,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         offset = local_offset(area_temp, adapter.read().current_temp)
         if number is None or offset is None:
             return []
-        return [self._set_number(number, offset)]
+        return [self._write_number_if_changed(number, offset)]
 
     @callback
     def _compute_status(self, data: SmartClimateData) -> Status:
@@ -934,42 +942,21 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     def device_runtime_fraction(self, entity_id: str) -> float | None:
         """Fraction of the trailing window the device was running (0..1)."""
         runtime = self._devices.get(entity_id)
-        samples = runtime.run_samples if runtime else None
-        if not samples:
+        if runtime is None:
             return None
-        now = time.monotonic()
-        start = max(samples[0].at, now - RUNTIME_WINDOW_SECONDS)
-        span = now - start
-        if span <= 0.0:
-            return None
-        pts = list(samples)
-        running_time = 0.0
-        for i, sample in enumerate(pts):
-            seg_start = max(sample.at, start)
-            seg_end = pts[i + 1].at if i + 1 < len(pts) else now
-            if sample.running and seg_end > seg_start:
-                running_time += seg_end - seg_start
-        return clamp(running_time / span, 0.0, 1.0)
+        return runtime_fraction(
+            list(runtime.run_samples), time.monotonic(), RUNTIME_WINDOW_SECONDS
+        )
 
     @callback
     def device_cycles_per_hour(self, entity_id: str) -> float | None:
         """Off->on starts per hour over the trailing window."""
         runtime = self._devices.get(entity_id)
-        samples = runtime.run_samples if runtime else None
-        if not samples or len(samples) < 2:
+        if runtime is None:
             return None
-        now = time.monotonic()
-        start = max(samples[0].at, now - RUNTIME_WINDOW_SECONDS)
-        span = now - start
-        if span <= 0.0:
-            return None
-        transitions = 0
-        prev: bool | None = None
-        for sample in samples:
-            if prev is not None and not prev and sample.running and sample.at >= start:
-                transitions += 1
-            prev = sample.running
-        return transitions * 3600.0 / span
+        return cycles_per_hour(
+            list(runtime.run_samples), time.monotonic(), RUNTIME_WINDOW_SECONDS
+        )
 
     @callback
     def frost_active(self) -> bool:
@@ -1121,7 +1108,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
     async def _async_control(self, data: SmartClimateData) -> None:
         """Decide per device, apply commands, and run TRV calibration."""
-        settings = resolve_settings(self.hass, self.entry.entry_id)
+        settings = self._cycle_settings = resolve_settings(
+            self.hass, self.entry.entry_id
+        )
         await self._refresh_forecast(settings)
         dt_min = self._cycle_minutes()
         hvac_mode, base_band = self._desired()
@@ -1240,8 +1229,12 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         await self._mpc_store.async_save(self._mpc_persist_data())
         await self.async_request_refresh()
 
-    async def _force_number(self, entity_id: str, value: float) -> None:
-        """Write a number entity unconditionally (no no-op skipping)."""
+    async def _write_number(self, entity_id: str, value: float) -> None:
+        """Write a number entity unconditionally (no no-op skipping).
+
+        Valve maintenance must exercise the full travel even if the number
+        already reads the target — hence no epsilon check here.
+        """
         await self.hass.services.async_call(
             "number",
             "set_value",
@@ -1275,7 +1268,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             ]
             for opening in (100.0, 0.0):
                 await asyncio.gather(
-                    *(self._force_number(number, opening) for number in valves),
+                    *(self._write_number(number, opening) for number in valves),
                     return_exceptions=True,
                 )
                 await asyncio.sleep(dwell)

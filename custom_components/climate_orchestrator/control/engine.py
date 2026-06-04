@@ -118,31 +118,21 @@ def decide(device: DeviceInput, g: GlobalInput) -> DeviceDecision:
     # average): a positive offset subtracts from the room's perceived
     # temperature, so it engages sooner and releases later — i.e. runs warmer.
     # Clamped so the shifted reading can't escape the usable temperature range.
+    def eff(temp: float, humidity: float | None) -> float:
+        return effective_temperature(
+            temp, humidity, use_comfort=g.use_comfort, influence=g.comfort_influence
+        )
+
     local_eff = (
         clamp(
-            effective_temperature(
-                device.local_temp,
-                device.local_humidity,
-                use_comfort=g.use_comfort,
-                influence=g.comfort_influence,
-            )
-            - device.offset,
+            eff(device.local_temp, device.local_humidity) - device.offset,
             MIN_TEMP,
             MAX_TEMP,
         )
         if device.local_temp is not None
         else None
     )
-    home_eff = (
-        effective_temperature(
-            g.home_temp,
-            g.home_humidity,
-            use_comfort=g.use_comfort,
-            influence=g.comfort_influence,
-        )
-        if g.home_temp is not None
-        else None
-    )
+    home_eff = eff(g.home_temp, g.home_humidity) if g.home_temp is not None else None
     # With the home-average trigger disabled, a room that has its own
     # reading is fully independent: drop the home side so engage *and*
     # release are judged on the local reading alone. A room with no reading

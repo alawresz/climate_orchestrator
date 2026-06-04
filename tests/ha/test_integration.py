@@ -39,19 +39,7 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, AREA_TEMP_SENSOR, TRV_ENTITY
-
-_HEAT_ATTRS = {
-    "hvac_modes": ["off", "heat"],
-    "min_temp": 7,
-    "max_temp": 35,
-    "target_temp_step": 0.5,
-}
-_COOL_ATTRS = {
-    "hvac_modes": ["off", "cool", "dry"],
-    "min_temp": 16,
-    "max_temp": 30,
-    "target_temp_step": 0.5,
-}
+from tests.ha.helpers import AC_ATTRS, TRV_ATTRS
 
 
 def _commanded(
@@ -98,8 +86,8 @@ async def _setup_living(
 ) -> None:
     register(TRV_ENTITY, area_id)
     register(AC_ENTITY, area_id)
-    hass.states.async_set(TRV_ENTITY, "off", _HEAT_ATTRS)
-    hass.states.async_set(AC_ENTITY, "off", _COOL_ATTRS)
+    hass.states.async_set(TRV_ENTITY, "off", TRV_ATTRS)
+    hass.states.async_set(AC_ENTITY, "off", AC_ATTRS)
     config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
@@ -161,8 +149,8 @@ async def test_home_average_engages_a_comfortable_rooms_ac(
 
     register_entity_in_area(AC_ENTITY, living_area)
     register_entity_in_area(TRV_ENTITY, bedroom.id)
-    hass.states.async_set(AC_ENTITY, "off", _COOL_ATTRS)
-    hass.states.async_set(TRV_ENTITY, "off", _HEAT_ATTRS)
+    hass.states.async_set(AC_ENTITY, "off", AC_ATTRS)
+    hass.states.async_set(TRV_ENTITY, "off", TRV_ATTRS)
     hass.states.async_set(AREA_TEMP_SENSOR, "22.0")  # living is comfortable
     config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(config_entry.entry_id)

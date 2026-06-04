@@ -14,6 +14,20 @@ from custom_components.climate_orchestrator.const import DOMAIN
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, TRV_ENTITY
 
+# Canonical capability attributes for the fake devices (shared across suites).
+TRV_ATTRS = {
+    "hvac_modes": ["off", "heat"],
+    "min_temp": 7.0,
+    "max_temp": 35.0,
+    "target_temp_step": 0.5,
+}
+AC_ATTRS = {
+    "hvac_modes": ["off", "cool", "dry"],
+    "min_temp": 16.0,
+    "max_temp": 30.0,
+    "target_temp_step": 0.5,
+}
+
 
 def set_desired_preset(
     hass: HomeAssistant,
