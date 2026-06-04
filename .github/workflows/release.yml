@@ -46,6 +46,12 @@ jobs:
         uses: python-semantic-release/python-semantic-release@350c48fcb3ffcdfd2e0a235206bc2ecea6b69df0 # v10.5.3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload the HACS zip to the release
+        if: steps.release.outputs.released == 'true'
+        uses: python-semantic-release/publish-action@68eaac9f1f594e9ec4b985245d06355734f43eea # v10.5.3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.release.outputs.tag }}
       - name: Attest build provenance of the HACS zip
         # Verifiable provenance for the exact artifact HACS installs:
         #   gh attestation verify climate_orchestrator.zip -R <owner>/<repo>
