@@ -203,8 +203,8 @@ point this at the AC's outdoor-temperature sensor), with an optional
 - Suppress **heating** when outdoor ≥ `heat_off_outdoor` threshold.
 - Suppress **cooling** when outdoor ≤ `cool_off_outdoor` threshold.
 
-This is the one cross-cutting coordination a prior-art integration lacked on the
-cooling side; here both paths are outdoor-aware.
+Gating is symmetric by design: both the heating and the cooling path are
+outdoor-aware.
 
 ## Window-open grace delay
 
