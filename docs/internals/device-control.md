@@ -195,14 +195,17 @@ Each managed device and sensor is tracked independently:
 A tri-state `status` (`initializing` / `ok` / `degraded`) gates startup noise.
 Right after a restart, devices and their area sensors typically haven't
 reported in yet, so the coordinator reports `initializing` for a grace window
-(`STARTUP_GRACE_SECONDS`, 120 s) until a managed device first yields a usable
-temperature. While `initializing`, the **transient** repairs
-(`no_temperature_source`, `stale_sensor`) are held back and `status` reads
-`initializing` rather than `degraded` — they would otherwise flash on every
-restart. The instant a usable reading arrives the warm-up ends for good (`ok`,
-or `degraded` if a device is unavailable); if the window elapses with still no
-reading the gap is real, so `status` becomes `degraded` and the missing-source
-repair fires. Static misconfigurations (inverted band, adaptive comfort without
+(`STARTUP_GRACE_SECONDS`, 120 s). The warm-up has two independent legs, and
+both must land before the status settles: a usable home temperature, and every
+managed device having reported in at least once. Area sensors usually beat the
+devices by tens of seconds, so a device still joining keeps `initializing`
+rather than flashing `degraded` (and its notification) on every restart — but
+a device that *was* seen and then went away is genuine degradation, grace
+window or not. While `initializing`, the **transient** repairs
+(`no_temperature_source`, `stale_sensor`) are also held back. If the window
+elapses with something still missing the gap is real: `status` becomes
+`degraded` and, when there's no reading at all, the missing-source repair
+fires. Static misconfigurations (inverted band, adaptive comfort without
 an outdoor sensor) are *not* startup-transient and fire immediately.
 `build_snapshot` sets a warm-up-unaware best-effort status; the coordinator
 refines it. The `degraded` property is `status is DEGRADED`.

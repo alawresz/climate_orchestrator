@@ -2,9 +2,11 @@
 
 Right after a Home Assistant restart, managed devices and their area sensors
 often haven't reported in yet. The orchestrator reports ``initializing`` during
-a warm-up window and holds back the transient ``no_temperature_source`` repair
-until either a usable reading arrives (``ok``) or the window elapses with still
-nothing (``degraded`` + the repair fires, because the gap is then real).
+a warm-up window — until a usable reading arrives *and* every managed device
+has reported in — and holds back the transient ``no_temperature_source`` repair
+and the degraded notification. If the window elapses with something still
+missing, it goes ``degraded`` (and the repair fires), because the gap is then
+real.
 """
 
 from __future__ import annotations
@@ -31,8 +33,8 @@ async def test_unavailable_device_after_warmup_is_degraded(
     init_integration: MockConfigEntry,
     entity_id_for: Callable[[str, str], str],
 ) -> None:
-    """Once initialized, an unavailable device flips status to degraded and is
-    listed in the status sensor's ``unavailable_devices`` attribute."""
+    """A device that reported in and then went away is degraded — even inside
+    the grace window — and is listed in the ``unavailable_devices`` attribute."""
     cid = init_integration.entry_id
     status_eid = entity_id_for("sensor", f"{cid}_status")
     # init_integration has a live reading at setup -> warm-up already over.
@@ -103,6 +105,69 @@ async def test_first_reading_clears_to_ok(
     assert ir.async_get(hass).async_get_issue(DOMAIN, "no_temperature_source") is None
     status = hass.states.get(entity_id_for("sensor", f"{entry.entry_id}_status"))
     assert status.state == "ok"
+
+
+async def _setup_with_joining_device(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+) -> MockConfigEntry:
+    """Set up a TRV-only entry where the sensors beat the device to startup."""
+    register_entity_in_area(TRV_ENTITY, living_area)
+    # The area sensor (live via the living_area fixture) reports immediately;
+    # the TRV is still joining.
+    hass.states.async_set(TRV_ENTITY, STATE_UNAVAILABLE)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=DEFAULT_TITLE,
+        data={CONF_TRVS: [TRV_ENTITY]},
+        entry_id="sc_status_join",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
+
+
+async def test_joining_device_keeps_initializing_not_degraded(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """A usable reading with a never-seen device stays initializing — no
+    degraded flash (or notification) while devices are still joining."""
+    entry = await _setup_with_joining_device(hass, living_area, register_entity_in_area)
+    status_eid = entity_id_for("sensor", f"{entry.entry_id}_status")
+    assert hass.states.get(status_eid).state == "initializing"
+    notification_id = f"climate_orchestrator_{entry.entry_id}_degraded"
+    assert notification_id not in hass.data.get("persistent_notification", {})
+
+    # The TRV reports in: warm-up complete, straight to ok.
+    hass.states.async_set(TRV_ENTITY, "heat", {"hvac_modes": ["off", "heat"]})
+    coordinator: SmartClimateCoordinator = entry.runtime_data
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(status_eid).state == "ok"
+
+
+async def test_device_never_joining_is_degraded_after_grace(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """The grace window elapsing with a device still missing is a real fault."""
+    entry = await _setup_with_joining_device(hass, living_area, register_entity_in_area)
+    coordinator: SmartClimateCoordinator = entry.runtime_data
+
+    coordinator._started -= STARTUP_GRACE_SECONDS + 10.0
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    status = hass.states.get(entity_id_for("sensor", f"{entry.entry_id}_status"))
+    assert status.state == "degraded"
+    assert TRV_ENTITY in status.attributes["unavailable_devices"]
 
 
 async def test_degraded_after_grace_raises_repair(

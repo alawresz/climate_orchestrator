@@ -286,11 +286,13 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self.entry = entry
         self._unsub_state: CALLBACK_TYPE | None = None
         self._tracked: frozenset[str] = frozenset()
-        # Post-restart warm-up bookkeeping: when we started, and whether we've
-        # yet seen a usable home temperature. Drives the tri-state status so
-        # transient startup gaps don't raise repairs (docs/internals/device-control.md).
+        # Post-restart warm-up bookkeeping: when we started, whether we've yet
+        # seen a usable home temperature, and which devices have reported in.
+        # Drives the tri-state status so transient startup gaps don't raise
+        # repairs or notifications (docs/internals/device-control.md).
         self._started = time.monotonic()
         self._ever_ready = False
+        self._seen_available: set[str] = set()
         # Consecutive control-cycle failures (drives the repair issue).
         self._control_failures = 0
         # The last control cycle's resolved settings (see current_settings).
@@ -872,21 +874,28 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     def _compute_status(self, data: SmartClimateData) -> Status:
         """Classify the orchestrator as initializing / ok / degraded.
 
-        With nothing managed there's nothing to warm up (``OK``). Once a usable
-        home temperature is ever seen the warm-up is over for good: ``OK``, or
-        ``DEGRADED`` if a managed device is unavailable. Before that first
-        reading we're ``INITIALIZING`` until the grace window elapses — after
-        which a persistent lack of any reading is a real fault (``DEGRADED``).
+        With nothing managed there's nothing to warm up (``OK``). The warm-up
+        has two independent legs: a usable home temperature, and every managed
+        device having reported in at least once. Area sensors usually beat the
+        devices by tens of seconds after a restart, so a still-joining device
+        keeps us ``INITIALIZING`` for the rest of the grace window rather than
+        flashing ``DEGRADED``. A device that *was* seen and then went away is
+        genuine degradation, grace window or not — and once the window elapses,
+        whatever is still missing is a real fault (``DEGRADED``).
         """
         if not self.device_ids:
             return Status.OK
         if data.home_avg_temperature is not None:
             self._ever_ready = True
-        if self._ever_ready:
-            return Status.DEGRADED if data.unavailable_devices else Status.OK
-        if time.monotonic() - self._started < STARTUP_GRACE_SECONDS:
-            return Status.INITIALIZING
-        return Status.DEGRADED
+        unavailable = set(data.unavailable_devices)
+        self._seen_available |= set(self.device_ids) - unavailable
+        in_grace = time.monotonic() - self._started < STARTUP_GRACE_SECONDS
+        if unavailable & self._seen_available or not in_grace:
+            ok = self._ever_ready and not unavailable
+            return Status.OK if ok else Status.DEGRADED
+        if self._ever_ready and not unavailable:
+            return Status.OK
+        return Status.INITIALIZING
 
     @callback
     def _room_effective(
