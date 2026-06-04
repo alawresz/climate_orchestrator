@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.20.2 (2026-06-04)
+
+### Bug Fixes
+
+- Upload HACS zip asset to release
+  ([`1eb0f9a`](https://github.com/alawresz/climate_orchestrator/commit/1eb0f9aeb5eef2bda4846d3057e939f921d740bb))
+
+
 ## v0.20.1 (2026-06-04)
 
 ### Bug Fixes
