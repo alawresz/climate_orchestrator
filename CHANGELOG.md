@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v0.20.3 (2026-06-04)
+
+### Bug Fixes
+
+- Discard corrupt persisted MPC state instead of failing setup
+  ([`a694dec`](https://github.com/alawresz/climate_orchestrator/commit/a694dece212409993cc7742afd4affb07108349b))
+
+### Continuous Integration
+
+- Add config entry migration scaffolding, weekly link checks, and coverage component split
+  ([`411aa43`](https://github.com/alawresz/climate_orchestrator/commit/411aa43a03f3731f66f7ac4b0260eaa26b4c3aa0))
+
+### Refactoring
+
+- **tests**: Centralize TRV setup and calibration helpers in `tests/ha/helpers.py`
+  ([`f19b1ed`](https://github.com/alawresz/climate_orchestrator/commit/f19b1edab7390be6628b41e411529ed593e176f4))
+
+
 ## v0.20.2 (2026-06-04)
 
 ### Bug Fixes
