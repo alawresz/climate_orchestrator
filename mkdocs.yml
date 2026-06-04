@@ -1,0 +1,118 @@
+site_name: Climate Orchestrator
+site_description: >-
+  Whole-home climate orchestration for Home Assistant — one thermostat
+  coordinating every TRV and AC from real room sensors.
+site_url: https://alawresz.github.io/climate_orchestrator/
+repo_url: https://github.com/alawresz/climate_orchestrator
+repo_name: alawresz/climate_orchestrator
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  logo: assets/icon.svg
+  favicon: assets/icon.svg
+  features:
+    # Sidebar-only navigation (no top tabs): Diátaxis-shaped sections render
+    # as left-hand groups, the way uv/ruff/pydantic structure their docs.
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+  palette:
+    # Follow the system, with a manual toggle. Colors are the brand palette
+    # from brand/icon.svg, defined in docs/stylesheets/extra.css.
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search # re-declare: a plugins key replaces the implicit default
+  - panzoom:
+      # Pan/zoom + fullscreen on mermaid diagrams (hover a diagram for the
+      # hint; the button in its corner goes fullscreen).
+      full_screen: true
+
+extra:
+  # Version selector in the header, fed by mike's versions.json on gh-pages.
+  version:
+    provider: mike
+    default: latest
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.snippets:
+      # Lets pages include files from the repo root (used to render
+      # CHANGELOG.md inside the docs without duplicating it).
+      base_path: [".", "docs"]
+      check_paths: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+# Fail the build on broken internal links/anchors (gated in CI).
+validation:
+  links:
+    absolute_links: warn
+    unrecognized_links: warn
+  nav:
+    omitted_files: warn
+
+# Diátaxis-shaped sections (https://diataxis.fr/): learning -> doing ->
+# looking up -> understanding -> contributing. Directories mirror the nav.
+nav:
+  - Home: index.md
+  - Getting started:
+      - Introduction: getting-started/introduction.md
+      - Installation: getting-started/installation.md
+      - First setup: getting-started/first-setup.md
+  - Guides:
+      - How it controls: guides/how-it-controls.md
+      - Comfort features: guides/comfort-features.md
+      - Driving the hardware: guides/hardware.md
+      - Services & automations: guides/services-automations.md
+  - Reference:
+      - Entities & settings: reference/entities.md
+      - Troubleshooting: reference/troubleshooting.md
+      - Known limitations: reference/limitations.md
+  - Internals:
+      - Architecture: internals/architecture.md
+      - Sensing & aggregation: internals/sensing.md
+      - Control model: internals/control-model.md
+      - MPC deep dive: internals/mpc.md
+      - Device control: internals/device-control.md
+      - Persistence & lifecycle: internals/persistence.md
+  - Project:
+      - Testing & quality: project/testing.md
+      - Tooling & CI: project/tooling.md
+      - Releases: project/releases.md
+      - Changelog: project/changelog.md
+      - Contributing: project/contributing.md

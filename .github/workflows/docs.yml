@@ -1,0 +1,122 @@
+name: Docs
+
+# Versioned docs via mike (the Material for MkDocs versioning tool), deployed
+# through the GitHub Pages *Actions* path — Pages stays on Source: "GitHub
+# Actions". mike still commits each built version into the gh-pages branch,
+# but that branch is only its version database (versions.json + per-version
+# trees); the deploy step uploads that tree as a Pages artifact.
+#
+# - Push to main (docs changed)  -> deploys/updates the "dev" version.
+# - Release published            -> deploys "X.Y" and points "latest" at it
+#                                   (patches update their minor's docs).
+# - Manual dispatch              -> bootstrap/repair any version by hand.
+#
+# The strict no-deploy build gating PRs lives in ci.yml.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs.yml"
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Docs version to deploy (e.g. 0.22)"
+        required: true
+        type: string
+      set_latest:
+        description: "Also point the 'latest' alias at it"
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build versioned site (mike)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # mike pushes its version database to the gh-pages branch
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0 # mike needs the gh-pages branch history
+          # zizmor: ignore[artipacked] -- mike pushes to gh-pages with the
+          # workflow token; this job builds from trusted repo content only.
+          persist-credentials: true
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: "3.14"
+          # This workflow publishes: no cache, so a poisoned cache can never
+          # inject content into the released site.
+          enable-cache: false
+      - name: Git identity for mike's gh-pages commits
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Resolve docs version
+        id: ver
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.event.release.tag_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_LATEST: ${{ inputs.set_latest }}
+        run: |
+          case "$EVENT" in
+            release)
+              # vX.Y.Z -> X.Y (patches update their minor's docs)
+              v="${TAG#v}"; v="${v%.*}"
+              echo "version=$v" >> "$GITHUB_OUTPUT"
+              echo "latest=true" >> "$GITHUB_OUTPUT"
+              ;;
+            workflow_dispatch)
+              echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+              echo "latest=$INPUT_LATEST" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "version=dev" >> "$GITHUB_OUTPUT"
+              echo "latest=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+      - name: Update the version database with mike
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          LATEST: ${{ steps.ver.outputs.latest }}
+        run: |
+          # --only-group docs: lean env from the lockfile (no HA test stack).
+          MIKE="uv run --only-group docs mike"
+          if [ "$LATEST" = "true" ]; then
+            $MIKE deploy --push --update-aliases "$VERSION" latest
+            $MIKE set-default --push latest
+          else
+            $MIKE deploy --push "$VERSION"
+          fi
+      - name: Collect the full site from mike's branch
+        run: git worktree add /tmp/pages gh-pages
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+        with:
+          path: /tmp/pages
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

@@ -37,6 +37,9 @@ jobs:
           custom_components/climate_orchestrator/translations/en.json
       - name: Workflow security lint (zizmor)
         run: uvx zizmor --no-progress .github/workflows
+      - name: Docs build (strict)
+        # Same command as the Pages deploy — a broken docs link fails the PR.
+        run: uv run --group docs mkdocs build --strict
       - name: mypy
         run: uv run mypy custom_components/climate_orchestrator
       - name: pytest (with coverage + JUnit results)
