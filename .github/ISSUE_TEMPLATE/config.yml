@@ -1,0 +1,9 @@
+# Funnel free-form questions to the docs; structured forms for the rest.
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://alawresz.github.io/climate_orchestrator/
+    about: Setup, guides, every entity and setting, troubleshooting, internals.
+  - name: 🩺 Troubleshooting guide
+    url: https://alawresz.github.io/climate_orchestrator/reference/troubleshooting/
+    about: Common problems, Repairs notices, diagnostics, and debug logging.

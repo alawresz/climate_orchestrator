@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest an improvement or a new capability.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Skim the [docs](https://alawresz.github.io/climate_orchestrator/) first
+        — some requests (per-area offsets, adaptive comfort, preconditioning,
+        boost, preset selection) already exist as opt-in features.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: >-
+        Describe the situation in your home that the integration handles
+        poorly today — the concrete scenario is more useful than the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed behaviour
+      description: How should it work? Which entities/settings would it add or change?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: >-
+        Workarounds you tried (automations, helpers, other integrations) and
+        why they fall short.

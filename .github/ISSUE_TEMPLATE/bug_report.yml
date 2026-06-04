@@ -1,0 +1,86 @@
+name: Bug report
+description: Something doesn't work the way the docs say it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Thanks for taking the time! Please check the
+        [troubleshooting guide](https://alawresz.github.io/climate_orchestrator/reference/troubleshooting/)
+        first — several common problems (and the Repairs notices that explain
+        them) are covered there.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before reporting
+      options:
+        - label: I searched existing issues for this problem.
+          required: true
+        - label: I read the troubleshooting guide.
+          required: true
+  - type: input
+    id: integration-version
+    attributes:
+      label: Climate Orchestrator version
+      placeholder: e.g. 0.24.1 (HACS → Climate Orchestrator)
+    validations:
+      required: true
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant version
+      placeholder: e.g. 2026.6.1
+    validations:
+      required: true
+  - type: dropdown
+    id: calibration-mode
+    attributes:
+      label: TRV calibration mode
+      options:
+        - target (default)
+        - mpc
+        - offset
+        - no TRVs (AC only)
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what did you expect?
+      description: >-
+        Include the relevant state: active preset, band setpoints, room/home
+        temperatures, and what the devices actually did.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware & transport
+      description: >-
+        TRV/AC models and how they're connected (Zigbee2MQTT, ZHA, cloud
+        integration, ...).
+      placeholder: e.g. 3× SONOFF TRVZB via Zigbee2MQTT, Midea AC via midea_ac_lan
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >-
+        Device page → ⋮ → **Download diagnostics**, then drag the JSON file
+        here. This contains the merged config, resolved settings, per-device
+        decisions, and learned state — it answers most questions at once.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug log
+      description: >-
+        Enable debug logging (see the
+        [troubleshooting guide](https://alawresz.github.io/climate_orchestrator/reference/troubleshooting/#enable-debug-logging)),
+        reproduce, and paste the relevant lines.
+      render: text
