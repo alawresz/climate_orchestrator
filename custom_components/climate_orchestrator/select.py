@@ -16,6 +16,10 @@ if TYPE_CHECKING:
 
     from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 
+# Writes are funneled through the coordinator; entity updates are pushed
+# snapshots, so platform-level update serialization is unnecessary.
+PARALLEL_UPDATES = 0
+
 CALIBRATION_MODE_KEY = "calibration_mode"
 
 

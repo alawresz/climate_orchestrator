@@ -16,6 +16,13 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 
+async def async_remove_entry(
+    hass: HomeAssistant, entry: SmartClimateConfigEntry
+) -> None:
+    """Clean up the entry's persisted learned state (.storage files)."""
+    await SmartClimateCoordinator.async_remove_stores(hass, entry.entry_id)
+
+
 async def async_migrate_entry(
     hass: HomeAssistant, entry: SmartClimateConfigEntry
 ) -> bool:

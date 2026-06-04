@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
@@ -15,6 +16,10 @@ from custom_components.climate_orchestrator.const import (
     DEFAULT_TITLE,
     DOMAIN,
 )
+from custom_components.climate_orchestrator.control.mpc.controller import (
+    MpcController,
+)
+from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import TRV_ENTITY
 
 
@@ -66,3 +71,24 @@ async def test_migration_refuses_entries_from_the_future(
     )
     entry.add_to_hass(hass)
     assert not await async_migrate_entry(hass, entry)
+
+
+async def test_remove_entry_cleans_persisted_stores(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    hass_storage: dict[str, Any],
+) -> None:
+    """Deleting the entry removes the learned-state .storage files."""
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    coordinator._runtime(TRV_ENTITY).mpc = MpcController()
+    await coordinator._mpc_store.async_save(coordinator._mpc_persist_data())
+    await coordinator._maint_store.async_save(coordinator._state_persist_data())
+    cid = init_integration.entry_id
+    assert f"climate_orchestrator.{cid}.mpc" in hass_storage
+    assert f"climate_orchestrator.{cid}.maintenance" in hass_storage
+
+    await hass.config_entries.async_remove(cid)
+    await hass.async_block_till_done()
+
+    assert f"climate_orchestrator.{cid}.mpc" not in hass_storage
+    assert f"climate_orchestrator.{cid}.maintenance" not in hass_storage

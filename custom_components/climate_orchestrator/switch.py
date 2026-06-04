@@ -18,6 +18,11 @@ if TYPE_CHECKING:
     from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 
 
+# Writes are funneled through the coordinator; entity updates are pushed
+# snapshots, so platform-level update serialization is unnecessary.
+PARALLEL_UPDATES = 0
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: SmartClimateConfigEntry,

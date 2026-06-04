@@ -37,6 +37,10 @@ if TYPE_CHECKING:
     from .control.mpc.controller import MpcController
     from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 
+# Writes are funneled through the coordinator; entity updates are pushed
+# snapshots, so platform-level update serialization is unnecessary.
+PARALLEL_UPDATES = 0
+
 _KELVIN_PER_MINUTE = "K/min"
 _PER_MINUTE = "1/min"
 

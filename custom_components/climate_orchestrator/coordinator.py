@@ -300,6 +300,15 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             if (controller := rt.mpc) is not None
         }
 
+    @staticmethod
+    async def async_remove_stores(hass: HomeAssistant, entry_id: str) -> None:
+        """Delete the entry's persisted stores (called on entry removal)."""
+        for suffix in ("mpc", "maintenance"):
+            store: Store[dict[str, Any]] = Store(
+                hass, _MPC_STORE_VERSION, f"{DOMAIN}.{entry_id}.{suffix}"
+            )
+            await store.async_remove()
+
     @property
     def _options(self) -> dict[str, object]:
         """Merged config: options override the original setup data."""

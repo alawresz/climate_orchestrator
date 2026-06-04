@@ -13,6 +13,16 @@
           "home_humidity_sensor": "Whole-home average humidity sensor (optional, overrides the computed average)",
           "valve_opening_hints": "TRV valve-opening number name hints (comma-separated)",
           "calibration_hints": "TRV local-calibration number name hints (comma-separated)"
+        },
+        "data_description": {
+          "trvs": "The radiator-valve climate entities to orchestrate.",
+          "acs": "The air-conditioner climate entities to orchestrate.",
+          "outdoor_sensor": "Used for outdoor gating and adaptive cooling comfort.",
+          "weather_entity": "Provides the hourly forecast for preconditioning.",
+          "home_temperature_sensor": "Replaces the computed whole-home average temperature; falls back to computed if unavailable.",
+          "home_humidity_sensor": "Replaces the computed whole-home average humidity; falls back to computed if unavailable.",
+          "valve_opening_hints": "Name fragments used to discover each TRV's valve-opening number entity (MPC mode).",
+          "calibration_hints": "Name fragments used to discover each TRV's local-calibration number entity (offset mode)."
         }
       }
     },
@@ -37,6 +47,16 @@
           "home_humidity_sensor": "Whole-home average humidity sensor (optional, overrides the computed average)",
           "valve_opening_hints": "TRV valve-opening number name hints (comma-separated)",
           "calibration_hints": "TRV local-calibration number name hints (comma-separated)"
+        },
+        "data_description": {
+          "trvs": "The radiator-valve climate entities to orchestrate.",
+          "acs": "The air-conditioner climate entities to orchestrate.",
+          "outdoor_sensor": "Used for outdoor gating and adaptive cooling comfort.",
+          "weather_entity": "Provides the hourly forecast for preconditioning.",
+          "home_temperature_sensor": "Replaces the computed whole-home average temperature; falls back to computed if unavailable.",
+          "home_humidity_sensor": "Replaces the computed whole-home average humidity; falls back to computed if unavailable.",
+          "valve_opening_hints": "Name fragments used to discover each TRV's valve-opening number entity (MPC mode).",
+          "calibration_hints": "Name fragments used to discover each TRV's local-calibration number entity (offset mode)."
         }
       }
     },

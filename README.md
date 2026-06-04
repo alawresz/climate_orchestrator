@@ -104,6 +104,17 @@ and **local-calibration number name hints** — used to auto-discover those
 naming; if you add a TRV from another brand whose entities are named differently,
 add its naming here (comma-separated) so MPC/offset can find them.
 
+### Removal
+
+1. Go to **Settings → Devices & services → Climate Orchestrator**, open the
+   entry's menu (⋮) and choose **Delete**. The integration's persisted learned
+   state (MPC models, adaptive values) is cleaned up automatically.
+2. Remove the repository from HACS (or delete
+   `custom_components/climate_orchestrator/` for a manual install) and restart
+   Home Assistant.
+3. Your TRVs and ACs simply stop being orchestrated — they keep their last
+   commanded state and return to manual control.
+
 ## Entities created
 
 A single hub device exposes:

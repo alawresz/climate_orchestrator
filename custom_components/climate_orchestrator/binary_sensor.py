@@ -29,6 +29,11 @@ if TYPE_CHECKING:
     from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 
 
+# Writes are funneled through the coordinator; entity updates are pushed
+# snapshots, so platform-level update serialization is unnecessary.
+PARALLEL_UPDATES = 0
+
+
 @dataclass(frozen=True, kw_only=True)
 class SmartClimateBinaryDescription(BinarySensorEntityDescription):
     """Describes a coordinator-backed binary sensor."""
