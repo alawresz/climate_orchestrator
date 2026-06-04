@@ -2,6 +2,50 @@
 
 <!-- version list -->
 
+## v0.22.6 (2026-06-04)
+
+### Bug Fixes
+
+- Persist-limiter sync + earliest-deadline window recheck
+  ([`accc2ee`](https://github.com/alawresz/climate_orchestrator/commit/accc2eebc70a76c3023eb7e6854fa64706fd66eb))
+
+### Continuous Integration
+
+- Dispatch versioned docs deploy from the release workflow
+  ([`77f7ae3`](https://github.com/alawresz/climate_orchestrator/commit/77f7ae3d1932b8d0fbb021ab73a0241c27b4de30))
+
+- Update GH Actions to v5 for pages artifact and deployment
+  ([`965cb33`](https://github.com/alawresz/climate_orchestrator/commit/965cb33bcb598b03adf46b5ed35a1ab7c6534561))
+
+- Weekly canary against Home Assistant pre-releases
+  ([`650c2be`](https://github.com/alawresz/climate_orchestrator/commit/650c2becfc8031ad2ccc44f0e81a95eeea554220))
+
+### Documentation
+
+- Accuracy fixes
+  ([`7ad2e82`](https://github.com/alawresz/climate_orchestrator/commit/7ad2e824469f5e449707297d8053b8ff9ea33294))
+
+- Add debug logging setup instructions to README
+  ([`4590c68`](https://github.com/alawresz/climate_orchestrator/commit/4590c68b2aecaa44e4c0adfbb56af87369a1f1fe))
+
+- Drop third-party comparisons
+  ([`097eca0`](https://github.com/alawresz/climate_orchestrator/commit/097eca0a76b020349e4c798d17f8f4b677c0da01))
+
+- Fix comment
+  ([`e2f144c`](https://github.com/alawresz/climate_orchestrator/commit/e2f144c300044380a50ca89f63204e22e0b05d5c))
+
+- Remove DESIGN, add mkdocs + GH pages
+  ([`a9b67d2`](https://github.com/alawresz/climate_orchestrator/commit/a9b67d2b4b1ae1c0ca5506ccac7bb51978c690cf))
+
+### Testing
+
+- Kill mutmut survivors at the MPC dt boundary and fit-rejection guard
+  ([`cc30384`](https://github.com/alawresz/climate_orchestrator/commit/cc30384a2cbafed5d6296c0f25d82f54bea92199))
+
+- Pin MPC dt-cap boundary, Kalman recovery, tail-holding
+  ([`db74a9a`](https://github.com/alawresz/climate_orchestrator/commit/db74a9aeea7caf626ca40fe4a5c62ecd1e53cd95))
+
+
 ## v0.22.5 (2026-06-04)
 
 ### Bug Fixes
