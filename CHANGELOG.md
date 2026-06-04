@@ -2,6 +2,38 @@
 
 <!-- version list -->
 
+## v0.27.0 (2026-06-04)
+
+### Chores
+
+- Add issue forms and PR template
+  ([`34d5b3c`](https://github.com/alawresz/climate_orchestrator/commit/34d5b3c02011248d37beeb9a41c088ecebe5d9e6))
+
+- Purge historical narration and dead DESIGN.md pointers from comments
+  ([`2ed4bbf`](https://github.com/alawresz/climate_orchestrator/commit/2ed4bbf301f3d85c2c314dd6282fc39904a9f7ff))
+
+### Continuous Integration
+
+- Add per-page revision dates, privacy plugin, and instant navigation to docs
+  ([`6059169`](https://github.com/alawresz/climate_orchestrator/commit/6059169d250c2166bb4f71f85cc635b5045c14f7))
+
+- Expand link check to include issue/PR templates and docs-site chapters
+  ([`c3073e3`](https://github.com/alawresz/climate_orchestrator/commit/c3073e3564445a2872aa75d8dc0e4c98ce147446))
+
+### Documentation
+
+- Clarify dry-bulb fallback when humidity sensors are missing
+  ([`b9c9c22`](https://github.com/alawresz/climate_orchestrator/commit/b9c9c2280ecfb52edc42578d00f55515db0aea30))
+
+- Version-prefix absolute docs links and fix the TRV controller anchor
+  ([`741afd3`](https://github.com/alawresz/climate_orchestrator/commit/741afd3e6f45d6af172a10479c1c071fb623ec1c))
+
+### Features
+
+- Bus events for operational transitions with self-clearing notifications
+  ([`0f466dd`](https://github.com/alawresz/climate_orchestrator/commit/0f466dd97e4e67513845f34476f3f098bc024da2))
+
+
 ## v0.26.0 (2026-06-04)
 
 ### Features
