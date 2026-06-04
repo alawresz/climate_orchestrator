@@ -125,6 +125,12 @@ _MPC_STORE_VERSION = 1
 # Skip number writes within this of the current value (update minimization).
 NUMBER_WRITE_EPSILON = 0.1
 _MPC_SAVE_DELAY = 30.0
+# Learned state (MPC history, rmot EMA, bias integrals) moves slowly but
+# *continuously*, so saving "on change" degenerates to saving every cycle —
+# one flash write per ~90 s, forever, on SD-card Home Assistant boxes. Persist
+# at most every this many seconds instead; a crash loses only that much slow
+# drift (clean stops still flush pending saves via the Store itself).
+_PERSIST_INTERVAL = 900.0
 
 # Trailing window (seconds) and sample cap for the home temperature-slope figure.
 _SLOPE_WINDOW_SECONDS = 900.0
@@ -211,6 +217,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self._control_failures = 0
         # The last control cycle's resolved settings (see current_settings).
         self._cycle_settings: RuntimeSettings | None = None
+        # Flash-wear rate limiting for the learned-state stores: when a save
+        # was last scheduled, and the payloads it was scheduled with.
+        self._last_persist: float | None = None
+        self._mpc_scheduled: dict[str, Any] | None = None
+        self._state_scheduled: dict[str, Any] | None = None
         # All mutable per-device state, one DeviceRuntime per managed entity.
         self._devices: dict[str, DeviceRuntime] = {}
         # The last cycle's decisions, replaced wholesale every control run (so
@@ -339,6 +350,34 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             for trv_id, rt in self._devices.items()
             if (controller := rt.mpc) is not None
         }
+
+    @callback
+    def _maybe_persist(self) -> None:
+        """Schedule learned-state saves, rate-limited for flash wear.
+
+        Called every control cycle, but a store is only (delay-)saved when at
+        least ``_PERSIST_INTERVAL`` has passed since the last scheduled save
+        *and* its payload actually differs from what was last scheduled.
+        """
+        now = time.monotonic()
+        if (
+            self._last_persist is not None
+            and now - self._last_persist < _PERSIST_INTERVAL
+        ):
+            return
+        scheduled = False
+        if (mpc := self._mpc_persist_data()) and mpc != self._mpc_scheduled:
+            self._mpc_scheduled = mpc
+            self._mpc_store.async_delay_save(self._mpc_persist_data, _MPC_SAVE_DELAY)
+            scheduled = True
+        if (state := self._state_persist_data()) != self._state_scheduled:
+            self._state_scheduled = state
+            self._maint_store.async_delay_save(
+                self._state_persist_data, _MPC_SAVE_DELAY
+            )
+            scheduled = True
+        if scheduled:
+            self._last_persist = now
 
     @staticmethod
     async def async_remove_stores(hass: HomeAssistant, entry_id: str) -> None:
@@ -1286,9 +1325,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                         "climate_orchestrator: %s is accepting commands again",
                         entity_id,
                     )
-        if any(rt.mpc is not None for rt in self._devices.values()):
-            self._mpc_store.async_delay_save(self._mpc_persist_data, _MPC_SAVE_DELAY)
-        self._maint_store.async_delay_save(self._state_persist_data, _MPC_SAVE_DELAY)
+        self._maybe_persist()
         self._maybe_auto_maintenance(settings, decisions)
 
     @callback
@@ -1406,4 +1443,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             self._window_recheck_unsub = None
         if any(rt.mpc is not None for rt in self._devices.values()):
             await self._mpc_store.async_save(self._mpc_persist_data())
+        # The rate limiter may be holding back up to _PERSIST_INTERVAL of
+        # slow-moving state — flush it now that we're going away for real.
+        await self._maint_store.async_save(self._state_persist_data())
         await super().async_shutdown()

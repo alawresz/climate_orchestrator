@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import time
+from unittest.mock import patch
 
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant
@@ -253,3 +255,31 @@ async def test_persisted_state_for_unmanaged_devices_is_dropped(
     # The next persist no longer carries the stale keys.
     assert "climate.removed_trv" not in fresh._mpc_persist_data()
     assert "climate.removed_ac" not in fresh._state_persist_data()["ac_bias_integral"]
+
+
+async def test_learned_state_saves_are_rate_limited(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Slow-moving learned state is persisted at most every _PERSIST_INTERVAL.
+
+    Saving "on change" would mean one flash write per cycle forever (rmot is
+    a continuously-updated EMA) — SD-card wear on typical HA boxes.
+    """
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    with patch.object(coordinator._maint_store, "async_delay_save") as delay_save:
+        # Setup's first cycle already scheduled a save: within the interval.
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert delay_save.call_count == 0
+
+        # Interval elapsed but nothing changed -> still no write scheduled.
+        coordinator._last_persist = time.monotonic() - 1000.0
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert delay_save.call_count == 0
+
+        # Interval elapsed and the payload changed -> exactly one schedule.
+        coordinator._rmot = 12.34
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert delay_save.call_count == 1
