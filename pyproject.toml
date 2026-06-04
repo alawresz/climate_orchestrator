@@ -30,6 +30,14 @@ dev = [
   "mutmut>=3.5,<4",         # mutation testing for the pure control/ math
   "python-semantic-release>=10.5,<11",  # local release tooling (CI uses the action)
 ]
+# Docs toolchain (site under docs/ + mkdocs.yml). Exact pins: the same
+# versions build locally (`uv run --group docs mkdocs serve`), in the CI gate,
+# and in the Pages deploy — no drift between preview and production.
+docs = [
+  "mkdocs-material==9.7.6",
+  "mkdocs-panzoom-plugin==0.5.2",
+  "mike==2.2.0",
+]
 
 [tool.ruff]
 # Source still targets py313 (oldest HA install we aim to run on), even though
