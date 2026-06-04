@@ -663,6 +663,14 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             self._window_open_since[area_id] = opened_at = now
             if delay_seconds > 0.0:
                 self._schedule_window_recheck(delay_seconds)
+        elif (
+            self._window_recheck_unsub is None
+            and (remaining := delay_seconds - (now - opened_at)) > 0.0
+        ):
+            # Re-arm: a window still inside its grace period but with no timer
+            # pending (e.g. an earlier-deadline window fired and was gone by
+            # then) would otherwise only be caught by the next keepalive.
+            self._schedule_window_recheck(remaining)
         return window_suppresses(raw_open, opened_at, now, delay_seconds)
 
     @callback
