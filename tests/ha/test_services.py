@@ -112,7 +112,9 @@ async def test_auto_valve_maintenance_runs_when_due(
 
     with patch(_NO_SLEEP, new=AsyncMock()):
         await coordinator.async_refresh()
-        await hass.async_block_till_done()
+        # Auto maintenance runs as an entry-tracked *background* task, which
+        # plain block_till_done deliberately doesn't wait for.
+        await hass.async_block_till_done(wait_background_tasks=True)
 
     assert any(c.data[ATTR_ENTITY_ID] == VALVE_NUMBER for c in set_value)
 

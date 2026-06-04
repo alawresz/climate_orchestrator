@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from typing import Any
 
@@ -92,3 +93,31 @@ async def test_remove_entry_cleans_persisted_stores(
 
     assert f"climate_orchestrator.{cid}.mpc" not in hass_storage
     assert f"climate_orchestrator.{cid}.maintenance" not in hass_storage
+
+
+async def test_background_tasks_are_cancelled_on_unload(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Fire-and-forget work (store saves, auto maintenance) dies with the entry.
+
+    A bare ``hass.async_create_task`` would keep running after unload
+    (use-after-unload); everything must go through the entry-tracked helper.
+    """
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def _hang() -> None:
+        started.set()
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    coordinator._background(_hang(), "test hang")
+    await started.wait()
+
+    assert await hass.config_entries.async_unload(init_integration.entry_id)
+    await hass.async_block_till_done()
+    assert cancelled.is_set()

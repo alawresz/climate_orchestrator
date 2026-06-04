@@ -444,7 +444,7 @@ A subagent-driven verification pass reviews coverage gaps before sign-off.
 
 ## 13. Persistence and restore
 
-Coordinator-owned `Store` (versioned) holds: learned MPC parameters/observer state per device, preset values, latched demand/hysteresis state, and the self-tuning AC bias. Restored on startup with safe priors; schema-migrated on version bumps.
+Coordinator-owned `Store` (versioned) holds: learned MPC parameters/observer state per device, preset values, latched demand/hysteresis state, and the self-tuning AC bias. Restored on startup with safe priors; schema-migrated on version bumps. Fire-and-forget work (debounced refreshes, store saves, auto valve maintenance) is spawned exclusively via the coordinator's `_background()` helper — `ConfigEntry.async_create_background_task` — so every task is tracked by the entry and cancelled on unload; nothing outlives the coordinator.
 
 ---
 

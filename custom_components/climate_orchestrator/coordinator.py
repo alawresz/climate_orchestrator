@@ -255,6 +255,18 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         """Return the device's mutable runtime state, created on first touch."""
         return self._devices.setdefault(entity_id, DeviceRuntime())
 
+    @callback
+    def _background(self, coro: Coroutine[Any, Any, Any], name: str) -> None:
+        """Run a fire-and-forget coroutine tied to the entry's lifecycle.
+
+        Every spawned task goes through here so it is tracked by the config
+        entry and cancelled on unload — a bare ``hass.async_create_task``
+        could otherwise complete after shutdown (use-after-unload).
+        """
+        self.entry.async_create_background_task(
+            self.hass, coro, name=f"{DOMAIN} {name}"
+        )
+
     async def async_load_mpc(self) -> None:
         """Restore persisted MPC + maintenance state (call before first refresh)."""
         data = await self._mpc_store.async_load()
@@ -548,7 +560,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         @callback
         def _fire(_now: object) -> None:
             self._window_recheck_unsub = None
-            self.hass.async_create_task(self.async_request_refresh())
+            self._background(self.async_request_refresh(), "window recheck refresh")
 
         # A small margin ensures the elapsed check passes when it fires.
         self._window_recheck_unsub = async_call_later(
@@ -1269,7 +1281,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     @callback
     def _handle_state_event(self, event: Event[EventStateChangedData]) -> None:
         """Trigger a (debounced) refresh when a tracked entity changes."""
-        self.hass.async_create_task(self.async_request_refresh())
+        self._background(self.async_request_refresh(), "state-change refresh")
 
     # --- Services / maintenance ---------------------------------------------
 
@@ -1345,8 +1357,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if self._last_maintenance is None:
             # First run after install: start the clock rather than acting now.
             self._last_maintenance = now
-            self.hass.async_create_task(
-                self._maint_store.async_save(self._state_persist_data())
+            self._background(
+                self._maint_store.async_save(self._state_persist_data()),
+                "maintenance clock save",
             )
             return
         if now - self._last_maintenance < settings.valve_maintenance_interval * 86400:
@@ -1354,7 +1367,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         trvs = set(self.trv_ids)
         if any(d.demand is Demand.HEAT for key, d in decisions.items() if key in trvs):
             return  # don't interrupt active heating
-        self.hass.async_create_task(self.async_run_valve_maintenance())
+        self._background(self.async_run_valve_maintenance(), "auto valve maintenance")
 
     async def async_shutdown(self) -> None:
         """Cancel listeners, flush MPC state, and shut the coordinator down."""
