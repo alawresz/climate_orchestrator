@@ -42,7 +42,7 @@ theme:
     repo: fontawesome/brands/github
 
 plugins:
-  - search # re-declare: a plugins key replaces the implicit default
+  - search # declared explicitly: a plugins key replaces the implicit default
   - panzoom:
       # Pan/zoom + fullscreen on mermaid diagrams (hover a diagram for the
       # hint; the button in its corner goes fullscreen).
