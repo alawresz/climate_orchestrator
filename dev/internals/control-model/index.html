@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -1795,6 +1795,11 @@ Selecting a preset applies its edges; a manual temperature set on the climate
 entity switches to a "manual" band derived from the single target + deadband
 and remembers the last preset. All preset edges are <code>number</code> entities that
 persist across restarts (RestoreEntity / coordinator store).</p>
+<p>The offering is narrowed by the <strong>Presets</strong> multi-select in the config/options
+flow: only selected presets appear in <code>preset_modes</code> and get setpoint numbers
+(deselected presets' registry entries are pruned at setup), <code>manual</code> is always
+last. Restoring (or defaulting to) a preset that is no longer selected falls
+back to <code>home</code>, else <code>manual</code>.</p>
 <h3 id="what-the-climate-entity-displays-vs-controls">What the climate entity displays vs. controls<a class="headerlink" href="#what-the-climate-entity-displays-vs-controls" title="Permanent link">&para;</a></h3>
 <p>To keep the thermostat card consistent with the control loop, the entity shows
 what control actually uses: <code>current_temperature</code> is the feels-like (apparent)

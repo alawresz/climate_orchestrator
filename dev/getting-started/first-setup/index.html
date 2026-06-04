@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -504,6 +504,17 @@
     <span class="md-ellipsis">
       
         Optional sources
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Presets
       
     </span>
   </a>
@@ -1376,6 +1387,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#advanced-trv-discovery-hints" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1515,6 +1537,23 @@ gives cool-only, and both together give the full heat/cool band.</p>
 <p>The override sensors replace the computed whole-home average wherever it's
 used; how that average drives control — and what happens when an override goes
 stale — is covered in <a href="../../guides/how-it-controls/">How it controls</a>.</p>
+<h3 id="presets">Presets<a class="headerlink" href="#presets" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Default</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Presets</strong></td>
+<td>Home, Away, Sleep</td>
+<td>Which presets the thermostat offers. Only selected presets get editable setpoint <code>number</code> entities; the manual band is always available.</td>
+</tr>
+</tbody>
+</table>
 <h3 id="advanced-trv-discovery-hints">Advanced: TRV discovery hints<a class="headerlink" href="#advanced-trv-discovery-hints" title="Permanent link">&para;</a></h3>
 <table>
 <thead>

@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -1420,6 +1420,12 @@ is editable within 7–35 °C.</p>
 </table>
 <p>The preset edges live as <code>number</code> entities on the hub device (e.g. <em>Preset Home
 heat setpoint</em>), so automations can edit them too.</p>
+<p>Don't need all three? The <strong>Presets</strong> multi-select in the integration's
+Configure dialog narrows the offering: deselected presets disappear from the
+thermostat and their setpoint numbers aren't created (existing ones are cleaned
+up). The manual band is always available. If the <em>active</em> preset is
+deselected, the thermostat falls back to Home — or to manual when Home isn't
+selected either.</p>
 <h2 id="the-manual-band">The manual band<a class="headerlink" href="#the-manual-band" title="Permanent link">&para;</a></h2>
 <p>You don't have to go through a preset: moving the setpoints directly on the
 <code>climate.climate_orchestrator</code> entity adjusts the live band. With both TRVs and
