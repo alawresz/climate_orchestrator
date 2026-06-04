@@ -3,7 +3,7 @@ name: Release
 # Run only after CI has gone green, so we never tag a broken commit.
 # main -> stable release; feat/* and fix/* -> prerelease (per pyproject config).
 on:
-  workflow_run:
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: ["CI"]
     types: [completed]
     branches: [main, "feat/**", "fix/**"]
@@ -20,9 +20,16 @@ jobs:
   release:
     name: Semantic release
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Only release CI runs from this repo's own branches — a fork PR whose
+    # branch happens to match feat/** must never reach a contents:write job.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     steps:
-      - uses: actions/checkout@v6
+      # PSR pushes the version-bump commit + tag with the checked-out
+      # credentials, so they must persist here (zizmor's artipacked finding
+      # is accepted by design for this job).
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3 # zizmor: ignore[artipacked]
         with:
           # Release from the branch CI ran on (main or dev).
           ref: ${{ github.event.workflow_run.head_branch }}
@@ -32,6 +39,6 @@ jobs:
         # Reads [tool.semantic_release] branch config to decide stable vs
         # prerelease, bumps pyproject.toml + manifest.json, updates the
         # changelog, commits + tags, and publishes the GitHub Release.
-        uses: python-semantic-release/python-semantic-release@v10.5.3
+        uses: python-semantic-release/python-semantic-release@350c48fcb3ffcdfd2e0a235206bc2ecea6b69df0 # v10.5.3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

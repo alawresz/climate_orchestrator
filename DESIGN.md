@@ -387,7 +387,7 @@ climate_orchestrator/
 | Snapshots | **syrupy** | Entity-state and diagnostics snapshot tests. |
 | Coverage | **pytest-cov** | Target ≥ 90% line + branch on `control/`, `sensors/`, `devices/`; gate in CI. |
 | Hooks | **pre-commit** | ruff + mypy + end-of-file/whitespace. |
-| CI | **GitHub Actions** (`.github/workflows/ci.yml`) | Installs uv + Python 3.14 via `astral-sh/setup-uv`; jobs for ruff lint+format, mypy, pytest with coverage + JUnit results (Codecov coverage and Test Analytics uploads), plus hassfest and HACS validation. |
+| CI | **GitHub Actions** (`.github/workflows/ci.yml`) | Installs uv + Python 3.14 via `astral-sh/setup-uv`; jobs for ruff lint+format, mypy, pytest with coverage + JUnit results (Codecov coverage and Test Analytics uploads), plus hassfest and HACS validation. All third-party actions are pinned by commit SHA with version comments (Dependabot keeps them current); `zizmor` lints the workflows themselves in CI, with the few accepted findings suppressed inline with rationale (release's `workflow_run` trigger + credential persistence for the PSR push, and the unpinnable `hassfest@master`/`hacs@main` branches). The release job additionally guards on `head_repository == github.repository`. |
 | HA validation | **hassfest** + **HACS action** | `home-assistant/actions/hassfest` validates the manifest/structure; `hacs/action` validates HACS packaging. hassfest validates `strings.json`, which is kept byte-identical to `translations/en.json` (sync-checked in CI and pre-commit); advisory until one green run confirms, then it becomes a gate. |
 
 ### 11a. Continuous integration (GitHub Actions)

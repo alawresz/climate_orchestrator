@@ -13,9 +13,11 @@ jobs:
     name: Lint, type-check, test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
       - name: Install uv (with Python 3.14, HA's runtime)
-        uses: astral-sh/setup-uv@v8.2.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           python-version: "3.14"
       - name: Install dependencies
@@ -33,6 +35,8 @@ jobs:
         run: >-
           diff -u custom_components/climate_orchestrator/strings.json
           custom_components/climate_orchestrator/translations/en.json
+      - name: Workflow security lint (zizmor)
+        run: uvx zizmor --no-progress .github/workflows
       - name: mypy
         run: uv run mypy custom_components/climate_orchestrator
       - name: pytest (with coverage + JUnit results)
@@ -42,7 +46,7 @@ jobs:
           --cov-report=xml --cov-report=term-missing
           --junitxml=junit.xml -o junit_family=legacy
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           files: coverage.xml
           # Public repos upload tokenless; add the secret if uploads start failing.
@@ -53,7 +57,7 @@ jobs:
         # dedicated test-results-action is deprecated; the main action handles
         # JUnit uploads via report_type since v5.
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           report_type: test_results
           files: junit.xml
@@ -64,15 +68,22 @@ jobs:
     name: hassfest (HA manifest/structure validation)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: home-assistant/actions/hassfest@master
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      # Upstream only publishes a moving branch (no tags/releases to pin);
+      # accepted: the job runs with a read-only token on a public repo.
+      - uses: home-assistant/actions/hassfest@master # zizmor: ignore[unpinned-uses]
 
   hacs:
     name: HACS validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: hacs/action@main
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      # Same accepted risk as hassfest: validation-only, read-only token.
+      - uses: hacs/action@main # zizmor: ignore[unpinned-uses]
         with:
           category: integration
           # Skip the brands check until the logo is submitted to
