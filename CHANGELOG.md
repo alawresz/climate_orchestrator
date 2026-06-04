@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.22.4 (2026-06-04)
+
+### Bug Fixes
+
+- Survive store schema mismatches — versioned migration + downgrade discard
+  ([`5fda8b5`](https://github.com/alawresz/climate_orchestrator/commit/5fda8b59a9176b0864b32e8d2c90375188126be2))
+
+
 ## v0.22.3 (2026-06-04)
 
 ### Bug Fixes
