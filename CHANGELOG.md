@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.20.1 (2026-06-04)
+
+### Bug Fixes
+
+- Ship and attest the HACS zip asset
+  ([`ff1c584`](https://github.com/alawresz/climate_orchestrator/commit/ff1c584e8a60246a02eed6e1358eb8815c7cd1b7))
+
+### Continuous Integration
+
+- SHA-pin actions, guard release trigger, lint workflows with zizmor
+  ([`68dbe73`](https://github.com/alawresz/climate_orchestrator/commit/68dbe73674db3503e4d4f223fc8610b4a7d3c395))
+
+
 ## v0.20.0 (2026-06-03)
 
 ### Features
