@@ -9,11 +9,33 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from homeassistant.helpers import entity_registry as er
+
 from .const import CONFIG_ENTRY_VERSION, PLATFORMS
 from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
+
+# unique_id suffixes of entities retired by later versions; their registry
+# entries are pruned at setup so upgrades don't leave orphans behind.
+# - _mpc_heating_gain/_mpc_heat_loss/_mpc_model_error: folded into the
+#   per-TRV MPC learning-status sensor's attributes.
+_RETIRED_UNIQUE_ID_SUFFIXES = (
+    "_mpc_heating_gain",
+    "_mpc_heat_loss",
+    "_mpc_model_error",
+)
+
+
+def _async_remove_retired_entities(
+    hass: HomeAssistant, entry: SmartClimateConfigEntry
+) -> None:
+    """Drop registry entries for entities this version no longer creates."""
+    registry = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if entity.unique_id.endswith(_RETIRED_UNIQUE_ID_SUFFIXES):
+            registry.async_remove(entity.entity_id)
 
 
 async def async_remove_entry(
@@ -41,6 +63,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: SmartClimateConfigEntry
 ) -> bool:
     """Set up Climate Orchestrator from a config entry."""
+    _async_remove_retired_entities(hass, entry)
     coordinator = SmartClimateCoordinator(hass, entry)
     await coordinator.async_load_mpc()
     await coordinator.async_config_entry_first_refresh()

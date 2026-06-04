@@ -8,6 +8,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.climate_orchestrator import async_migrate_entry
@@ -40,6 +41,48 @@ async def test_setup_creates_entities(
     assert hass.states.get(entity_id_for("sensor", f"{cid}_home_avg_temperature"))
     assert hass.states.get(entity_id_for("sensor", f"{cid}_home_avg_humidity"))
     assert hass.states.get(entity_id_for("sensor", f"{cid}_status"))
+
+
+async def test_setup_prunes_retired_entities(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+) -> None:
+    """Registry entries for retired unique_ids are removed at setup.
+
+    The per-TRV MPC gain/loss/error sensors were folded into the
+    learning-status sensor's attributes; an upgrade must not leave their
+    registry entries behind as unavailable orphans.
+    """
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat")
+    config_entry.add_to_hass(hass)
+
+    registry = er.async_get(hass)
+    cid = config_entry.entry_id
+    retired = [
+        registry.async_get_or_create(
+            "sensor",
+            DOMAIN,
+            f"{cid}_{TRV_ENTITY}_{suffix}",
+            config_entry=config_entry,
+        ).entity_id
+        for suffix in ("mpc_heating_gain", "mpc_heat_loss", "mpc_model_error")
+    ]
+    kept = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{cid}_{TRV_ENTITY}_mpc_learning_status",
+        config_entry=config_entry,
+    ).entity_id
+
+    assert await hass.config_entries.async_setup(cid)
+    await hass.async_block_till_done()
+
+    for entity_id in retired:
+        assert registry.async_get(entity_id) is None
+    assert registry.async_get(kept) is not None
 
 
 async def test_unload_entry(

@@ -93,20 +93,21 @@ async def test_mpc_diagnostic_sensors_reflect_learned_state(
     living_area: str,
     entity_id_for: Callable[[str, str], str],
 ) -> None:
-    """Once a controller exists, the gain sensor reads a number and status moves."""
+    """Once a controller exists, the status moves and the model rides as attrs."""
     await setup_trv_with_number(hass, config_entry, living_area, trv_attrs=_TRV_ATTRS)
     async_mock_service(hass, "number", "set_value")
     await _engage_mpc_heating(hass, config_entry, entity_id_for)
 
     cid = config_entry.entry_id
-    gain = hass.states.get(
-        entity_id_for("sensor", f"{cid}_{TRV_ENTITY}_mpc_heating_gain")
-    )
     status = hass.states.get(
         entity_id_for("sensor", f"{cid}_{TRV_ENTITY}_mpc_learning_status")
     )
-    assert gain is not None and float(gain.state) >= 0.0
     assert status.state in ("learning", "ready")
+    assert status.attributes["heating_gain"] >= 0.0
+    assert status.attributes["heat_loss"] >= 0.0
+    # A fresh controller's first observation only anchors the model; the first
+    # (dt, temp -> next_temp) sample pair lands on the *next* cycle.
+    assert status.attributes["samples"] >= 0
 
 
 async def test_mpc_state_is_persisted(

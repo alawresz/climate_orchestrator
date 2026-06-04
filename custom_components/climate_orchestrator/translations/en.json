@@ -106,8 +106,6 @@
           "no_data": "No sensor data"
         }
       },
-      "mpc_heating_gain": { "name": "{trv} MPC heating power" },
-      "mpc_heat_loss": { "name": "{trv} MPC heat loss" },
       "mpc_learning_status": {
         "name": "{trv} MPC learning status",
         "state": {
@@ -116,7 +114,6 @@
           "ready": "Ready"
         }
       },
-      "mpc_model_error": { "name": "{trv} MPC model error" },
       "device_action": {
         "name": "{device} action",
         "state": {

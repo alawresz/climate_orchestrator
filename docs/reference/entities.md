@@ -105,9 +105,7 @@ One heat/cool edge pair per preset, each editable within 7–35 °C — behaviou
 
 | Diagnostic | Description |
 |------------|-------------|
-| {TRV} MPC heating power / heat loss | The learned `gain` (K/min at full valve) and `loss` (1/min). Populated only in `mpc` mode. |
-| {TRV} MPC learning status | `idle` (no model / not in MPC mode), `learning` (collecting samples), or `ready`. |
-| {TRV} MPC model error | RMS residual (K) of the learned fit over its history — lower means a better-trusted model. |
+| {TRV} MPC learning status | `idle` (no model / not in MPC mode), `learning` (collecting samples), or `ready`. The learned model rides along as attributes: `heating_gain` (K/min at full valve), `heat_loss` (1/min), `model_error` (RMS residual of the fit, K — lower means a better-trusted model), and `samples`. |
 | {device} action | The device's current action (idle / heating / cooling / drying / off / unavailable), with the last commanded mode + setpoint as attributes. |
 | {device} runtime | Percentage of the last hour the device was running. |
 | {device} cycles per hour | Off→on starts per hour over the last hour — surfaces short-cycling. |

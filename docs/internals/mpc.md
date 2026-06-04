@@ -78,8 +78,9 @@ estimates plus residual diagnostics.
 
 The fit's quality is surfaced per TRV: `MpcController.fit_rmse()` returns the
 root-mean-square residual (K/step) of the current `(gain, loss)` over the
-sample history, feeding the `<trv>_mpc_model_error` diagnostic sensor as a
-model-confidence figure.
+sample history, exposed as the `model_error` attribute on the
+`<trv>_mpc_learning_status` diagnostic sensor (alongside `heating_gain`,
+`heat_loss`, and `samples`) as a model-confidence figure.
 
 ## Kalman observer
 

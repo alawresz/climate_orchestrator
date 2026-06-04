@@ -49,13 +49,21 @@ async def test_per_device_sensors_registered(
         )
         is None
     )
-    # MPC model-error diagnostic exists for the TRV.
+    # MPC diagnostics are folded into one learning-status sensor for the TRV;
+    # the retired per-value sensors are never created.
     assert (
         registry.async_get_entity_id(
-            "sensor", "climate_orchestrator", f"{cid}_{TRV_ENTITY}_mpc_model_error"
+            "sensor", "climate_orchestrator", f"{cid}_{TRV_ENTITY}_mpc_learning_status"
         )
         is not None
     )
+    for retired in ("mpc_heating_gain", "mpc_heat_loss", "mpc_model_error"):
+        assert (
+            registry.async_get_entity_id(
+                "sensor", "climate_orchestrator", f"{cid}_{TRV_ENTITY}_{retired}"
+            )
+            is None
+        )
 
 
 async def test_device_action_and_frost_binary_sensor(

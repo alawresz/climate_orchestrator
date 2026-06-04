@@ -134,15 +134,16 @@ async def test_mpc_diagnostic_sensors_default_when_not_learning(
     init_integration: MockConfigEntry,
     entity_id_for: Callable[[str, str], str],
 ) -> None:
-    """Per-TRV MPC sensors exist, are diagnostics, and idle without a model."""
+    """The per-TRV MPC sensor exists, is a diagnostic, and idles without a model."""
     cid = init_integration.entry_id
     status_id = entity_id_for("sensor", f"{cid}_{TRV_ENTITY}_mpc_learning_status")
-    gain_id = entity_id_for("sensor", f"{cid}_{TRV_ENTITY}_mpc_heating_gain")
 
-    assert hass.states.get(status_id).state == "idle"
+    state = hass.states.get(status_id)
+    assert state.state == "idle"
+    # No controller -> no learned-model attributes.
+    assert "heating_gain" not in state.attributes
     registry = er.async_get(hass)
     assert registry.async_get(status_id).entity_category is EntityCategory.DIAGNOSTIC
-    assert registry.async_get(gain_id).entity_category is EntityCategory.DIAGNOSTIC
 
 
 async def test_mpc_learning_status_ready_with_enough_history(
@@ -164,7 +165,12 @@ async def test_mpc_learning_status_ready_with_enough_history(
     await hass.async_block_till_done()
 
     status_id = entity_id_for("sensor", f"{cid}_{TRV_ENTITY}_mpc_learning_status")
-    assert hass.states.get(status_id).state == "ready"
+    state = hass.states.get(status_id)
+    assert state.state == "ready"
+    # The learned model rides along as attributes.
+    assert state.attributes["samples"] == MIN_SAMPLES
+    assert state.attributes["heating_gain"] == controller.params.gain
+    assert state.attributes["heat_loss"] == controller.params.loss
 
 
 async def test_home_avg_source_sensor_defaults_to_computed(

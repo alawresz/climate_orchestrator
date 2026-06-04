@@ -4,10 +4,11 @@ Two families:
 
 * **Home-wide measurements** (no entity category, shown under *Sensors*): the
   whole-home temperature/humidity averages and the temperature slope (K/min).
-* **Per-TRV MPC diagnostics** (diagnostic category): the learned heating gain,
-  heat loss, and a learning-status enum — surfacing what each radiator's model
-  has figured out. Only meaningful in ``mpc`` calibration mode; otherwise they
-  read ``unknown``/``idle``.
+* **Per-TRV MPC diagnostics** (diagnostic category): one learning-status enum
+  per TRV carrying the learned model (gain, loss, fit error, sample count) as
+  attributes — surfacing what each radiator's model has figured out without a
+  recorder series per number. Only meaningful in ``mpc`` calibration mode;
+  otherwise it reads ``idle`` with no attributes.
 """
 
 from __future__ import annotations
@@ -42,7 +43,6 @@ if TYPE_CHECKING:
 PARALLEL_UPDATES = 0
 
 _KELVIN_PER_MINUTE = "K/min"
-_PER_MINUTE = "1/min"
 
 _REASON_OPTIONS = [
     "off",
@@ -198,58 +198,12 @@ SENSORS: tuple[SmartClimateSensorDescription, ...] = (
 )
 
 
-@dataclass(frozen=True, kw_only=True)
-class MpcSensorDescription(SensorEntityDescription):
-    """Describes a per-TRV MPC diagnostic sensor."""
-
-    value_fn: Callable[[MpcController | None], float | str | None]
-
-
 def _learning_status(controller: MpcController | None) -> str:
     if controller is None:
         return _LEARNING_IDLE
     if len(controller.history) >= MIN_SAMPLES:
         return _LEARNING_READY
     return _LEARNING_LEARNING
-
-
-MPC_SENSORS: tuple[MpcSensorDescription, ...] = (
-    MpcSensorDescription(
-        key="mpc_heating_gain",
-        translation_key="mpc_heating_gain",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=_KELVIN_PER_MINUTE,
-        suggested_display_precision=3,
-        value_fn=lambda c: None if c is None else c.params.gain,
-    ),
-    MpcSensorDescription(
-        key="mpc_heat_loss",
-        translation_key="mpc_heat_loss",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=_PER_MINUTE,
-        suggested_display_precision=4,
-        value_fn=lambda c: None if c is None else c.params.loss,
-    ),
-    MpcSensorDescription(
-        key="mpc_learning_status",
-        translation_key="mpc_learning_status",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        device_class=SensorDeviceClass.ENUM,
-        options=_LEARNING_OPTIONS,
-        value_fn=_learning_status,
-    ),
-    MpcSensorDescription(
-        key="mpc_model_error",
-        translation_key="mpc_model_error",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        suggested_display_precision=4,
-        value_fn=lambda c: None if c is None else c.fit_rmse(),
-    ),
-)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -331,12 +285,10 @@ async def async_setup_entry(
     ]
     entities.append(SmartClimateReasonSensor(coordinator))
     trvs = set(coordinator.trv_ids)
-    for trv_id in coordinator.trv_ids:
-        label = _trv_label(trv_id)
-        entities.extend(
-            SmartClimateMpcSensor(coordinator, description, trv_id, label)
-            for description in MPC_SENSORS
-        )
+    entities.extend(
+        SmartClimateMpcSensor(coordinator, trv_id, _trv_label(trv_id))
+        for trv_id in coordinator.trv_ids
+    )
     for entity_id in coordinator.device_ids:
         label = _trv_label(entity_id)
         entities.extend(
@@ -376,32 +328,50 @@ class SmartClimateSensor(SmartClimateBaseEntity, SensorEntity):
 
 
 class SmartClimateMpcSensor(SmartClimateBaseEntity, SensorEntity):
-    """A per-TRV MPC diagnostic sensor reading the learned controller state."""
+    """One MPC diagnostic per TRV: a learning-status enum with the model attached.
 
-    entity_description: MpcSensorDescription
+    The status is the at-a-glance value; the slow-moving learned numbers
+    (heating gain, heat loss, fit RMSE, sample count) ride along as attributes
+    rather than as separate MEASUREMENT sensors — they are debugging context,
+    not trends worth a recorder series each.
+    """
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = _LEARNING_OPTIONS
+    _attr_translation_key = "mpc_learning_status"
 
     def __init__(
         self,
         coordinator: SmartClimateCoordinator,
-        description: MpcSensorDescription,
         trv_id: str,
         label: str,
     ) -> None:
         """Initialise the diagnostic sensor for one TRV."""
         super().__init__(coordinator)
-        self.entity_description = description
         self._trv_id = trv_id
         self._attr_translation_placeholders = {"trv": label}
         self._attr_unique_id = (
-            f"{coordinator.entry.entry_id}_{trv_id}_{description.key}"
+            f"{coordinator.entry.entry_id}_{trv_id}_mpc_learning_status"
         )
 
     @property
-    def native_value(self) -> float | str | None:
-        """Return the learned value for this TRV's controller."""
-        return self.entity_description.value_fn(
-            self.coordinator.mpc_state(self._trv_id)
-        )
+    def native_value(self) -> str:
+        """Return the learning status for this TRV's controller."""
+        return _learning_status(self.coordinator.mpc_state(self._trv_id))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Expose the learned model for this TRV, when one exists."""
+        controller = self.coordinator.mpc_state(self._trv_id)
+        if controller is None:
+            return None
+        return {
+            "heating_gain": controller.params.gain,  # K/min at 100 % valve
+            "heat_loss": controller.params.loss,  # 1/min toward outdoors
+            "model_error": controller.fit_rmse(),  # °C RMSE; None until ready
+            "samples": len(controller.history),
+        }
 
 
 class SmartClimateDeviceSensor(SmartClimateBaseEntity, SensorEntity):

@@ -25,8 +25,8 @@ mode** select chooses how Climate Orchestrator handles that:
     2. **Learning (system identification)** — fits `gain` and `loss` from observed
        `(valve, temperature change, outdoor)` samples with a least-squares solver
        (SciPy), regularised toward sane priors. After ~6 samples it moves from
-       **learning** to **ready**; the fitted values show as the **MPC heating
-       power** / **MPC heat loss** diagnostics and persist across restarts.
+       **learning** to **ready**; the fitted values show as attributes on the
+       **MPC learning status** diagnostic and persist across restarts.
     3. **A Kalman filter** smooths the noisy, slow-reporting sensor between updates.
     4. **Receding-horizon optimisation** — simulates the room a few steps ahead
        under the learned model and writes the **valve opening percentage** that best
