@@ -25,6 +25,7 @@ from homeassistant.components.climate import (
     DOMAIN as CLIMATE_DOMAIN,
 )
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE, UnitOfTemperature
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -33,6 +34,7 @@ import voluptuous as vol
 from .const import (
     DEFAULT_PRESET,
     DEFAULT_PRESETS,
+    DOMAIN,
     MAX_TEMP,
     MIN_TEMP,
     PRESET_MANUAL,
@@ -459,7 +461,11 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
 
     async def async_run_valve_maintenance(self, trvs: list[str] | None = None) -> None:
         """Service: exercise some/all TRV valves (full open then closed)."""
-        await self.coordinator.async_run_valve_maintenance(trvs)
+        if not await self.coordinator.async_run_valve_maintenance(trvs):
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="no_maintenance_valves",
+            )
 
     async def async_turn_on(self) -> None:
         """Turn the climate entity on into the mode its hardware supports."""

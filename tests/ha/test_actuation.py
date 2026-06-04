@@ -7,6 +7,8 @@ from collections.abc import Callable
 from homeassistant.components.climate import ATTR_HVAC_MODE
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError
+import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_mock_service,
@@ -195,3 +197,61 @@ async def test_home_average_trigger_switch_wires_into_control(
         for c in set_hvac
         if c.data[ATTR_ENTITY_ID] == TRV_ENTITY and c.data[ATTR_HVAC_MODE] == "heat"
     ]
+
+
+async def test_command_failures_log_once_per_outage(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A failing device warns once, stays quiet, and logs once on recovery."""
+    climate_id = entity_id_for("climate", init_integration.entry_id)
+    # Deterministic outage: the climate services exist but reject every command.
+    # (Overrides the real entity services the climate component registered, and
+    # avoids racing setup's first control cycle, whose ServiceNotFound warning
+    # lands in caplog's setup phase, not the call phase counted below.)
+    failing = True
+
+    async def _device_rejects(call: ServiceCall) -> None:
+        if failing:
+            raise HomeAssistantError("device rejected the command")
+
+    hass.services.async_register("climate", "set_hvac_mode", _device_rejects)
+    hass.services.async_register("climate", "set_temperature", _device_rejects)
+    hass.states.async_set(TRV_ENTITY, "off", TRV_ATTRS)
+    hass.states.async_set(AREA_TEMP_SENSOR, "19.0")
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    # Setup's very first cycle already tripped the latch (no climate services
+    # existed yet, in caplog's setup phase); reset it so the outage below
+    # starts from a healthy device.
+    coordinator._runtime(TRV_ENTITY).command_failing = False
+    caplog.clear()
+
+    async def _cycle() -> None:
+        # Each refresh makes the real climate entity rewrite its state, wiping
+        # the faked desired mode — re-fake it before every cycle.
+        set_desired_preset(hass, climate_id)
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+
+    def _warnings() -> int:
+        return sum(
+            1
+            for r in caplog.records
+            if "failed to command" in r.getMessage() and TRV_ENTITY in r.getMessage()
+        )
+
+    await _cycle()
+    assert _warnings() == 1
+
+    await _cycle()
+    assert _warnings() == 1  # still just the one warning while it stays down
+
+    failing = False
+    await _cycle()
+    assert _warnings() == 1
+    assert any(
+        "accepting commands again" in r.getMessage() and TRV_ENTITY in r.getMessage()
+        for r in caplog.records
+    )

@@ -280,6 +280,9 @@ DEVICE_SENSORS: tuple[DeviceSensorDescription, ...] = (
         key="device_runtime",
         translation_key="device_runtime",
         entity_category=EntityCategory.DIAGNOSTIC,
+        # Noisy rolling statistics; opt-in (quality scale:
+        # entity-disabled-by-default).
+        entity_registry_enabled_default=False,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         suggested_display_precision=0,
@@ -289,6 +292,9 @@ DEVICE_SENSORS: tuple[DeviceSensorDescription, ...] = (
         key="device_cycles_per_hour",
         translation_key="device_cycles_per_hour",
         entity_category=EntityCategory.DIAGNOSTIC,
+        # Noisy rolling statistics; opt-in (quality scale:
+        # entity-disabled-by-default).
+        entity_registry_enabled_default=False,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=_PER_HOUR,
         suggested_display_precision=1,

@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock, patch
 
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
+import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_mock_service,
@@ -113,3 +115,20 @@ async def test_auto_valve_maintenance_runs_when_due(
         await hass.async_block_till_done()
 
     assert any(c.data[ATTR_ENTITY_ID] == VALVE_NUMBER for c in set_value)
+
+
+async def test_valve_maintenance_without_valves_raises_translated_error(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """No discoverable valve numbers -> ServiceValidationError, not a no-op."""
+    climate_id = entity_id_for("climate", init_integration.entry_id)
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "run_valve_maintenance",
+            {ATTR_ENTITY_ID: climate_id},
+            blocking=True,
+        )
+    assert err.value.translation_key == "no_maintenance_valves"

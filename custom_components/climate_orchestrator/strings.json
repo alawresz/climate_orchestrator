@@ -193,6 +193,11 @@
       }
     }
   },
+  "exceptions": {
+    "no_maintenance_valves": {
+      "message": "No valve-opening number entities were found for the selected TRVs. Check the valve name hints in the integration's options."
+    }
+  },
   "issues": {
     "missing_calibration_number": {
       "title": "Climate Orchestrator: TRV calibration number not found",

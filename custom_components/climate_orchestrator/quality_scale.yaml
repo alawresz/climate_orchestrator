@@ -33,28 +33,28 @@ rules:
 
   # --- Silver ---------------------------------------------------------------
   action-exceptions:
-    status: todo
+    status: done
     comment: >-
-      Valve maintenance silently no-ops when no valve numbers are
-      discoverable; it should raise ServiceValidationError instead.
+      Valve maintenance raises a translated ServiceValidationError when no
+      valve numbers are discoverable.
   config-entry-unloading: done
   docs-configuration-parameters: done
   docs-installation-parameters: done
   entity-unavailable: done
   integration-owner: done
   log-when-unavailable:
-    status: todo
+    status: done
     comment: >-
-      Failed device commands are logged every cycle while a device stays
-      down; needs once-per-outage logging (state is already surfaced via the
-      Status sensor and repairs).
+      Device command failures log once per outage and once on recovery
+      (DeviceRuntime.command_failing latch); state is also surfaced via the
+      Status sensor and repairs.
   parallel-updates: done
   reauthentication-flow:
     status: exempt
     comment: No authentication — orchestrates local Home Assistant entities.
   test-coverage:
-    status: todo
-    comment: The enforced gate is 90% (branch); raise to 95% after measuring.
+    status: done
+    comment: CI enforces a 95% branch-coverage gate (coverage fail_under).
 
   # --- Gold -----------------------------------------------------------------
   devices: done
@@ -68,12 +68,8 @@ rules:
     status: exempt
     comment: See discovery.
   docs-data-update: done
-  docs-examples:
-    status: todo
-    comment: No automation examples in the README yet.
-  docs-known-limitations:
-    status: todo
-    comment: Limitations are scattered through the README; needs a section.
+  docs-examples: done
+  docs-known-limitations: done
   docs-supported-devices: done
   docs-supported-functions: done
   docs-troubleshooting: done
@@ -86,16 +82,12 @@ rules:
   entity-category: done
   entity-device-class: done
   entity-disabled-by-default:
-    status: todo
-    comment: >-
-      The per-device runtime/cycle diagnostic sensors could default to
-      disabled.
+    status: done
+    comment: The per-device runtime/cycle diagnostic sensors default to disabled.
   entity-translations: done
   exception-translations:
-    status: exempt
-    comment: >-
-      No user-facing exceptions are raised (config-flow errors use
-      translation keys). Revisit together with action-exceptions.
+    status: done
+    comment: Service exceptions use translation keys (strings.json exceptions).
   icon-translations: done
   reconfiguration-flow:
     status: done
@@ -107,11 +99,10 @@ rules:
 
   # --- Platinum ---------------------------------------------------------------
   async-dependency:
-    status: todo
+    status: done
     comment: >-
-      scipy is synchronous and the MPC identification/optimisation currently
-      runs in the event loop (millisecond-scale, but should move to an
-      executor job).
+      scipy is synchronous; the MPC observe/identify/optimise math runs in an
+      executor job, keeping the event loop unblocked.
   inject-websession:
     status: exempt
     comment: No HTTP dependency.

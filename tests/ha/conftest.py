@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Generator
+from unittest.mock import PropertyMock, patch
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar
@@ -22,6 +23,21 @@ from tests.conftest import (
     AREA_TEMP_SENSOR,
     TRV_ENTITY,
 )
+
+
+@pytest.fixture(autouse=True)
+def auto_enable_disabled_entities() -> Generator[None]:
+    """Create default-disabled entities (runtime/cycle counters) in tests.
+
+    Inlined from HA core's ``entity_registry_enabled_by_default`` fixture
+    (tests/components/conftest.py), which PHACC does not ship.
+    """
+    with patch(
+        "homeassistant.helpers.entity.Entity.entity_registry_enabled_default",
+        return_value=True,
+        new_callable=PropertyMock,
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)

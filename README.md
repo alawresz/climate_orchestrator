@@ -505,6 +505,66 @@ Developer Tools → Actions (target the whole-home `climate` entity):
   temperature, and the per-device demand latch) is persisted, so a restart resumes
   where it left off.
 
+## Automation examples
+
+Get notified when the orchestrator degrades (a device went offline or the
+control loop keeps failing):
+
+```yaml
+automation:
+  - alias: "Climate Orchestrator needs attention"
+    triggers:
+      - trigger: state
+        entity_id: sensor.climate_orchestrator_status
+        to: "degraded"
+        for: "00:05:00"
+    actions:
+      - action: notify.mobile_app_your_phone
+        data:
+          title: "Climate Orchestrator degraded"
+          message: >-
+            {{ state_attr('sensor.climate_orchestrator_status',
+                          'unavailable_devices') | join(', ') or 'See log' }}
+```
+
+Switch the whole home to the away preset when everyone leaves, and back on
+return:
+
+```yaml
+automation:
+  - alias: "Climate follows presence"
+    triggers:
+      - trigger: state
+        entity_id: zone.home
+    actions:
+      - action: climate.set_preset_mode
+        target:
+          entity_id: climate.climate_orchestrator
+        data:
+          preset_mode: >-
+            {{ 'away' if states('zone.home') | int == 0 else 'home' }}
+```
+
+## Known limitations
+
+- **One home per Home Assistant instance** — a single config entry drives one
+  whole-home entity. Per-room *bias* exists (area band offsets), but rooms
+  don't have independent schedules; use presets + automations for time-based
+  behaviour.
+- **Rooms need their own sensors for full local control.** A device whose HA
+  area has no temperature sensor is controlled against the home average only.
+- **Valve/calibration discovery is name-based.** MPC and offset modes find a
+  TRV's `number` entities by name hints (Zigbee2MQTT/SONOFF defaults,
+  configurable in options); a brand with different naming needs its hints set.
+- **MPC learns from history.** After install or a learning reset, valve
+  control starts from conservative priors and typically needs a few hours of
+  heating to fit a room's model (watch the *MPC learning status* sensors).
+- **Forecast preconditioning needs an hourly forecast** from the configured
+  weather entity, and only ever *raises* heating — it won't pre-cool.
+- **Devices must be standard HA `climate` entities** exposing the usual
+  attributes (`hvac_modes`, `current_temperature`, min/max). Anything that
+  does is fair game; anything that doesn't isn't.
+
 ## Development
 
 Uses [uv](https://github.com/astral-sh/uv), [ruff](https://docs.astral.sh/ruff/),
@@ -516,7 +576,7 @@ uv venv --python 3.14 && uv sync --dev   # create env, install deps
 uv run ruff check . && uv run ruff format --check .
 uv run mypy custom_components/climate_orchestrator
 uv run pytest                            # fast: tests only
-uv run pytest --cov=custom_components/climate_orchestrator   # with coverage (CI gate: 90%)
+uv run pytest --cov=custom_components/climate_orchestrator   # with coverage (CI gate: 95%)
 uv run mutmut run                        # mutation-test the control/ math
 ```
 

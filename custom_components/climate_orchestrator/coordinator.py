@@ -164,6 +164,9 @@ class DeviceRuntime:
     ac_bias_integral: float = 0.0
     """Integral accumulator for the self-tuning AC setpoint bias."""
 
+    command_failing: bool = False
+    """Whether commands to this device are currently failing (log-once latch)."""
+
 
 @dataclass(frozen=True, slots=True)
 class CycleContext:
@@ -600,29 +603,44 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self._calibration_issue(entity_id, "mpc", missing=number is None)
         if number is None or area_temp is None:
             return []
+        return [self._mpc_observe_and_write(entity_id, number, area_temp, ctx)]
+
+    async def _mpc_observe_and_write(
+        self, entity_id: str, number: str, area_temp: float, ctx: CycleContext
+    ) -> None:
+        """Run the MPC math in the executor, then write the valve opening.
+
+        scipy (system identification + optimisation) is synchronous; running
+        it in an executor job keeps the event loop unblocked. Each TRV has its
+        own controller, so concurrent jobs never share state.
+        """
         ambient = ctx.outdoor if ctx.outdoor is not None else area_temp
         runtime = self._runtime(entity_id)
         if runtime.mpc is None:
             runtime.mpc = MpcController()
-        runtime.mpc.observe(
-            temp=area_temp,
-            valve=0.0 if runtime.valve is None else runtime.valve,
-            outdoor=ambient,
-            dt=ctx.dt_min,
-        )
-        # Plan from the Kalman-filtered estimate (smooths sensor noise); raw
-        # reading as a guard, though observe() always seeds an estimate.
-        estimate = runtime.mpc.estimated_temperature
-        pct = preconditioned_valve_pct(
-            runtime.mpc,
-            temp=area_temp if estimate is None else estimate,
-            target=ctx.band.heat_target(ctx.settings.tolerance),
-            outdoor=ambient,
-            series=self._precondition_series(ctx.dt_min, ctx.settings),
-            dt=ctx.dt_min,
-        )
+        controller = runtime.mpc
+        last_valve = 0.0 if runtime.valve is None else runtime.valve
+        series = self._precondition_series(ctx.dt_min, ctx.settings)
+
+        def _observe_and_optimize() -> float:
+            controller.observe(
+                temp=area_temp, valve=last_valve, outdoor=ambient, dt=ctx.dt_min
+            )
+            # Plan from the Kalman-filtered estimate (smooths sensor noise);
+            # raw reading as a guard, though observe() always seeds one.
+            estimate = controller.estimated_temperature
+            return preconditioned_valve_pct(
+                controller,
+                temp=area_temp if estimate is None else estimate,
+                target=ctx.band.heat_target(ctx.settings.tolerance),
+                outdoor=ambient,
+                series=series,
+                dt=ctx.dt_min,
+            )
+
+        pct = await self.hass.async_add_executor_job(_observe_and_optimize)
         runtime.valve = pct / 100.0
-        return [self._write_number_if_changed(number, pct)]
+        await self._write_number_if_changed(number, pct)
 
     def _offset_writes(
         self, entity_id: str, area_temp: float | None, adapter: ClimateAdapter
@@ -1195,12 +1213,28 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             results = await asyncio.gather(
                 *(coro for _, coro in writes), return_exceptions=True
             )
+            failures: dict[str, Exception] = {}
             for (entity_id, _), result in zip(writes, results, strict=True):
                 if isinstance(result, Exception):
-                    _LOGGER.warning(
-                        "climate_orchestrator: failed to command %s: %s",
+                    failures.setdefault(entity_id, result)
+            # Log once per outage, not once per cycle: a device that stays
+            # down would otherwise emit a warning every UPDATE_INTERVAL.
+            for entity_id in {eid for eid, _ in writes}:
+                runtime = self._runtime(entity_id)
+                if (error := failures.get(entity_id)) is not None:
+                    if not runtime.command_failing:
+                        runtime.command_failing = True
+                        _LOGGER.warning(
+                            "climate_orchestrator: failed to command %s: %s "
+                            "(suppressing repeats until it recovers)",
+                            entity_id,
+                            error,
+                        )
+                elif runtime.command_failing:
+                    runtime.command_failing = False
+                    _LOGGER.info(
+                        "climate_orchestrator: %s is accepting commands again",
                         entity_id,
-                        result,
                     )
         if any(rt.mpc is not None for rt in self._devices.values()):
             self._mpc_store.async_delay_save(self._mpc_persist_data, _MPC_SAVE_DELAY)
@@ -1256,25 +1290,25 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         trv_ids: list[str] | None = None,
         *,
         dwell: float = VALVE_MAINTENANCE_DWELL_SECONDS,
-    ) -> None:
+    ) -> bool:
         """Exercise each TRV's valve fully open then closed, then restore control.
 
         Prevents the valve seizing/scaling when it sits at a fixed opening for a
         long time. Re-entrancy guarded so overlapping triggers can't stack.
+        Returns whether any valve numbers were found — the service layer turns
+        ``False`` into a translated ``ServiceValidationError``.
         """
+        valves = [
+            number
+            for trv_id in (trv_ids or self.trv_ids)
+            if (number := find_related_number(self.hass, trv_id, VALVE_OPENING_HINTS))
+        ]
+        if not valves:
+            return False
         if self._maintenance_running:
-            return
+            return True
         self._maintenance_running = True
         try:
-            valves = [
-                number
-                for trv_id in (trv_ids or self.trv_ids)
-                if (
-                    number := find_related_number(
-                        self.hass, trv_id, VALVE_OPENING_HINTS
-                    )
-                )
-            ]
             for opening in (100.0, 0.0):
                 await asyncio.gather(
                     *(self._write_number(number, opening) for number in valves),
@@ -1287,6 +1321,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             self._maintenance_running = False
             # Restore normal valve positions on the next cycle.
             await self.async_request_refresh()
+        return True
 
     @callback
     def _maybe_auto_maintenance(
