@@ -14,6 +14,8 @@ permissions:
   # For the build-provenance attestation of the HACS zip asset.
   id-token: write
   attestations: write
+  # To dispatch the versioned-docs deploy (docs.yml) after a release.
+  actions: write
 
 concurrency:
   group: release-${{ github.event.workflow_run.head_branch }}
@@ -52,6 +54,22 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.release.outputs.tag }}
+      - name: Deploy versioned docs
+        # PSR creates the GitHub Release with the default GITHUB_TOKEN, and
+        # GitHub never fires `release` events for token-created releases — so
+        # docs.yml's `on: release` trigger won't see ours. workflow_dispatch
+        # IS token-triggerable, so kick the versioned deploy explicitly.
+        # Stable releases only: prereleases must not move the docs.
+        if: >-
+          steps.release.outputs.released == 'true' &&
+          github.event.workflow_run.head_branch == 'main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          # X.Y.Z -> X.Y (patches update their minor's docs)
+          gh workflow run docs.yml --ref main \
+            -f version="${VERSION%.*}" -f set_latest=true
       - name: Attest build provenance of the HACS zip
         # Verifiable provenance for the exact artifact HACS installs:
         #   gh attestation verify climate_orchestrator.zip -R <owner>/<repo>

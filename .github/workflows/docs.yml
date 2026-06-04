@@ -7,8 +7,11 @@ name: Docs
 # trees); the deploy step uploads that tree as a Pages artifact.
 #
 # - Push to main (docs changed)  -> deploys/updates the "dev" version.
-# - Release published            -> deploys "X.Y" and points "latest" at it
-#                                   (patches update their minor's docs).
+# - Stable release               -> release.yml dispatches this workflow with
+#                                   version "X.Y" + latest (GitHub doesn't fire
+#                                   `release` events for GITHUB_TOKEN-created
+#                                   releases, so the trigger below only covers
+#                                   hand-published ones).
 # - Manual dispatch              -> bootstrap/repair any version by hand.
 #
 # The strict no-deploy build gating PRs lives in ci.yml.
