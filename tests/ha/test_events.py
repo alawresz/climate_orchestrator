@@ -20,8 +20,8 @@ from custom_components.climate_orchestrator.const import (
     EVENT_TYPE_STATUS_CHANGED,
     EVENT_TYPE_WINDOW_PAUSE_STARTED,
 )
-from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AREA_TEMP_SENSOR, TRV_ENTITY
+from tests.ha.helpers import refresh
 
 
 def _notifications(hass: HomeAssistant) -> dict[str, Any]:
@@ -31,12 +31,6 @@ def _notifications(hass: HomeAssistant) -> dict[str, Any]:
 
 def _events_of(events: list, event_type: str) -> list:
     return [e for e in events if e.data["type"] == event_type]
-
-
-async def _refresh(hass: HomeAssistant, entry: MockConfigEntry) -> None:
-    coordinator: SmartClimateCoordinator = entry.runtime_data
-    await coordinator.async_refresh()
-    await hass.async_block_till_done()
 
 
 async def _drive_frost(
@@ -56,7 +50,7 @@ async def _drive_frost(
     )
     hass.states.async_set(AREA_TEMP_SENSOR, "5.0", {"device_class": "temperature"})
     hass.states.async_set(TRV_ENTITY, "heat", {"hvac_modes": ["off", "heat"]})
-    await _refresh(hass, entry)
+    await refresh(hass, entry)
 
 
 async def test_frost_events_and_notification(
@@ -77,11 +71,11 @@ async def test_frost_events_and_notification(
     assert notification_id in _notifications(hass)
 
     # Still frosty next cycle: edge-triggered, so no duplicate.
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert len(_events_of(events, EVENT_TYPE_FROST_STARTED)) == 1
 
     hass.states.async_set(AREA_TEMP_SENSOR, "21.0", {"device_class": "temperature"})
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert len(_events_of(events, EVENT_TYPE_FROST_ENDED)) == 1
     assert notification_id not in _notifications(hass)
 
@@ -134,11 +128,11 @@ async def test_window_pause_event_carries_the_device(
     )
     registry.async_update_entity(window.entity_id, area_id=living_area)
     hass.states.async_set(window.entity_id, "off")
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
 
     events = async_capture_events(hass, EVENT_CLIMATE_ORCHESTRATOR)
     hass.states.async_set(window.entity_id, "on")
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
 
     started = _events_of(events, EVENT_TYPE_WINDOW_PAUSE_STARTED)
     assert {e.data["entity_id"] for e in started} >= {TRV_ENTITY}
@@ -154,7 +148,7 @@ async def test_status_change_event_and_degraded_notification(
     notification_id = f"climate_orchestrator_{init_integration.entry_id}_degraded"
 
     hass.states.async_set(TRV_ENTITY, STATE_UNAVAILABLE)
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     changed = _events_of(events, EVENT_TYPE_STATUS_CHANGED)
     assert len(changed) == 1
     assert changed[0].data["from"] == "ok"
@@ -163,7 +157,7 @@ async def test_status_change_event_and_degraded_notification(
     assert notification_id in _notifications(hass)
 
     hass.states.async_set(TRV_ENTITY, "heat")
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     changed = _events_of(events, EVENT_TYPE_STATUS_CHANGED)
     assert len(changed) == 2
     assert changed[1].data["to"] == "ok"

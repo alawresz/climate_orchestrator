@@ -8,14 +8,8 @@ from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AREA_TEMP_SENSOR
-
-
-async def _refresh(hass: HomeAssistant, entry: MockConfigEntry) -> None:
-    coordinator: SmartClimateCoordinator = entry.runtime_data
-    await coordinator.async_refresh()
-    await hass.async_block_till_done()
+from tests.ha.helpers import refresh
 
 
 async def test_area_offset_number_created_per_area(
@@ -59,7 +53,7 @@ async def test_positive_offset_makes_area_heat(
 
     # 21.0 sits inside the home band (heat edge 20.5) -> idle.
     hass.states.async_set(AREA_TEMP_SENSOR, "21.0", {"device_class": "temperature"})
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert hass.states.get(climate).attributes["hvac_action"] == "idle"
 
     # +3 offset pulls the perceived reading to 18.0 (< 20.5) -> heating.
@@ -69,5 +63,5 @@ async def test_positive_offset_makes_area_heat(
         {ATTR_ENTITY_ID: offset, "value": 3.0},
         blocking=True,
     )
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert hass.states.get(climate).attributes["hvac_action"] == "heating"

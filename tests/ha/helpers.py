@@ -98,3 +98,10 @@ async def setup_trv_with_number(
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
     return config_entry.runtime_data
+
+
+async def refresh(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    """Run one control cycle and settle the event loop."""
+    coordinator: SmartClimateCoordinator = entry.runtime_data
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()

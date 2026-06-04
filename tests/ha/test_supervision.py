@@ -25,18 +25,13 @@ from custom_components.climate_orchestrator.const import (
 )
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AREA_TEMP_SENSOR, TRV_ENTITY
+from tests.ha.helpers import refresh
 
 _TRV_ATTRS = {"hvac_modes": ["off", "heat"]}
 
 
 def _events_of(events: list, event_type: str) -> list:
     return [e for e in events if e.data["type"] == event_type]
-
-
-async def _refresh(hass: HomeAssistant, entry: MockConfigEntry) -> None:
-    coordinator: SmartClimateCoordinator = entry.runtime_data
-    await coordinator.async_refresh()
-    await hass.async_block_till_done()
 
 
 async def _establish_compliance(
@@ -52,7 +47,7 @@ async def _establish_compliance(
     """
     set_hvac = async_mock_service(hass, "climate", "set_hvac_mode")
     set_temp = async_mock_service(hass, "climate", "set_temperature")
-    await _refresh(hass, entry)
+    await refresh(hass, entry)
     coordinator: SmartClimateCoordinator = entry.runtime_data
     assert coordinator._runtime(TRV_ENTITY).command is not None
     hass.states.async_set(TRV_ENTITY, "off", _TRV_ATTRS)
@@ -90,7 +85,7 @@ async def test_override_suppresses_writes_and_surfaces_reason(
     await _human_touches_trv(hass)
 
     set_hvac.clear()
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert not [c for c in set_hvac if c.data[ATTR_ENTITY_ID] == TRV_ENTITY]
     assert coordinator.last_decisions[TRV_ENTITY].reason == "manual_override"
     attrs = coordinator.device_command_attrs(TRV_ENTITY)
@@ -110,7 +105,7 @@ async def test_override_expires_and_control_resumes(
 
     coordinator._runtime(TRV_ENTITY).override_until = time.monotonic() - 1.0
     set_hvac.clear()
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
 
     ended = [e for e in events if e.data["type"] == EVENT_TYPE_OVERRIDE_ENDED]
     assert len(ended) == 1
@@ -171,7 +166,7 @@ async def test_frost_protection_punches_through_override(
 
     hass.states.async_set(AREA_TEMP_SENSOR, "5.0", {"device_class": "temperature"})
     set_temp.clear()
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
 
     ended = [e for e in events if e.data["type"] == EVENT_TYPE_OVERRIDE_ENDED]
     assert ended and ended[0].data["reason"] == "frost_protection"
@@ -228,7 +223,7 @@ async def test_setpoint_change_also_triggers_override(
     hass.states.async_set(AREA_TEMP_SENSOR, "18.0", {"device_class": "temperature"})
     await hass.async_block_till_done()
     # A cold room: the TRV is commanded to heat toward a target.
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     command = coordinator._runtime(TRV_ENTITY).command
     assert command is not None and command.target_temp is not None
@@ -274,8 +269,8 @@ async def _start_ignored_streak(
     """
     async_mock_service(hass, "climate", "set_hvac_mode")
     async_mock_service(hass, "climate", "set_temperature")
-    await _refresh(hass, entry)
-    await _refresh(hass, entry)
+    await refresh(hass, entry)
+    await refresh(hass, entry)
     coordinator: SmartClimateCoordinator = entry.runtime_data
     assert coordinator._runtime(TRV_ENTITY).ignored_since is not None
     return coordinator
@@ -292,12 +287,12 @@ async def test_command_ignored_watchdog_raises_and_clears(
 
     # Pretend the divergence has persisted past the watchdog threshold.
     coordinator._runtime(TRV_ENTITY).ignored_since = time.monotonic() - 999.0
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is not None
 
     # The device finally applies the commanded mode -> issue clears.
     hass.states.async_set(TRV_ENTITY, "off")
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
     assert coordinator._runtime(TRV_ENTITY).ignored_since is None
 
@@ -316,8 +311,8 @@ async def test_loud_command_failures_do_not_raise_ignored_issue(
 
     hass.services.async_register("climate", "set_hvac_mode", _device_rejects)
     hass.services.async_register("climate", "set_temperature", _device_rejects)
-    await _refresh(hass, init_integration)
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
+    await refresh(hass, init_integration)
 
     assert coordinator._runtime(TRV_ENTITY).command_failing
     assert coordinator._runtime(TRV_ENTITY).ignored_since is None
@@ -331,11 +326,11 @@ async def test_unavailable_device_clears_ignored_issue(
     registry = ir.async_get(hass)
     coordinator = await _start_ignored_streak(hass, init_integration)
     coordinator._runtime(TRV_ENTITY).ignored_since = time.monotonic() - 999.0
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is not None
 
     hass.states.async_set(TRV_ENTITY, STATE_UNAVAILABLE)
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
     assert coordinator._runtime(TRV_ENTITY).ignored_since is None
 
@@ -349,18 +344,18 @@ async def test_watchdog_events_fire_on_both_edges(
     async_mock_service(hass, "climate", "set_temperature")
     events = async_capture_events(hass, EVENT_CLIMATE_ORCHESTRATOR)
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
-    await _refresh(hass, init_integration)
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
+    await refresh(hass, init_integration)
 
     coordinator._runtime(TRV_ENTITY).ignored_since = time.monotonic() - 999.0
-    await _refresh(hass, init_integration)
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     started = _events_of(events, EVENT_TYPE_IGNORING_STARTED)
     assert len(started) == 1  # edge, not per cycle
     assert started[0].data["entity_id"] == TRV_ENTITY
 
     hass.states.async_set(TRV_ENTITY, "off")  # device finally complies
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     ended = _events_of(events, EVENT_TYPE_IGNORING_ENDED)
     assert len(ended) == 1
 
@@ -377,6 +372,6 @@ async def test_loud_failures_fire_no_watchdog_events(
     hass.services.async_register("climate", "set_hvac_mode", _device_rejects)
     hass.services.async_register("climate", "set_temperature", _device_rejects)
     events = async_capture_events(hass, EVENT_CLIMATE_ORCHESTRATOR)
-    await _refresh(hass, init_integration)
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert not _events_of(events, EVENT_TYPE_IGNORING_STARTED)

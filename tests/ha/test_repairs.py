@@ -18,12 +18,7 @@ from custom_components.climate_orchestrator.const import (
 )
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, AREA_HUMIDITY_SENSOR, AREA_TEMP_SENSOR, TRV_ENTITY
-
-
-async def _refresh(hass: HomeAssistant, entry: MockConfigEntry) -> None:
-    coordinator: SmartClimateCoordinator = entry.runtime_data
-    await coordinator.async_refresh()
-    await hass.async_block_till_done()
+from tests.ha.helpers import refresh
 
 
 async def test_adaptive_comfort_without_outdoor_sensor_raises_and_clears(
@@ -41,13 +36,13 @@ async def test_adaptive_comfort_without_outdoor_sensor_raises_and_clears(
     await hass.services.async_call(
         "switch", "turn_on", {ATTR_ENTITY_ID: switch}, blocking=True
     )
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, "outdoor_sensor_missing") is not None
 
     await hass.services.async_call(
         "switch", "turn_off", {ATTR_ENTITY_ID: switch}, blocking=True
     )
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, "outdoor_sensor_missing") is None
 
 
@@ -79,13 +74,13 @@ async def test_inverted_band_raises_and_clears(
     # Push the cool edge below the heat edge -> inverted (no neutral zone).
     await _set(cool_num, 22.0)
     await _set(heat_num, 24.0)
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, "inverted_band") is not None
 
     # Restore a sane band -> the issue clears.
     await _set(heat_num, 20.5)
     await _set(cool_num, 24.5)
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, "inverted_band") is None
 
 
@@ -98,7 +93,7 @@ async def test_no_temperature_source_raises_issue(
 
     for entity in (TRV_ENTITY, AC_ENTITY, AREA_TEMP_SENSOR, AREA_HUMIDITY_SENSOR):
         hass.states.async_set(entity, STATE_UNAVAILABLE)
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
 
     assert registry.async_get_issue(DOMAIN, "no_temperature_source") is not None
 
@@ -118,14 +113,14 @@ async def test_repeated_control_failures_raise_and_clear(
     monkeypatch.setattr(coordinator, "_async_control", _boom)
     # One failure short of the threshold: contained, no repair yet.
     for _ in range(CONTROL_FAILURE_ISSUE_THRESHOLD - 1):
-        await _refresh(hass, init_integration)
+        await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, "control_loop_failing") is None
 
     # The threshold-th consecutive failure surfaces the repair.
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, "control_loop_failing") is not None
 
     # The next clean cycle clears it (and resets the counter).
     monkeypatch.undo()
-    await _refresh(hass, init_integration)
+    await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, "control_loop_failing") is None

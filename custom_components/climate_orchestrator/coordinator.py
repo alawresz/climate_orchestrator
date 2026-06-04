@@ -234,6 +234,44 @@ class CycleContext:
     data: SmartClimateData
 
 
+def _build_global_input(
+    settings: RuntimeSettings,
+    band: Band,
+    data: SmartClimateData,
+    outdoor: float | None,
+    *,
+    master_off: bool,
+) -> GlobalInput:
+    """Map the cycle's resolved settings/band/snapshot onto the engine input.
+
+    Pure field mapping — the only logic is the two derived flags (dew-point
+    threshold gated by its switch, outdoor gating requiring a reading).
+    """
+    return GlobalInput(
+        band=band,
+        release_offset=settings.release_offset,
+        tolerance=settings.tolerance,
+        home_temp=data.home_avg_temperature,
+        home_humidity=data.home_avg_humidity,
+        home_trigger=settings.home_average_trigger,
+        outdoor_temp=outdoor,
+        master_off=master_off,
+        use_comfort=settings.comfort_index_targeting,
+        comfort_influence=settings.comfort_humidity_influence,
+        dew_point_threshold=(
+            settings.dew_point_threshold if settings.dew_point_guard else None
+        ),
+        frost_temp=settings.frost_protection_temp,
+        heat_off_outdoor=settings.heat_off_outdoor,
+        cool_off_outdoor=settings.cool_off_outdoor,
+        window_detection=settings.window_open_detection,
+        ac_ignore_window=settings.ac_ignore_window,
+        frost_protection=settings.frost_protection,
+        outdoor_gating=settings.outdoor_temp_gating and outdoor is not None,
+        ac_heating_assist=settings.ac_heating_assist,
+    )
+
+
 class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     """Coordinate sensor resolution and (later) control for the whole home."""
 
@@ -1290,30 +1328,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             weather_entity=self.weather_entity,
             has_devices=bool(self.device_ids),
         )
-        global_input = GlobalInput(
-            band=band,
-            release_offset=settings.release_offset,
-            tolerance=settings.tolerance,
-            home_temp=data.home_avg_temperature,
-            home_humidity=data.home_avg_humidity,
-            home_trigger=settings.home_average_trigger,
-            outdoor_temp=outdoor,
-            master_off=hvac_mode == HVACMode.OFF,
-            use_comfort=settings.comfort_index_targeting,
-            comfort_influence=settings.comfort_humidity_influence,
-            dew_point_threshold=(
-                settings.dew_point_threshold if settings.dew_point_guard else None
-            ),
-            frost_temp=settings.frost_protection_temp,
-            heat_off_outdoor=settings.heat_off_outdoor,
-            cool_off_outdoor=settings.cool_off_outdoor,
-            window_detection=settings.window_open_detection,
-            ac_ignore_window=settings.ac_ignore_window,
-            frost_protection=settings.frost_protection,
-            outdoor_gating=settings.outdoor_temp_gating and outdoor is not None,
-            ac_heating_assist=settings.ac_heating_assist,
+        global_input = _build_global_input(
+            settings, band, data, outdoor, master_off=hvac_mode == HVACMode.OFF
         )
-
         ctx = CycleContext(
             settings=settings, band=band, outdoor=outdoor, dt_min=dt_min, data=data
         )
@@ -1355,36 +1372,47 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
         self.last_decisions = decisions
         self._record_runtime(decisions)
-        if writes:
-            results = await asyncio.gather(
-                *(coro for _, coro in writes), return_exceptions=True
-            )
-            failures: dict[str, Exception] = {}
-            for (entity_id, _), result in zip(writes, results, strict=True):
-                if isinstance(result, Exception):
-                    failures.setdefault(entity_id, result)
-            # Log once per outage, not once per cycle: a device that stays
-            # down would otherwise emit a warning every UPDATE_INTERVAL.
-            for entity_id in {eid for eid, _ in writes}:
-                runtime = self._runtime(entity_id)
-                if (error := failures.get(entity_id)) is not None:
-                    if not runtime.command_failing:
-                        runtime.command_failing = True
-                        _LOGGER.warning(
-                            "climate_orchestrator: failed to command %s: %s "
-                            "(suppressing repeats until it recovers)",
-                            entity_id,
-                            error,
-                        )
-                elif runtime.command_failing:
-                    runtime.command_failing = False
-                    _LOGGER.info(
-                        "climate_orchestrator: %s is accepting commands again",
-                        entity_id,
-                    )
+        await self._apply_writes(writes)
         self._events.dispatch_cycle(data, window_state, settings, decisions)
         self._maybe_persist()
         self._maybe_auto_maintenance(settings, decisions)
+
+    async def _apply_writes(
+        self, writes: list[tuple[str, Coroutine[Any, Any, None]]]
+    ) -> None:
+        """Run the cycle's writes in parallel, latching per-device failures.
+
+        Every write is isolated (``return_exceptions=True``), so one device
+        erroring can never abort the others. Failures log once per outage,
+        not once per cycle — a device that stays down would otherwise emit a
+        warning every ``UPDATE_INTERVAL``.
+        """
+        if not writes:
+            return
+        results = await asyncio.gather(
+            *(coro for _, coro in writes), return_exceptions=True
+        )
+        failures: dict[str, Exception] = {}
+        for (entity_id, _), result in zip(writes, results, strict=True):
+            if isinstance(result, Exception):
+                failures.setdefault(entity_id, result)
+        for entity_id in {eid for eid, _ in writes}:
+            runtime = self._runtime(entity_id)
+            if (error := failures.get(entity_id)) is not None:
+                if not runtime.command_failing:
+                    runtime.command_failing = True
+                    _LOGGER.warning(
+                        "climate_orchestrator: failed to command %s: %s "
+                        "(suppressing repeats until it recovers)",
+                        entity_id,
+                        error,
+                    )
+            elif runtime.command_failing:
+                runtime.command_failing = False
+                _LOGGER.info(
+                    "climate_orchestrator: %s is accepting commands again",
+                    entity_id,
+                )
 
     @callback
     def _ensure_subscription(self, tracked: frozenset[str]) -> None:
