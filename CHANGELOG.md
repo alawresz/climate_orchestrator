@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.25.0 (2026-06-04)
+
+### Continuous Integration
+
+- Publish only released docs versions
+  ([`28ab1a8`](https://github.com/alawresz/climate_orchestrator/commit/28ab1a838a3d29d732ee0615ff18166cc1b1cc45))
+
+### Features
+
+- Boost preset with directional band push and timed auto-revert
+  ([`b8b3e3c`](https://github.com/alawresz/climate_orchestrator/commit/b8b3e3ce24fd6811af6445f956c0dfd19bb907ed))
+
+
 ## v0.24.0 (2026-06-04)
 
 ### Features
