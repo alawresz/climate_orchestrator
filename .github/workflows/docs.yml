@@ -6,22 +6,21 @@ name: Docs
 # but that branch is only its version database (versions.json + per-version
 # trees); the deploy step uploads that tree as a Pages artifact.
 #
-# - Push to main (docs changed)  -> deploys/updates the "dev" version.
-# - Stable release               -> release.yml dispatches this workflow with
-#                                   version "X.Y" + latest (GitHub doesn't fire
-#                                   `release` events for GITHUB_TOKEN-created
-#                                   releases, so the trigger below only covers
-#                                   hand-published ones).
-# - Manual dispatch              -> bootstrap/repair any version by hand.
+# Only released versions are published — no rolling "dev" build of main:
+# semantic-release cuts a release for nearly every change, so main never
+# drifts far ahead of the newest numbered version, and "dev" was just noise
+# in the version selector.
+#
+# - Stable release   -> release.yml dispatches this workflow with version
+#                       "X.Y" + latest (GitHub doesn't fire `release` events
+#                       for GITHUB_TOKEN-created releases, so the trigger
+#                       below only covers hand-published ones).
+# - Manual dispatch  -> bootstrap/repair any version by hand, or refresh the
+#                       current version after a docs-only (`docs:`) commit
+#                       that didn't cut a release.
 #
 # The strict no-deploy build gating PRs lives in ci.yml.
 on:
-  push:
-    branches: [main]
-    paths:
-      - "docs/**"
-      - "mkdocs.yml"
-      - ".github/workflows/docs.yml"
   release:
     types: [published]
   workflow_dispatch:
@@ -85,8 +84,8 @@ jobs:
               echo "latest=$INPUT_LATEST" >> "$GITHUB_OUTPUT"
               ;;
             *)
-              echo "version=dev" >> "$GITHUB_OUTPUT"
-              echo "latest=false" >> "$GITHUB_OUTPUT"
+              echo "unexpected trigger: $EVENT" >&2
+              exit 1
               ;;
           esac
       - name: Update the version database with mike
