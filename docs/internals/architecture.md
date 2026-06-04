@@ -91,6 +91,9 @@ climate_orchestrator/
 │       ├── config_flow.py         # config + options flow (TRVs/ACs, outdoor sensor, weather entity, hints)
 │       ├── brand/                 # in-integration icon.png/icon@2x.png (HA >= 2026.3 local brands)
 │       ├── coordinator.py         # SmartClimateCoordinator: snapshot + control cycle + persistence
+│       ├── events.py              # EventBridge: edge-triggered bus events + bell notifications
+│       ├── supervision.py         # DeviceSupervisor: command-ignored watchdog + manual-override takeover
+│       ├── repairs.py             # repair-issue helpers (raise/clear Repairs notices)
 │       ├── settings.py            # NumberSetting/SwitchSetting registries + RuntimeSettings resolver
 │       ├── entity.py              # shared base entity + hub DeviceInfo
 │       ├── diagnostics.py         # downloadable diagnostics dump

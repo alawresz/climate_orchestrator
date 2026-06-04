@@ -20,6 +20,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
+    async_capture_events,
     async_fire_time_changed,
     mock_restore_cache,
 )
@@ -29,10 +30,17 @@ from custom_components.climate_orchestrator.const import (
     CONF_PRESETS,
     DEFAULT_PRESETS,
     DOMAIN,
+    EVENT_CLIMATE_ORCHESTRATOR,
+    EVENT_TYPE_BOOST_ENDED,
+    EVENT_TYPE_BOOST_STARTED,
 )
 from tests.conftest import AC_ENTITY, AREA_TEMP_SENSOR, TRV_ENTITY
 
 _HOME_HEAT, _HOME_COOL = DEFAULT_PRESETS["home"]
+
+
+def _events_of(events: list, event_type: str) -> list:
+    return [e for e in events if e.data["type"] == event_type]
 
 
 async def _select_preset(hass: HomeAssistant, climate_id: str, preset: str) -> None:
@@ -251,3 +259,35 @@ async def test_boost_deselected_creates_no_entities(
     registry = er.async_get(hass)
     for key in ("boost_offset", "boost_duration"):
         assert registry.async_get_entity_id("number", DOMAIN, f"{cid}_{key}") is None
+
+
+async def test_boost_events(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Boost fires started on selection and ended (cancelled) on takeover."""
+    events = async_capture_events(hass, EVENT_CLIMATE_ORCHESTRATOR)
+    climate_id = entity_id_for("climate", init_integration.entry_id)
+
+    async def _preset(preset: str) -> None:
+        await hass.services.async_call(
+            "climate",
+            "set_preset_mode",
+            {ATTR_ENTITY_ID: climate_id, "preset_mode": preset},
+            blocking=True,
+        )
+        await hass.async_block_till_done()
+
+    await _preset("boost")
+    started = _events_of(events, EVENT_TYPE_BOOST_STARTED)
+    assert len(started) == 1
+    assert started[0].data["direction"] == "heat"
+    assert started[0].data["previous_preset"] == "home"
+    assert started[0].data["until"]
+
+    await _preset("sleep")
+    ended = _events_of(events, EVENT_TYPE_BOOST_ENDED)
+    assert len(ended) == 1
+    assert ended[0].data["reason"] == "cancelled"
+    assert ended[0].data["reverted_to"] == "sleep"

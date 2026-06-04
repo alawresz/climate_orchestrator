@@ -18,7 +18,6 @@ import math
 import time
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components import persistent_notification as pn
 from homeassistant.components.climate import HVACMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
@@ -32,9 +31,6 @@ from homeassistant.core import (
 from homeassistant.exceptions import UnsupportedStorageVersionError
 from homeassistant.helpers import (
     entity_registry as er,
-)
-from homeassistant.helpers import (
-    issue_registry as ir,
 )
 from homeassistant.helpers.event import (
     async_call_later,
@@ -52,7 +48,6 @@ from .const import (
     CALIBRATION_MPC,
     CALIBRATION_OFFSET,
     CALIBRATION_TARGET,
-    COMMAND_IGNORED_SECONDS,
     CONF_ACS,
     CONF_CALIBRATION_HINTS,
     CONF_HOME_HUMIDITY_SENSOR,
@@ -65,24 +60,11 @@ from .const import (
     DEFAULT_PRESET,
     DEFAULT_PRESETS,
     DOMAIN,
-    EVENT_CLIMATE_ORCHESTRATOR,
-    EVENT_TYPE_DEHUMIDIFYING_ENDED,
-    EVENT_TYPE_DEHUMIDIFYING_STARTED,
-    EVENT_TYPE_FROST_ENDED,
-    EVENT_TYPE_FROST_STARTED,
-    EVENT_TYPE_IGNORING_ENDED,
-    EVENT_TYPE_IGNORING_STARTED,
-    EVENT_TYPE_OVERRIDE_ENDED,
-    EVENT_TYPE_OVERRIDE_STARTED,
-    EVENT_TYPE_STATUS_CHANGED,
-    EVENT_TYPE_WINDOW_PAUSE_ENDED,
-    EVENT_TYPE_WINDOW_PAUSE_STARTED,
     PRECONDITION_FORECAST_REFRESH_SECONDS,
     PRECONDITION_MAX_STEPS,
     RMOT_TAU_SECONDS,
     RUNTIME_WINDOW_SECONDS,
     STARTUP_GRACE_SECONDS,
-    TARGET_TEMP_STEP,
     UPDATE_INTERVAL_SECONDS,
     VALVE_MAINTENANCE_DWELL_SECONDS,
 )
@@ -115,6 +97,7 @@ from .devices.trv import (
     find_related_number,
     local_offset,
 )
+from .events import EventBridge
 from .models import (
     AcSetpoint,
     Band,
@@ -123,6 +106,7 @@ from .models import (
     SmartClimateData,
     Status,
 )
+from .repairs import calibration_issue, environment_issues, toggle_issue
 from .sensing.registry import build_snapshot
 from .settings import (
     RuntimeSettings,
@@ -131,12 +115,11 @@ from .settings import (
     enabled_presets,
     resolve_settings,
 )
+from .supervision import DeviceSupervisor
 from .util import as_float, float_state
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
-
-    from homeassistant.core import State
 
 _MPC_STORE_VERSION = 1
 
@@ -305,11 +288,10 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         # forecast-based preconditioning, plus when it was last fetched.
         self._forecast_hourly: list[float] = []
         self._forecast_fetched_at = 0.0
-        # Edge detection for bus events: last cycle's home-wide flags, the
-        # devices whose heating/cooling was window-paused, and the status.
-        self._event_flags: dict[str, bool] = {}
-        self._window_paused: frozenset[str] = frozenset()
-        self._last_status: Status | None = None
+        # Collaborators: bus events/notifications, and the per-device
+        # watchdog + manual-override supervision.
+        self._events = EventBridge(hass, entry.entry_id)
+        self._supervisor = DeviceSupervisor(hass, entry.entry_id, self._events)
         self._mpc_store: Store[dict[str, Any]] = _LearnedStateStore(
             hass, _MPC_STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.mpc"
         )
@@ -583,7 +565,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             )
         else:
             self._control_failures = 0
-        self._toggle_issue(
+        toggle_issue(
+            self.hass,
             "control_loop_failing",
             self._control_failures >= CONTROL_FAILURE_ISSUE_THRESHOLD,
             "control_loop_failing",
@@ -794,7 +777,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     ) -> list[Coroutine[Any, Any, None]]:
         """Observe the room, optimise the valve opening, and write it."""
         number = find_related_number(self.hass, entity_id, self.valve_hints)
-        self._calibration_issue(entity_id, "mpc", missing=number is None)
+        calibration_issue(self.hass, entity_id, "mpc", missing=number is None)
         if number is None or area_temp is None:
             return []
         return [self._mpc_observe_and_write(entity_id, number, area_temp, ctx)]
@@ -841,7 +824,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     ) -> list[Coroutine[Any, Any, None]]:
         """Write the local-calibration offset so the TRV sees the area temp."""
         number = find_related_number(self.hass, entity_id, self.calibration_hints)
-        self._calibration_issue(entity_id, "offset", missing=number is None)
+        calibration_issue(self.hass, entity_id, "offset", missing=number is None)
         offset = local_offset(area_temp, adapter.read().current_temp)
         if number is None or offset is None:
             return []
@@ -866,145 +849,6 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if time.monotonic() - self._started < STARTUP_GRACE_SECONDS:
             return Status.INITIALIZING
         return Status.DEGRADED
-
-    @callback
-    def _calibration_issue(self, entity_id: str, mode: str, *, missing: bool) -> None:
-        """Raise/clear a repair issue when a TRV lacks its calibration number."""
-        issue_id = f"missing_calibration_number_{entity_id}"
-        if missing:
-            ir.async_create_issue(
-                self.hass,
-                DOMAIN,
-                issue_id,
-                is_fixable=False,
-                severity=ir.IssueSeverity.WARNING,
-                translation_key="missing_calibration_number",
-                translation_placeholders={"entity_id": entity_id, "mode": mode},
-            )
-        else:
-            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
-
-    @callback
-    def _watch_command_compliance(
-        self, entity_id: str, runtime: DeviceRuntime, mode: str | None, desired: str
-    ) -> None:
-        """Watchdog: flag a device whose service calls succeed but do nothing.
-
-        A child lock, a weak radio link, a dying battery, or a wedged upstream
-        integration all look the same from here: ``set_hvac_mode`` returns
-        fine, yet the entity's state never becomes the commanded mode. When
-        one *unchanged* commanded mode stays unreflected past
-        ``COMMAND_IGNORED_SECONDS``, raise a per-device repair; it clears the
-        moment the device converges. Loud failures are excluded — those are
-        the control-failure repair's job.
-        """
-        if mode == desired or runtime.command_failing:
-            runtime.ignored_mode = None
-            runtime.ignored_since = None
-            self._command_ignored_issue(entity_id, active=False)
-            self._set_ignoring(entity_id, runtime, active=False)
-            return
-        now = time.monotonic()
-        if runtime.ignored_mode != desired or runtime.ignored_since is None:
-            runtime.ignored_mode = desired
-            runtime.ignored_since = now
-        active = now - runtime.ignored_since >= COMMAND_IGNORED_SECONDS
-        self._command_ignored_issue(entity_id, active=active)
-        self._set_ignoring(entity_id, runtime, active=active, mode=desired)
-
-    @callback
-    def _set_ignoring(
-        self,
-        entity_id: str,
-        runtime: DeviceRuntime,
-        *,
-        active: bool,
-        mode: str | None = None,
-    ) -> None:
-        """Latch the watchdog verdict and fire a bus event on each edge."""
-        if active == runtime.ignoring:
-            return
-        runtime.ignoring = active
-        if active:
-            self._fire_event(
-                EVENT_TYPE_IGNORING_STARTED,
-                {"entity_id": entity_id, "commanded_mode": mode},
-            )
-        else:
-            self._fire_event(EVENT_TYPE_IGNORING_ENDED, {"entity_id": entity_id})
-
-    @callback
-    def _command_ignored_issue(self, entity_id: str, *, active: bool) -> None:
-        """Raise/clear the per-device "commands ignored" repair issue."""
-        issue_id = f"device_ignoring_commands_{entity_id}"
-        if active:
-            ir.async_create_issue(
-                self.hass,
-                DOMAIN,
-                issue_id,
-                is_fixable=False,
-                severity=ir.IssueSeverity.WARNING,
-                translation_key="device_ignoring_commands",
-                translation_placeholders={"entity_id": entity_id},
-            )
-        else:
-            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
-
-    @callback
-    def _toggle_issue(self, issue_id: str, active: bool, key: str) -> None:
-        """Create or clear a static (no-placeholder) repair issue."""
-        if active:
-            ir.async_create_issue(
-                self.hass,
-                DOMAIN,
-                issue_id,
-                is_fixable=False,
-                severity=ir.IssueSeverity.WARNING,
-                translation_key=key,
-            )
-        else:
-            ir.async_delete_issue(self.hass, DOMAIN, issue_id)
-
-    @callback
-    def _environment_issues(
-        self, settings: RuntimeSettings, data: SmartClimateData, base_band: Band
-    ) -> None:
-        """Surface misconfigurations that would otherwise fail silently."""
-        # An inverted band (cool edge below heat edge) has no neutral zone, so
-        # the home would heat below the cool edge and cool above it — running
-        # constantly. Flag it rather than burn energy silently.
-        self._toggle_issue(
-            "inverted_band",
-            base_band.cool_edge < base_band.heat_edge,
-            "inverted_band",
-        )
-        # Adaptive comfort is opt-in, so enabling it without an outdoor sensor is
-        # a clear mistake. Outdoor gating is on by default, so don't nag about it.
-        self._toggle_issue(
-            "outdoor_sensor_missing",
-            settings.adaptive_cooling_comfort and self.outdoor_sensor is None,
-            "outdoor_sensor_missing",
-        )
-        # Forecast preconditioning needs a weather entity to read a forecast from.
-        self._toggle_issue(
-            "weather_forecast_missing",
-            settings.forecast_preconditioning and self.weather_entity is None,
-            "weather_forecast_missing",
-        )
-        # These two are transient right after a restart (sensors haven't
-        # reported in yet), so hold them back while still initializing — only
-        # raise once warm-up is over and the gap is therefore real.
-        settled = not data.initializing
-        self._toggle_issue(
-            "no_temperature_source",
-            settled and bool(self.device_ids) and data.home_avg_temperature is None,
-            "no_temperature_source",
-        )
-        self._toggle_issue(
-            "stale_sensor",
-            settled and bool(data.stale_sensors),
-            "stale_sensor",
-        )
 
     @callback
     def _room_effective(
@@ -1270,126 +1114,6 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         """Whether any AC is currently running dry mode for the dew-point guard."""
         return any(d.dry_mode for d in self.last_decisions.values())
 
-    # --- Events & notifications -----------------------------------------------
-
-    @callback
-    def _fire_event(self, event_type: str, data: dict[str, Any]) -> None:
-        """Fire one bus event (single event type, discriminated by ``type``)."""
-        self.hass.bus.async_fire(
-            EVENT_CLIMATE_ORCHESTRATOR, {"type": event_type, **data}
-        )
-
-    @callback
-    def _sync_notification(
-        self, key: str, *, rising: bool, clear: bool, title: str, message: str
-    ) -> None:
-        """Keep one self-clearing bell notification in step with its condition.
-
-        Created only on the rising edge (so a manually dismissed notice stays
-        dismissed while the condition persists) and dismissed whenever the
-        condition is gone — dismissing an absent id is a no-op.
-        """
-        notification_id = f"{DOMAIN}_{self.entry.entry_id}_{key}"
-        if clear:
-            pn.async_dismiss(self.hass, notification_id)
-        elif rising:
-            pn.async_create(
-                self.hass, message, title=title, notification_id=notification_id
-            )
-
-    @callback
-    def _fire_transition_events(
-        self,
-        data: SmartClimateData,
-        window_state: dict[str, bool],
-        settings: RuntimeSettings,
-    ) -> None:
-        """Fire bus events (and sync notifications) on operational transitions.
-
-        Edge-triggered against the previous cycle, reusing exactly the
-        predicates behind the binary sensors and the status sensor, so events
-        can never disagree with what the dashboard shows. Watchdog and boost
-        transitions are fired at their own edges (`_watch_command_compliance`,
-        the climate entity), not here.
-        """
-        frost = self.frost_active()
-        if frost != self._event_flags.get("frost", False):
-            frosty = sorted(
-                key
-                for key, d in self.last_decisions.items()
-                if d.reason == "frost_protection"
-            )
-            self._fire_event(
-                EVENT_TYPE_FROST_STARTED if frost else EVENT_TYPE_FROST_ENDED,
-                {"entities": frosty},
-            )
-            self._sync_notification(
-                "frost_protection",
-                rising=frost and settings.event_notifications,
-                clear=not frost,
-                title="Climate Orchestrator: frost protection",
-                message=(
-                    "A room is at or below the frost-protection temperature; "
-                    "forced heating is engaged for: " + ", ".join(frosty)
-                ),
-            )
-
-        dew = self.dew_point_active()
-        if dew != self._event_flags.get("dew", False):
-            drying = sorted(key for key, d in self.last_decisions.items() if d.dry_mode)
-            self._fire_event(
-                EVENT_TYPE_DEHUMIDIFYING_STARTED
-                if dew
-                else EVENT_TYPE_DEHUMIDIFYING_ENDED,
-                {"entities": drying},
-            )
-        self._event_flags = {"frost": frost, "dew": dew}
-
-        paused = frozenset(eid for eid, blocked in window_state.items() if blocked)
-        for started, entities in (
-            (True, paused - self._window_paused),
-            (False, self._window_paused - paused),
-        ):
-            for entity_id in sorted(entities):
-                reading = data.readings.get(entity_id)
-                self._fire_event(
-                    EVENT_TYPE_WINDOW_PAUSE_STARTED
-                    if started
-                    else EVENT_TYPE_WINDOW_PAUSE_ENDED,
-                    {
-                        "entity_id": entity_id,
-                        "area_id": reading.area_id if reading else None,
-                    },
-                )
-        self._window_paused = paused
-
-        status = data.status
-        # _last_status is None on the first cycle after setup: report only
-        # *changes*, not the initial state, so restarts stay quiet.
-        if self._last_status is not None and status is not self._last_status:
-            self._fire_event(
-                EVENT_TYPE_STATUS_CHANGED,
-                {
-                    "from": self._last_status.value,
-                    "to": status.value,
-                    "unavailable_devices": sorted(data.unavailable_devices),
-                },
-            )
-            self._sync_notification(
-                "degraded",
-                rising=(status is Status.DEGRADED) and settings.event_notifications,
-                clear=status is not Status.DEGRADED,
-                title="Climate Orchestrator: degraded",
-                message=(
-                    "Some managed devices or sensors are not usable: "
-                    + (
-                        ", ".join(sorted(data.unavailable_devices))
-                        or "no temperature source"
-                    )
-                ),
-            )
-        self._last_status = status
-
     @callback
     def _ac_bias(
         self,
@@ -1499,18 +1223,10 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         )
         runtime.demand = decision.demand
         if not reading.available:
-            # Excluded this cycle, but its latch is preserved. An offline
-            # device can't comply with anything: drop any watchdog streak so
-            # the unavailability is reported as such, not as "ignoring" —
-            # and a manual override on a device that vanished is moot.
-            runtime.ignored_mode = None
-            runtime.ignored_since = None
-            self._command_ignored_issue(entity_id, active=False)
-            self._set_ignoring(entity_id, runtime, active=False)
-            if runtime.override_until is not None:
-                self._end_override(entity_id, runtime, "unavailable")
+            # Excluded this cycle, but its latch is preserved.
+            self._supervisor.handle_unavailable(entity_id, runtime)
             return decision, []
-        if self._override_active(entity_id, runtime, decision):
+        if self._supervisor.override_active(entity_id, runtime, decision):
             # A human adjusted this device: keep deciding (the hysteresis
             # latch stays current for the handback) but write nothing — no
             # command, no MPC observe/valve, no bias update, no watchdog.
@@ -1537,7 +1253,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         )
         command = self._throttle_ac_setpoint(entity_id, command)
         runtime.command = command
-        self._watch_command_compliance(
+        self._supervisor.watch_compliance(
             entity_id, runtime, device_state.hvac_mode, command.hvac_mode.value
         )
         writes: list[tuple[str, Coroutine[Any, Any, None]]] = [
@@ -1565,7 +1281,15 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         hvac_mode, base_band = self._desired()
         outdoor = self._outdoor_temp()
         band = self._apply_adaptive_comfort(base_band, outdoor, settings, dt_min)
-        self._environment_issues(settings, data, base_band)
+        environment_issues(
+            self.hass,
+            settings,
+            data,
+            base_band,
+            outdoor_sensor=self.outdoor_sensor,
+            weather_entity=self.weather_entity,
+            has_devices=bool(self.device_ids),
+        )
         global_input = GlobalInput(
             band=band,
             release_offset=settings.release_offset,
@@ -1658,7 +1382,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                         "climate_orchestrator: %s is accepting commands again",
                         entity_id,
                     )
-        self._fire_transition_events(data, window_state, settings)
+        self._events.dispatch_cycle(data, window_state, settings, decisions)
         self._maybe_persist()
         self._maybe_auto_maintenance(settings, decisions)
 
@@ -1679,114 +1403,13 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     @callback
     def _handle_state_event(self, event: Event[EventStateChangedData]) -> None:
         """Trigger a (debounced) refresh when a tracked entity changes."""
-        self._detect_manual_override(event)
+        self._supervisor.detect_override(event, self._devices, self.device_ids)
         self._background(self.async_request_refresh(), "state-change refresh")
-
-    # --- Manual-override takeover ----------------------------------------------
-
-    @callback
-    def _detect_manual_override(self, event: Event[EventStateChangedData]) -> None:
-        """Spot a human (or external automation) adjusting a managed device.
-
-        Our own writes echo back *matching* the active command, and a device
-        that never reached the command is the watchdog's case — the takeover
-        signature is a device that **was** at the commanded state and then
-        moved away (in mode, or in target setpoint by at least one device
-        step) with no new command from us.
-        """
-        entity_id = event.data["entity_id"]
-        if entity_id not in self.device_ids:
-            return  # an area sensor, not a managed device
-        runtime = self._devices.get(entity_id)
-        if runtime is None or (command := runtime.command) is None:
-            return
-        duration_min = clamped_number_value(
-            self.hass, self.entry.entry_id, "manual_override_duration"
-        )
-        if duration_min <= 0.0:
-            return  # takeover disabled
-        old = event.data["old_state"]
-        new = event.data["new_state"]
-        if (
-            old is None
-            or new is None
-            or old.state in (STATE_UNAVAILABLE, STATE_UNKNOWN)
-            or new.state in (STATE_UNAVAILABLE, STATE_UNKNOWN)
-        ):
-            return  # (un)availability churn is never a human
-
-        step = as_float(new.attributes.get("target_temp_step")) or TARGET_TEMP_STEP
-
-        def _matches(state: State) -> bool:
-            if state.state != command.hvac_mode.value:
-                return False
-            if command.target_temp is None or command.hvac_mode is Mode.OFF:
-                return True
-            target = as_float(state.attributes.get("temperature"))
-            return target is None or abs(target - command.target_temp) < step
-
-        if _matches(old) and not _matches(new):
-            self._start_override(entity_id, runtime, duration_min)
-
-    @callback
-    def _start_override(
-        self, entity_id: str, runtime: DeviceRuntime, duration_min: float
-    ) -> None:
-        """Stop driving a device the user just adjusted, for the set duration."""
-        runtime.override_until = time.monotonic() + duration_min * 60.0
-        # The device will now intentionally diverge from our last command —
-        # that must not look like non-compliance when the override ends.
-        runtime.ignored_mode = None
-        runtime.ignored_since = None
-        self._command_ignored_issue(entity_id, active=False)
-        self._set_ignoring(entity_id, runtime, active=False)
-        _LOGGER.info(
-            "climate_orchestrator: manual change detected on %s; "
-            "standing back for %.0f min",
-            entity_id,
-            duration_min,
-        )
-        self._fire_event(
-            EVENT_TYPE_OVERRIDE_STARTED,
-            {"entity_id": entity_id, "duration_minutes": duration_min},
-        )
-
-    @callback
-    def _end_override(
-        self, entity_id: str, runtime: DeviceRuntime, reason: str
-    ) -> None:
-        """Resume driving a device (next cycle reconciles it to the band)."""
-        runtime.override_until = None
-        self._fire_event(
-            EVENT_TYPE_OVERRIDE_ENDED, {"entity_id": entity_id, "reason": reason}
-        )
 
     @callback
     def clear_manual_overrides(self, reason: str) -> None:
         """End every active override (the user reasserted whole-home intent)."""
-        for entity_id, runtime in self._devices.items():
-            if runtime.override_until is not None:
-                self._end_override(entity_id, runtime, reason)
-
-    @callback
-    def _override_active(
-        self, entity_id: str, runtime: DeviceRuntime, decision: DeviceDecision
-    ) -> bool:
-        """Whether the device's override still holds this cycle.
-
-        Expiry is checked here (per cycle, so within a keepalive of the
-        deadline) and frost protection punches through unconditionally —
-        safety beats courtesy.
-        """
-        if runtime.override_until is None:
-            return False
-        if decision.reason == "frost_protection":
-            self._end_override(entity_id, runtime, "frost_protection")
-            return False
-        if time.monotonic() >= runtime.override_until:
-            self._end_override(entity_id, runtime, "expired")
-            return False
-        return True
+        self._supervisor.clear_overrides(self._devices, reason)
 
     # --- Services / maintenance ---------------------------------------------
 

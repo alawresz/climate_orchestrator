@@ -3,27 +3,20 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-import time
 from typing import Any
 
 from homeassistant.const import ATTR_ENTITY_ID, STATE_UNAVAILABLE
-from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_capture_events,
-    async_mock_service,
 )
 
 from custom_components.climate_orchestrator.const import (
     EVENT_CLIMATE_ORCHESTRATOR,
-    EVENT_TYPE_BOOST_ENDED,
-    EVENT_TYPE_BOOST_STARTED,
     EVENT_TYPE_FROST_ENDED,
     EVENT_TYPE_FROST_STARTED,
-    EVENT_TYPE_IGNORING_ENDED,
-    EVENT_TYPE_IGNORING_STARTED,
     EVENT_TYPE_STATUS_CHANGED,
     EVENT_TYPE_WINDOW_PAUSE_STARTED,
 )
@@ -175,77 +168,3 @@ async def test_status_change_event_and_degraded_notification(
     assert len(changed) == 2
     assert changed[1].data["to"] == "ok"
     assert notification_id not in _notifications(hass)
-
-
-async def test_watchdog_events_fire_on_both_edges(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-) -> None:
-    """The watchdog announces non-compliance and recovery exactly once each."""
-    async_mock_service(hass, "climate", "set_hvac_mode")
-    async_mock_service(hass, "climate", "set_temperature")
-    events = async_capture_events(hass, EVENT_CLIMATE_ORCHESTRATOR)
-    coordinator: SmartClimateCoordinator = init_integration.runtime_data
-    await _refresh(hass, init_integration)
-    await _refresh(hass, init_integration)
-
-    coordinator._runtime(TRV_ENTITY).ignored_since = time.monotonic() - 999.0
-    await _refresh(hass, init_integration)
-    await _refresh(hass, init_integration)
-    started = _events_of(events, EVENT_TYPE_IGNORING_STARTED)
-    assert len(started) == 1  # edge, not per cycle
-    assert started[0].data["entity_id"] == TRV_ENTITY
-
-    hass.states.async_set(TRV_ENTITY, "off")  # device finally complies
-    await _refresh(hass, init_integration)
-    ended = _events_of(events, EVENT_TYPE_IGNORING_ENDED)
-    assert len(ended) == 1
-
-
-async def test_loud_failures_fire_no_watchdog_events(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-) -> None:
-    """Failing service calls never produce watchdog events."""
-
-    async def _device_rejects(call: ServiceCall) -> None:
-        raise HomeAssistantError
-
-    hass.services.async_register("climate", "set_hvac_mode", _device_rejects)
-    hass.services.async_register("climate", "set_temperature", _device_rejects)
-    events = async_capture_events(hass, EVENT_CLIMATE_ORCHESTRATOR)
-    await _refresh(hass, init_integration)
-    await _refresh(hass, init_integration)
-    assert not _events_of(events, EVENT_TYPE_IGNORING_STARTED)
-
-
-async def test_boost_events(
-    hass: HomeAssistant,
-    init_integration: MockConfigEntry,
-    entity_id_for: Callable[[str, str], str],
-) -> None:
-    """Boost fires started on selection and ended (cancelled) on takeover."""
-    events = async_capture_events(hass, EVENT_CLIMATE_ORCHESTRATOR)
-    climate_id = entity_id_for("climate", init_integration.entry_id)
-
-    async def _preset(preset: str) -> None:
-        await hass.services.async_call(
-            "climate",
-            "set_preset_mode",
-            {ATTR_ENTITY_ID: climate_id, "preset_mode": preset},
-            blocking=True,
-        )
-        await hass.async_block_till_done()
-
-    await _preset("boost")
-    started = _events_of(events, EVENT_TYPE_BOOST_STARTED)
-    assert len(started) == 1
-    assert started[0].data["direction"] == "heat"
-    assert started[0].data["previous_preset"] == "home"
-    assert started[0].data["until"]
-
-    await _preset("sleep")
-    ended = _events_of(events, EVENT_TYPE_BOOST_ENDED)
-    assert len(ended) == 1
-    assert ended[0].data["reason"] == "cancelled"
-    assert ended[0].data["reverted_to"] == "sleep"

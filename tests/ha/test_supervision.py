@@ -1,12 +1,14 @@
-"""Tests for the manual-override takeover."""
+"""Tests for the device supervision: manual-override takeover + watchdog."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 import time
 
-from homeassistant.const import ATTR_ENTITY_ID
-from homeassistant.core import HomeAssistant
+from homeassistant.const import ATTR_ENTITY_ID, STATE_UNAVAILABLE
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_capture_events,
@@ -14,7 +16,10 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from custom_components.climate_orchestrator.const import (
+    DOMAIN,
     EVENT_CLIMATE_ORCHESTRATOR,
+    EVENT_TYPE_IGNORING_ENDED,
+    EVENT_TYPE_IGNORING_STARTED,
     EVENT_TYPE_OVERRIDE_ENDED,
     EVENT_TYPE_OVERRIDE_STARTED,
 )
@@ -22,6 +27,10 @@ from custom_components.climate_orchestrator.coordinator import SmartClimateCoord
 from tests.conftest import AREA_TEMP_SENSOR, TRV_ENTITY
 
 _TRV_ATTRS = {"hvac_modes": ["off", "heat"]}
+
+
+def _events_of(events: list, event_type: str) -> list:
+    return [e for e in events if e.data["type"] == event_type]
 
 
 async def _refresh(hass: HomeAssistant, entry: MockConfigEntry) -> None:
@@ -244,3 +253,130 @@ async def test_setpoint_change_also_triggers_override(
     )
     await hass.async_block_till_done()
     assert coordinator._runtime(TRV_ENTITY).override_until is not None
+
+
+# --- Command-ignored watchdog -------------------------------------------------
+
+
+_IGNORED_ISSUE = f"device_ignoring_commands_{TRV_ENTITY}"
+
+
+async def _start_ignored_streak(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> SmartClimateCoordinator:
+    """Mock succeeding climate services and run until the watchdog is armed.
+
+    The fixture TRV reports ``heat`` while a 21 °C room (inside the band)
+    commands ``off`` — with the service calls now *succeeding*, that's a
+    silently non-compliant device. Two cycles: the first still sees the
+    setup-phase command_failing latch (the fixture had no climate services),
+    the second starts the streak.
+    """
+    async_mock_service(hass, "climate", "set_hvac_mode")
+    async_mock_service(hass, "climate", "set_temperature")
+    await _refresh(hass, entry)
+    await _refresh(hass, entry)
+    coordinator: SmartClimateCoordinator = entry.runtime_data
+    assert coordinator._runtime(TRV_ENTITY).ignored_since is not None
+    return coordinator
+
+
+async def test_command_ignored_watchdog_raises_and_clears(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """A device that takes commands but never applies them raises a repair."""
+    registry = ir.async_get(hass)
+    coordinator = await _start_ignored_streak(hass, init_integration)
+    # Streak running but young: no issue yet.
+    assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
+
+    # Pretend the divergence has persisted past the watchdog threshold.
+    coordinator._runtime(TRV_ENTITY).ignored_since = time.monotonic() - 999.0
+    await _refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is not None
+
+    # The device finally applies the commanded mode -> issue clears.
+    hass.states.async_set(TRV_ENTITY, "off")
+    await _refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
+    assert coordinator._runtime(TRV_ENTITY).ignored_since is None
+
+
+async def test_loud_command_failures_do_not_raise_ignored_issue(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Failing service calls are the log-once latch's job, not the watchdog's."""
+    registry = ir.async_get(hass)
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+
+    # Deterministic outage: the climate services exist but reject every command
+    # (a missing entity alone only warns — the call itself would succeed).
+    async def _device_rejects(call: ServiceCall) -> None:
+        raise HomeAssistantError
+
+    hass.services.async_register("climate", "set_hvac_mode", _device_rejects)
+    hass.services.async_register("climate", "set_temperature", _device_rejects)
+    await _refresh(hass, init_integration)
+    await _refresh(hass, init_integration)
+
+    assert coordinator._runtime(TRV_ENTITY).command_failing
+    assert coordinator._runtime(TRV_ENTITY).ignored_since is None
+    assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
+
+
+async def test_unavailable_device_clears_ignored_issue(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """A device dropping offline is 'unavailable', not 'ignoring commands'."""
+    registry = ir.async_get(hass)
+    coordinator = await _start_ignored_streak(hass, init_integration)
+    coordinator._runtime(TRV_ENTITY).ignored_since = time.monotonic() - 999.0
+    await _refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is not None
+
+    hass.states.async_set(TRV_ENTITY, STATE_UNAVAILABLE)
+    await _refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
+    assert coordinator._runtime(TRV_ENTITY).ignored_since is None
+
+
+async def test_watchdog_events_fire_on_both_edges(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+) -> None:
+    """The watchdog announces non-compliance and recovery exactly once each."""
+    async_mock_service(hass, "climate", "set_hvac_mode")
+    async_mock_service(hass, "climate", "set_temperature")
+    events = async_capture_events(hass, EVENT_CLIMATE_ORCHESTRATOR)
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    await _refresh(hass, init_integration)
+    await _refresh(hass, init_integration)
+
+    coordinator._runtime(TRV_ENTITY).ignored_since = time.monotonic() - 999.0
+    await _refresh(hass, init_integration)
+    await _refresh(hass, init_integration)
+    started = _events_of(events, EVENT_TYPE_IGNORING_STARTED)
+    assert len(started) == 1  # edge, not per cycle
+    assert started[0].data["entity_id"] == TRV_ENTITY
+
+    hass.states.async_set(TRV_ENTITY, "off")  # device finally complies
+    await _refresh(hass, init_integration)
+    ended = _events_of(events, EVENT_TYPE_IGNORING_ENDED)
+    assert len(ended) == 1
+
+
+async def test_loud_failures_fire_no_watchdog_events(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+) -> None:
+    """Failing service calls never produce watchdog events."""
+
+    async def _device_rejects(call: ServiceCall) -> None:
+        raise HomeAssistantError
+
+    hass.services.async_register("climate", "set_hvac_mode", _device_rejects)
+    hass.services.async_register("climate", "set_temperature", _device_rejects)
+    events = async_capture_events(hass, EVENT_CLIMATE_ORCHESTRATOR)
+    await _refresh(hass, init_integration)
+    await _refresh(hass, init_integration)
+    assert not _events_of(events, EVENT_TYPE_IGNORING_STARTED)
