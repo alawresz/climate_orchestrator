@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.26.0 (2026-06-04)
+
+### Features
+
+- Watchdog repair for devices that silently ignore commands
+  ([`a5c8649`](https://github.com/alawresz/climate_orchestrator/commit/a5c8649157e255c565de389717bbe208127c563c))
+
+
 ## v0.25.0 (2026-06-04)
 
 ### Continuous Integration
