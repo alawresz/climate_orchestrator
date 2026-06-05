@@ -1,0 +1,103 @@
+name: Backfill release artifacts
+
+# One-off, manually dispatched, idempotent: bring every existing GitHub
+# Release up to the current standard — the HACS zip attached (rebuilt from
+# the tag's source tree if missing) plus a provenance bundle
+# (climate_orchestrator.zip.intoto.jsonl).
+#
+# Honest caveat: a retroactive attestation proves that *this* workflow
+# vouched for the exact bytes at backfill time — it cannot prove the
+# original build. From v0.28.4 on, release.yml attests at build time.
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  plan:
+    name: List releases
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      tags: ${{ steps.list.outputs.tags }}
+    steps:
+      - name: Collect release tags
+        id: list
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tags="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 200 \
+            --json tagName --jq '[.[].tagName]')"
+          echo "$tags"
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+
+  backfill:
+    name: Backfill ${{ matrix.tag }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # upload missing release assets
+      id-token: write # sign the attestation
+      attestations: write
+    strategy:
+      fail-fast: false
+      max-parallel: 2 # stay clear of API secondary rate limits
+      matrix:
+        tag: ${{ fromJSON(needs.plan.outputs.tags) }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          ref: ${{ matrix.tag }} # only read when the zip must be rebuilt
+      - name: Ensure the zip asset exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ matrix.tag }}
+        run: |
+          mkdir -p /tmp/work
+          if gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern climate_orchestrator.zip --dir /tmp/work; then
+            echo "zip already attached"
+          else
+            # Rebuild from the tag's source: manifest.json marks the
+            # integration directory, whatever its name was at that tag.
+            manifest="$(find custom_components -name manifest.json | head -1)"
+            test -n "$manifest"
+            (cd "$(dirname "$manifest")" \
+              && zip -qr /tmp/work/climate_orchestrator.zip .)
+            gh release upload "$TAG" /tmp/work/climate_orchestrator.zip \
+              --repo "$GITHUB_REPOSITORY"
+            echo "zip rebuilt from the $TAG tree and attached"
+          fi
+      - name: Check for an existing provenance bundle
+        id: have
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ matrix.tag }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --json assets --jq '.assets[].name' \
+              | grep -q '\.intoto\.jsonl$'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Attest the zip
+        id: attest
+        if: steps.have.outputs.skip != 'true'
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: /tmp/work/climate_orchestrator.zip
+      - name: Attach the provenance bundle
+        if: steps.have.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ matrix.tag }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          cp "$BUNDLE" climate_orchestrator.zip.intoto.jsonl
+          gh release upload "$TAG" climate_orchestrator.zip.intoto.jsonl \
+            --repo "$GITHUB_REPOSITORY" --clobber
