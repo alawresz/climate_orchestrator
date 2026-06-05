@@ -1552,7 +1552,25 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         trvs = set(self.trv_ids)
         if any(d.demand is Demand.HEAT for key, d in decisions.items() if key in trvs):
             return  # don't interrupt active heating
-        self._background(self.async_run_valve_maintenance(), "auto valve maintenance")
+        self._background(self._auto_maintenance(), "auto valve maintenance")
+
+    async def _auto_maintenance(self) -> None:
+        """Run due auto maintenance, surfacing the found-no-valves case.
+
+        ``async_run_valve_maintenance`` returning False means no valve
+        opening numbers were found (hint mismatch, devices renamed). Left
+        alone, the run would stay "due" and respawn a silent no-op every
+        cycle — restart the clock instead and say why, once per interval.
+        """
+        if await self.async_run_valve_maintenance():
+            return
+        self._last_maintenance = time.time()
+        await self._maint_store.async_save(self._state_persist_data())
+        _LOGGER.warning(
+            "climate_orchestrator: auto valve maintenance found no valve"
+            " opening numbers on the configured TRVs; retrying next interval"
+            " (check the valve discovery hints)"
+        )
 
     async def async_shutdown(self) -> None:
         """Cancel listeners, flush MPC state, and shut the coordinator down."""

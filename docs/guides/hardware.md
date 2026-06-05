@@ -84,6 +84,8 @@ exercise it:
   [Services & automations](services-automations.md).
 - **Automatic.** Turn on the **Automatic valve maintenance** switch to run the
   same exercise periodically, every **Valve maintenance interval** days
-  (default 30). It's skipped while a room is actively heating.
+  (default 30). It's skipped while a room is actively heating. If no valve
+  opening numbers can be found (hint mismatch, renamed devices), a warning is
+  logged and the run is deferred to the next interval.
 
 Next: [Reference](../reference/entities.md)

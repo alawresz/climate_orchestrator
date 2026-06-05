@@ -119,6 +119,39 @@ async def test_auto_valve_maintenance_runs_when_due(
     assert any(c.data[ATTR_ENTITY_ID] == VALVE_NUMBER for c in set_value)
 
 
+async def test_auto_maintenance_without_valves_warns_and_restarts_clock(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """No valve numbers: auto maintenance warns once and waits a full interval.
+
+    Without the clock restart the run would stay "due" and respawn a silent
+    no-op background task on every cycle.
+    """
+    coordinator = init_integration.runtime_data
+    cid = init_integration.entry_id
+    await hass.services.async_call(
+        "switch",
+        "turn_on",
+        {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_auto_valve_maintenance")},
+        blocking=True,
+    )
+    coordinator._last_maintenance = time.time() - 365 * 86400  # long overdue
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert "found no valve" in caplog.text
+    # The clock restarted: no longer due, so the next cycle stays quiet.
+    assert coordinator._last_maintenance >= time.time() - 60
+    caplog.clear()
+    await coordinator.async_refresh()
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert "found no valve" not in caplog.text
+
+
 async def test_valve_maintenance_without_valves_raises_translated_error(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
