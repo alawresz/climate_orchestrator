@@ -2,6 +2,47 @@
 
 <!-- version list -->
 
+## v0.28.7 (2026-06-05)
+
+### Bug Fixes
+
+- Ignore a stale forecast cache instead of preconditioning on dead data
+  ([`f9c0b1a`](https://github.com/alawresz/climate_orchestrator/commit/f9c0b1a24d418f2fa819bf00d5479b735f160f1d))
+
+### Chores
+
+- Expand ruff ruleset (bandit, pylint, pytest-style + 14 free groups) and fix findings
+  ([`e3f3e91`](https://github.com/alawresz/climate_orchestrator/commit/e3f3e9168a78d97ff0c48c98a0847ebd7ce58c3e))
+
+### Documentation
+
+- Fix post-extraction attribution drift and clarify mutation scope
+  ([`af40217`](https://github.com/alawresz/climate_orchestrator/commit/af402175b70eba105608ee70e2b7cf948752ebd3))
+
+- Record tuning-constant rationale, test-helper preconditions, and config migration how-to
+  ([`5ffa0d1`](https://github.com/alawresz/climate_orchestrator/commit/5ffa0d1e9eb601f2d38819bcb51d334605773f7d))
+
+### Refactoring
+
+- Add `last_maintenance` property for diagnostics and replace direct access to `_last_maintenance`
+  ([`e53813a`](https://github.com/alawresz/climate_orchestrator/commit/e53813afb084d625f7a1bc91b92a750dd7503467))
+
+- Enum membership, comprehensions, no throwaway runtime construction
+  ([`0a9b8f1`](https://github.com/alawresz/climate_orchestrator/commit/0a9b8f1f97fb442d8a30a27ac42882777ba9afac))
+
+- Extract LearnedStateStores (persistence) from the coordinator
+  ([`af0332b`](https://github.com/alawresz/climate_orchestrator/commit/af0332b780994233ddc9ec370a07ffd0d087672d))
+
+- Extract WeatherAdaptation from the coordinator
+  ([`d954161`](https://github.com/alawresz/climate_orchestrator/commit/d954161e9a1a162e8631d3b02760486255660862))
+
+- Extract WindowMonitor from the coordinator
+  ([`5af3a5a`](https://github.com/alawresz/climate_orchestrator/commit/5af3a5a671e9fffe364ad37a2d7437872d56ab4f))
+
+- **test**: Route all coordinator-internal access through helpers, enforced via SLF001
+  ([`0b03c4d`](https://github.com/alawresz/climate_orchestrator/commit/0b03c4d21c129b5de9de3240eeb6cc86be87d615))
+
+
 ## v0.28.6 (2026-06-05)
 
 ### Bug Fixes
