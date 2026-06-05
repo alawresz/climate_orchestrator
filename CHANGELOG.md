@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.28.5 (2026-06-05)
+
+### Bug Fixes
+
+- Push a failed release
+  ([`16d2eb2`](https://github.com/alawresz/climate_orchestrator/commit/16d2eb23a95245076c5549c8c6f6489f0866c9f6))
+
+
 ## v0.28.4 (2026-06-05)
 
 ### Bug Fixes
