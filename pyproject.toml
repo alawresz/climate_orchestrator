@@ -70,6 +70,7 @@ select = [
   "PERF", # perflint
   "TRY",  # tryceratops (exception hygiene)
   "D",    # pydocstyle
+  "SLF",  # flake8-self: no reaching into other objects' privates
 ]
 # RUF012: HA entity `_attr_*` lists are effectively class-level constants;
 # annotating them ClassVar conflicts with the base classes' instance attrs.
@@ -82,6 +83,10 @@ convention = "pep257"
 # Tests are dev-only: docstrings aren't required, and TYPE_CHECKING import
 # guards add churn without runtime benefit.
 "tests/**" = ["D", "TC"]
+# The ONE sanctioned home for coordinator-internal access (see
+# docs/project/testing.md): every other file — source and tests alike —
+# gets SLF001 if it reaches into another object's privates.
+"tests/ha/helpers.py" = ["SLF001"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["custom_components"]

@@ -35,6 +35,9 @@ from custom_components.climate_orchestrator.const import DEFAULT_PRESETS
 from custom_components.climate_orchestrator.control.comfort import apparent_temperature
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, AREA_HUMIDITY_SENSOR, AREA_TEMP_SENSOR, TRV_ENTITY
+from tests.ha.helpers import (
+    set_rmot,
+)
 
 
 @pytest.fixture
@@ -88,7 +91,7 @@ async def test_adaptive_comfort_relaxes_displayed_cool_edge(
     relaxed cool edge while the base band stays in its attribute."""
     cid = init_integration.entry_id
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
-    coordinator._rmot = 30.0  # above onset (cool edge + bias)
+    set_rmot(coordinator, 30.0)  # above onset (cool edge + bias)
 
     await hass.services.async_call(
         "switch",

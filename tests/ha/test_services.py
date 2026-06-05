@@ -18,7 +18,12 @@ from pytest_homeassistant_custom_component.common import (
 from custom_components.climate_orchestrator.const import DOMAIN
 from custom_components.climate_orchestrator.control.mpc.controller import MpcController
 from tests.conftest import TRV_ENTITY
-from tests.ha.helpers import setup_trv_with_number
+from tests.ha.helpers import (
+    maintenance_clock,
+    runtime,
+    set_maintenance_clock,
+    setup_trv_with_number,
+)
 
 VALVE_NUMBER = "number.trv_1_valve_opening_degree"
 _NO_SLEEP = "custom_components.climate_orchestrator.coordinator.asyncio.sleep"
@@ -76,7 +81,7 @@ async def test_reset_mpc_learning_service(
     coordinator = await setup_trv_with_number(
         hass, config_entry, living_area, number_value="50"
     )
-    coordinator._runtime(TRV_ENTITY).mpc = MpcController()
+    runtime(coordinator, TRV_ENTITY).mpc = MpcController()
 
     await hass.services.async_call(
         DOMAIN,
@@ -86,7 +91,7 @@ async def test_reset_mpc_learning_service(
     )
     await hass.async_block_till_done()
 
-    assert coordinator._runtime(TRV_ENTITY).mpc is None
+    assert runtime(coordinator, TRV_ENTITY).mpc is None
 
 
 async def test_auto_valve_maintenance_runs_when_due(
@@ -108,7 +113,7 @@ async def test_auto_valve_maintenance_runs_when_due(
         {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_auto_valve_maintenance")},
         blocking=True,
     )
-    coordinator._last_maintenance = time.time() - 30 * 86400  # long overdue
+    set_maintenance_clock(coordinator, time.time() - 30 * 86400)  # long overdue
 
     with patch(_NO_SLEEP, new=AsyncMock()):
         await coordinator.async_refresh()
@@ -138,14 +143,14 @@ async def test_auto_maintenance_without_valves_warns_and_restarts_clock(
         {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_auto_valve_maintenance")},
         blocking=True,
     )
-    coordinator._last_maintenance = time.time() - 365 * 86400  # long overdue
+    set_maintenance_clock(coordinator, time.time() - 365 * 86400)  # long overdue
 
     await coordinator.async_refresh()
     await hass.async_block_till_done(wait_background_tasks=True)
 
     assert "found no valve" in caplog.text
     # The clock restarted: no longer due, so the next cycle stays quiet.
-    assert coordinator._last_maintenance >= time.time() - 60
+    assert maintenance_clock(coordinator) >= time.time() - 60
     caplog.clear()
     await coordinator.async_refresh()
     await hass.async_block_till_done(wait_background_tasks=True)
@@ -191,12 +196,12 @@ async def test_future_maintenance_timestamp_is_reset_not_trusted(
         {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_auto_valve_maintenance")},
         blocking=True,
     )
-    coordinator._last_maintenance = time.time() + 365 * 86400  # a year ahead
+    set_maintenance_clock(coordinator, time.time() + 365 * 86400)  # a year ahead
 
     await coordinator.async_refresh()
     await hass.async_block_till_done(wait_background_tasks=True)
 
     # The clock restarted from now: no maintenance ran, timestamp is sane.
     assert not [c for c in set_value if c.data[ATTR_ENTITY_ID] == VALVE_NUMBER]
-    assert coordinator._last_maintenance is not None
-    assert coordinator._last_maintenance <= time.time()
+    assert maintenance_clock(coordinator) is not None
+    assert maintenance_clock(coordinator) <= time.time()

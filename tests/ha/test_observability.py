@@ -20,6 +20,7 @@ from tests.conftest import (
     AREA_TEMP_SENSOR,
     TRV_ENTITY,
 )
+from tests.ha.helpers import runtime
 
 
 async def test_per_device_sensors_registered(
@@ -106,7 +107,7 @@ async def test_runtime_and_cycle_counters(
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     now = time.monotonic()
     # Over the last hour: off, on@-1800s, off@-900s, on@-600s.
-    coordinator._runtime(TRV_ENTITY).run_samples = deque(
+    runtime(coordinator, TRV_ENTITY).run_samples = deque(
         [
             RuntimeSample(at=now - 3600.0, running=False),
             RuntimeSample(at=now - 1800.0, running=True),

@@ -23,6 +23,14 @@ from custom_components.climate_orchestrator.control.mpc.controller import (
 )
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import TRV_ENTITY
+from tests.ha.helpers import (
+    mpc_payload,
+    mpc_store,
+    runtime,
+    spawn_background,
+    state_payload,
+    state_store,
+)
 
 
 async def test_setup_creates_entities(
@@ -124,9 +132,9 @@ async def test_remove_entry_cleans_persisted_stores(
 ) -> None:
     """Deleting the entry removes the learned-state .storage files."""
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
-    coordinator._runtime(TRV_ENTITY).mpc = MpcController()
-    await coordinator._mpc_store.async_save(coordinator._mpc_persist_data())
-    await coordinator._maint_store.async_save(coordinator._state_persist_data())
+    runtime(coordinator, TRV_ENTITY).mpc = MpcController()
+    await mpc_store(coordinator).async_save(mpc_payload(coordinator))
+    await state_store(coordinator).async_save(state_payload(coordinator))
     cid = init_integration.entry_id
     assert f"climate_orchestrator.{cid}.mpc" in hass_storage
     assert f"climate_orchestrator.{cid}.maintenance" in hass_storage
@@ -158,7 +166,7 @@ async def test_background_tasks_are_cancelled_on_unload(
             cancelled.set()
             raise
 
-    coordinator._background(_hang(), "test hang")
+    spawn_background(coordinator, _hang(), "test hang")
     await started.wait()
 
     assert await hass.config_entries.async_unload(init_integration.entry_id)

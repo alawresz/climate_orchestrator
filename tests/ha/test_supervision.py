@@ -25,7 +25,10 @@ from custom_components.climate_orchestrator.const import (
 )
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AREA_TEMP_SENSOR, TRV_ENTITY
-from tests.ha.helpers import refresh
+from tests.ha.helpers import (
+    refresh,
+    runtime,
+)
 
 _TRV_ATTRS = {"hvac_modes": ["off", "heat"]}
 
@@ -49,10 +52,10 @@ async def _establish_compliance(
     set_temp = async_mock_service(hass, "climate", "set_temperature")
     await refresh(hass, entry)
     coordinator: SmartClimateCoordinator = entry.runtime_data
-    assert coordinator._runtime(TRV_ENTITY).command is not None
+    assert runtime(coordinator, TRV_ENTITY).command is not None
     hass.states.async_set(TRV_ENTITY, "off", _TRV_ATTRS)
     await hass.async_block_till_done()
-    assert coordinator._runtime(TRV_ENTITY).override_until is None
+    assert runtime(coordinator, TRV_ENTITY).override_until is None
     return coordinator, set_hvac, set_temp
 
 
@@ -69,8 +72,8 @@ async def test_external_change_starts_override(
     coordinator, _, _ = await _establish_compliance(hass, init_integration)
 
     await _human_touches_trv(hass)
-    runtime = coordinator._runtime(TRV_ENTITY)
-    assert runtime.override_until is not None
+    rt = runtime(coordinator, TRV_ENTITY)
+    assert rt.override_until is not None
     started = [e for e in events if e.data["type"] == EVENT_TYPE_OVERRIDE_STARTED]
     assert len(started) == 1
     assert started[0].data["entity_id"] == TRV_ENTITY
@@ -92,7 +95,7 @@ async def test_override_suppresses_writes_and_surfaces_reason(
     assert attrs["manual_override"] is True
     assert attrs["manual_override_remaining_min"] > 0
     # The intentional divergence must not arm the watchdog.
-    assert coordinator._runtime(TRV_ENTITY).ignored_since is None
+    assert runtime(coordinator, TRV_ENTITY).ignored_since is None
 
 
 async def test_override_expires_and_control_resumes(
@@ -103,7 +106,7 @@ async def test_override_expires_and_control_resumes(
     coordinator, set_hvac, _ = await _establish_compliance(hass, init_integration)
     await _human_touches_trv(hass)
 
-    coordinator._runtime(TRV_ENTITY).override_until = time.monotonic() - 1.0
+    runtime(coordinator, TRV_ENTITY).override_until = time.monotonic() - 1.0
     set_hvac.clear()
     await refresh(hass, init_integration)
 
@@ -123,7 +126,7 @@ async def test_orchestrator_interaction_clears_overrides(
     events = async_capture_events(hass, EVENT_CLIMATE_ORCHESTRATOR)
     coordinator, _, _ = await _establish_compliance(hass, init_integration)
     await _human_touches_trv(hass)
-    assert coordinator._runtime(TRV_ENTITY).override_until is not None
+    assert runtime(coordinator, TRV_ENTITY).override_until is not None
 
     await hass.services.async_call(
         "climate",
@@ -136,7 +139,7 @@ async def test_orchestrator_interaction_clears_overrides(
     )
     await hass.async_block_till_done()
 
-    assert coordinator._runtime(TRV_ENTITY).override_until is None
+    assert runtime(coordinator, TRV_ENTITY).override_until is None
     ended = [e for e in events if e.data["type"] == EVENT_TYPE_OVERRIDE_ENDED]
     assert ended and ended[0].data["reason"] == "reasserted"
 
@@ -162,7 +165,7 @@ async def test_frost_protection_punches_through_override(
     )
     coordinator, _, set_temp = await _establish_compliance(hass, init_integration)
     await _human_touches_trv(hass)
-    assert coordinator._runtime(TRV_ENTITY).override_until is not None
+    assert runtime(coordinator, TRV_ENTITY).override_until is not None
 
     hass.states.async_set(AREA_TEMP_SENSOR, "5.0", {"device_class": "temperature"})
     set_temp.clear()
@@ -194,7 +197,7 @@ async def test_zero_duration_disables_takeover(
     )
     coordinator, _, _ = await _establish_compliance(hass, init_integration)
     await _human_touches_trv(hass)
-    assert coordinator._runtime(TRV_ENTITY).override_until is None
+    assert runtime(coordinator, TRV_ENTITY).override_until is None
 
 
 async def test_setpoint_change_also_triggers_override(
@@ -225,7 +228,7 @@ async def test_setpoint_change_also_triggers_override(
     # A cold room: the TRV is commanded to heat toward a target.
     await refresh(hass, init_integration)
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
-    command = coordinator._runtime(TRV_ENTITY).command
+    command = runtime(coordinator, TRV_ENTITY).command
     assert command is not None and command.target_temp is not None
 
     # Device complies (mode + setpoint), then a human turns the dial +2 °C.
@@ -235,7 +238,7 @@ async def test_setpoint_change_also_triggers_override(
         {**_TRV_ATTRS, "temperature": command.target_temp, "target_temp_step": 0.5},
     )
     await hass.async_block_till_done()
-    assert coordinator._runtime(TRV_ENTITY).override_until is None
+    assert runtime(coordinator, TRV_ENTITY).override_until is None
 
     hass.states.async_set(
         TRV_ENTITY,
@@ -247,7 +250,7 @@ async def test_setpoint_change_also_triggers_override(
         },
     )
     await hass.async_block_till_done()
-    assert coordinator._runtime(TRV_ENTITY).override_until is not None
+    assert runtime(coordinator, TRV_ENTITY).override_until is not None
 
 
 # --- Command-ignored watchdog -------------------------------------------------
@@ -272,7 +275,7 @@ async def _start_ignored_streak(
     await refresh(hass, entry)
     await refresh(hass, entry)
     coordinator: SmartClimateCoordinator = entry.runtime_data
-    assert coordinator._runtime(TRV_ENTITY).ignored_since is not None
+    assert runtime(coordinator, TRV_ENTITY).ignored_since is not None
     return coordinator
 
 
@@ -286,7 +289,7 @@ async def test_command_ignored_watchdog_raises_and_clears(
     assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
 
     # Pretend the divergence has persisted past the watchdog threshold.
-    coordinator._runtime(TRV_ENTITY).ignored_since = time.monotonic() - 999.0
+    runtime(coordinator, TRV_ENTITY).ignored_since = time.monotonic() - 999.0
     await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is not None
 
@@ -294,7 +297,7 @@ async def test_command_ignored_watchdog_raises_and_clears(
     hass.states.async_set(TRV_ENTITY, "off")
     await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
-    assert coordinator._runtime(TRV_ENTITY).ignored_since is None
+    assert runtime(coordinator, TRV_ENTITY).ignored_since is None
 
 
 async def test_loud_command_failures_do_not_raise_ignored_issue(
@@ -314,8 +317,8 @@ async def test_loud_command_failures_do_not_raise_ignored_issue(
     await refresh(hass, init_integration)
     await refresh(hass, init_integration)
 
-    assert coordinator._runtime(TRV_ENTITY).command_failing
-    assert coordinator._runtime(TRV_ENTITY).ignored_since is None
+    assert runtime(coordinator, TRV_ENTITY).command_failing
+    assert runtime(coordinator, TRV_ENTITY).ignored_since is None
     assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
 
 
@@ -325,14 +328,14 @@ async def test_unavailable_device_clears_ignored_issue(
     """A device dropping offline is 'unavailable', not 'ignoring commands'."""
     registry = ir.async_get(hass)
     coordinator = await _start_ignored_streak(hass, init_integration)
-    coordinator._runtime(TRV_ENTITY).ignored_since = time.monotonic() - 999.0
+    runtime(coordinator, TRV_ENTITY).ignored_since = time.monotonic() - 999.0
     await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is not None
 
     hass.states.async_set(TRV_ENTITY, STATE_UNAVAILABLE)
     await refresh(hass, init_integration)
     assert registry.async_get_issue(DOMAIN, _IGNORED_ISSUE) is None
-    assert coordinator._runtime(TRV_ENTITY).ignored_since is None
+    assert runtime(coordinator, TRV_ENTITY).ignored_since is None
 
 
 async def test_watchdog_events_fire_on_both_edges(
@@ -347,7 +350,7 @@ async def test_watchdog_events_fire_on_both_edges(
     await refresh(hass, init_integration)
     await refresh(hass, init_integration)
 
-    coordinator._runtime(TRV_ENTITY).ignored_since = time.monotonic() - 999.0
+    runtime(coordinator, TRV_ENTITY).ignored_since = time.monotonic() - 999.0
     await refresh(hass, init_integration)
     await refresh(hass, init_integration)
     started = _events_of(events, EVENT_TYPE_IGNORING_STARTED)

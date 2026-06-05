@@ -17,6 +17,10 @@ from custom_components.climate_orchestrator.const import (
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from custom_components.climate_orchestrator.settings import resolve_settings
 from tests.conftest import TRV_ENTITY
+from tests.ha.helpers import (
+    forecast_cache,
+    precondition_series,
+)
 
 WEATHER = "weather.home"
 _FORECAST = [5.0, 4.0, 3.0, 2.0, 1.0]
@@ -64,8 +68,8 @@ async def test_forecast_is_fetched_cached_and_expanded(
     coordinator: SmartClimateCoordinator = entry.runtime_data
 
     # Off by default -> no forecast pulled, no series.
-    assert coordinator._forecast_hourly == []
-    assert coordinator._precondition_series(1.0, resolve_settings(hass, cid)) is None
+    assert forecast_cache(coordinator) == []
+    assert precondition_series(coordinator, 1.0, resolve_settings(hass, cid)) is None
 
     await hass.services.async_call(
         "switch",
@@ -77,8 +81,8 @@ async def test_forecast_is_fetched_cached_and_expanded(
     await hass.async_block_till_done()
 
     # The hourly forecast is cached, and the look-ahead expands onto 1-min steps.
-    assert coordinator._forecast_hourly == _FORECAST
-    series = coordinator._precondition_series(1.0, resolve_settings(hass, cid))
+    assert forecast_cache(coordinator) == _FORECAST
+    series = precondition_series(coordinator, 1.0, resolve_settings(hass, cid))
     assert series is not None
     assert len(series) == 120  # 2 h default look-ahead at a 1-min step
     assert series[0] == 5.0
@@ -115,5 +119,5 @@ async def test_hourly_forecast_cache_is_capped(
     await coordinator.async_refresh()
     await hass.async_block_till_done()
 
-    assert len(coordinator._forecast_hourly) == 48  # _FORECAST_MAX_HOURS
-    assert coordinator._forecast_hourly[0] == 0.0
+    assert len(forecast_cache(coordinator)) == 48  # _FORECAST_MAX_HOURS
+    assert forecast_cache(coordinator)[0] == 0.0

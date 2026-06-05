@@ -16,7 +16,12 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, AREA_TEMP_SENSOR, TRV_ENTITY
-from tests.ha.helpers import TRV_ATTRS, set_desired_preset
+from tests.ha.helpers import (
+    TRV_ATTRS,
+    runtime,
+    set_desired_preset,
+    window_timers,
+)
 
 
 async def test_heating_demand_commands_the_trv(
@@ -241,8 +246,8 @@ async def test_command_failures_log_once_per_outage(
     # existed yet, in caplog's setup phase); reset it so the outage below
     # starts from a healthy device. Likewise drop any takeover the state
     # faking above already started.
-    coordinator._runtime(TRV_ENTITY).command_failing = False
-    coordinator._runtime(TRV_ENTITY).override_until = None
+    runtime(coordinator, TRV_ENTITY).command_failing = False
+    runtime(coordinator, TRV_ENTITY).override_until = None
     caplog.clear()
 
     async def _cycle() -> None:
@@ -283,7 +288,7 @@ async def test_dead_window_timer_areas_are_pruned(
     must self-clean each cycle instead of holding dead keys forever.
     """
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
-    coordinator._window_open_since["ghost_area"] = 123.0
+    window_timers(coordinator)["ghost_area"] = 123.0
     await coordinator.async_refresh()
     await hass.async_block_till_done()
-    assert "ghost_area" not in coordinator._window_open_since
+    assert "ghost_area" not in window_timers(coordinator)

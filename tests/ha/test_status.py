@@ -22,10 +22,12 @@ from custom_components.climate_orchestrator.const import (
     CONF_TRVS,
     DEFAULT_TITLE,
     DOMAIN,
-    STARTUP_GRACE_SECONDS,
 )
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AREA_HUMIDITY_SENSOR, AREA_TEMP_SENSOR, TRV_ENTITY
+from tests.ha.helpers import (
+    expire_startup_grace,
+)
 
 
 async def test_unavailable_device_after_warmup_is_degraded(
@@ -161,7 +163,7 @@ async def test_device_never_joining_is_degraded_after_grace(
     entry = await _setup_with_joining_device(hass, living_area, register_entity_in_area)
     coordinator: SmartClimateCoordinator = entry.runtime_data
 
-    coordinator._started -= STARTUP_GRACE_SECONDS + 10.0
+    expire_startup_grace(coordinator)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
 
@@ -181,7 +183,7 @@ async def test_degraded_after_grace_raises_repair(
     coordinator: SmartClimateCoordinator = entry.runtime_data
 
     # Pretend the warm-up window has elapsed without any usable reading.
-    coordinator._started -= STARTUP_GRACE_SECONDS + 10.0
+    expire_startup_grace(coordinator)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
 

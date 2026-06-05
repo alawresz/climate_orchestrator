@@ -39,7 +39,14 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, AREA_TEMP_SENSOR, TRV_ENTITY
-from tests.ha.helpers import AC_ATTRS, TRV_ATTRS
+from tests.ha.helpers import (
+    AC_ATTRS,
+    TRV_ATTRS,
+    cancel_window_recheck,
+    runtime,
+    window_recheck_deadline,
+    window_timers,
+)
 
 
 def _commanded(
@@ -268,7 +275,7 @@ async def test_window_open_delay_defers_then_stops_heating(
 
     # Pretend the window has now been open longer than the delay, and re-run.
     set_hvac.clear()
-    coordinator._window_open_since[living_area] = time.monotonic() - 999.0
+    window_timers(coordinator)[living_area] = time.monotonic() - 999.0
     await _drive(hass, coordinator, climate_id)
     assert not _commanded(set_hvac, TRV_ENTITY, ATTR_HVAC_MODE, "heat")
 
@@ -285,7 +292,7 @@ async def test_self_tuning_ac_bias_lowers_the_setpoint(
     _, set_temp = _mock_climate_services(hass)
 
     coordinator: SmartClimateCoordinator = config_entry.runtime_data
-    coordinator._runtime(AC_ENTITY).ac_bias_integral = 1.0  # learned extra bias
+    runtime(coordinator, AC_ENTITY).ac_bias_integral = 1.0  # learned extra bias
     hass.states.async_set(AREA_TEMP_SENSOR, "27.0")
     climate_id = entity_id_for("climate", config_entry.entry_id)
     await _drive(hass, coordinator, climate_id)
@@ -334,15 +341,11 @@ async def test_window_recheck_rearms_when_no_timer_is_pending(
 
     coordinator: SmartClimateCoordinator = config_entry.runtime_data
     # Simulate "opened a minute ago, timer already fired and cleared".
-    coordinator._window_open_since[living_area] = time.monotonic() - 60.0
-    if coordinator._window_recheck_unsub is not None:
-        coordinator._window_recheck_unsub()
-        coordinator._window_recheck_unsub = None
-        coordinator._window_recheck_at = None
+    window_timers(coordinator)[living_area] = time.monotonic() - 60.0
+    cancel_window_recheck(coordinator)
 
     climate_id = entity_id_for("climate", config_entry.entry_id)
     await _drive(hass, coordinator, climate_id)
 
     # The cycle re-armed a one-shot recheck for the remaining grace time.
-    assert coordinator._window_recheck_unsub is not None
-    assert coordinator._window_recheck_at is not None
+    assert window_recheck_deadline(coordinator) is not None

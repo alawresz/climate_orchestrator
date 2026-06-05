@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from homeassistant.const import ATTR_ENTITY_ID
@@ -10,8 +11,14 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.climate_orchestrator.const import DOMAIN
-from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
+from custom_components.climate_orchestrator.const import (
+    DOMAIN,
+    STARTUP_GRACE_SECONDS,
+)
+from custom_components.climate_orchestrator.coordinator import (
+    DeviceRuntime,
+    SmartClimateCoordinator,
+)
 from tests.conftest import AC_ENTITY, TRV_ENTITY
 
 # Canonical capability attributes for the fake devices (shared across suites).
@@ -119,3 +126,112 @@ async def refresh(hass: HomeAssistant, entry: MockConfigEntry) -> None:
     coordinator: SmartClimateCoordinator = entry.runtime_data
     await coordinator.async_refresh()
     await hass.async_block_till_done()
+
+
+# --- Coordinator internals: the single point of private access -------------
+#
+# Tests legitimately manipulate coordinator-internal state (simulated clocks,
+# injected learned models, store round-trips). ALL such access lives behind
+# the helpers below — production refactors may break this section, but never
+# the test files themselves. Do not touch `coordinator._*` anywhere else.
+
+
+def runtime(coordinator: SmartClimateCoordinator, entity_id: str) -> DeviceRuntime:
+    """The device's mutable runtime state (read or seed fields directly)."""
+    return coordinator._runtime(entity_id)
+
+
+def has_runtime(coordinator: SmartClimateCoordinator, entity_id: str) -> bool:
+    """Whether a runtime exists for the device (eviction checks)."""
+    return entity_id in coordinator._devices
+
+
+def mpc_payload(coordinator: SmartClimateCoordinator) -> dict[str, Any]:
+    """The MPC store payload the coordinator would persist right now."""
+    return coordinator._mpc_persist_data()
+
+
+def state_payload(coordinator: SmartClimateCoordinator) -> dict[str, Any]:
+    """The slow-state store payload (rmot, bias, demand, maintenance clock)."""
+    return coordinator._state_persist_data()
+
+
+def mpc_store(coordinator: SmartClimateCoordinator) -> Any:
+    """The learned-MPC Store (simulate restores by saving crafted payloads)."""
+    return coordinator._mpc_store
+
+
+def state_store(coordinator: SmartClimateCoordinator) -> Any:
+    """The slow-state Store (maintenance clock, rmot, bias integrals)."""
+    return coordinator._maint_store
+
+
+def expire_persist_limiter(coordinator: SmartClimateCoordinator) -> None:
+    """Make the flash-wear rate limiter consider a persist due now."""
+    coordinator._last_persist = time.monotonic() - 1000.0
+
+
+def maintenance_clock(coordinator: SmartClimateCoordinator) -> float | None:
+    """Wall-clock epoch of the last valve maintenance run (None = never)."""
+    return coordinator.last_maintenance
+
+
+def set_maintenance_clock(
+    coordinator: SmartClimateCoordinator, when: float | None
+) -> None:
+    """Set the last-maintenance epoch (e.g. far in the past = overdue)."""
+    coordinator._last_maintenance = when
+
+
+def rmot(coordinator: SmartClimateCoordinator) -> float | None:
+    """The running-mean outdoor temperature driving adaptive comfort."""
+    return coordinator._rmot
+
+
+def set_rmot(coordinator: SmartClimateCoordinator, value: float) -> None:
+    """Seed the running-mean outdoor temperature (skip the slow EMA warm-up)."""
+    coordinator._rmot = value
+
+
+def window_timers(coordinator: SmartClimateCoordinator) -> dict[str, float]:
+    """Per-area window-open-since timers (mutate to inject/inspect)."""
+    return coordinator._window_open_since
+
+
+def cancel_window_recheck(coordinator: SmartClimateCoordinator) -> None:
+    """Drop any pending window grace-delay recheck timer."""
+    if coordinator._window_recheck_unsub is not None:
+        coordinator._window_recheck_unsub()
+        coordinator._window_recheck_unsub = None
+        coordinator._window_recheck_at = None
+
+
+def window_recheck_deadline(coordinator: SmartClimateCoordinator) -> float | None:
+    """Monotonic deadline of the pending window recheck (None = none armed)."""
+    if coordinator._window_recheck_unsub is None:
+        return None
+    return coordinator._window_recheck_at
+
+
+def forecast_cache(coordinator: SmartClimateCoordinator) -> list[float]:
+    """The cached hourly forecast temperatures."""
+    return coordinator._forecast_hourly
+
+
+def precondition_series(
+    coordinator: SmartClimateCoordinator, dt_minutes: float, settings: Any
+) -> list[float] | None:
+    """The forecast series the MPC preconditioner would optimise against."""
+    return coordinator._precondition_series(dt_minutes, settings)
+
+
+def expire_startup_grace(coordinator: SmartClimateCoordinator) -> None:
+    """Pretend the post-restart warm-up window has fully elapsed."""
+    coordinator._started -= STARTUP_GRACE_SECONDS + 10.0
+
+
+def spawn_background(
+    coordinator: SmartClimateCoordinator, coro: Any, name: str
+) -> None:
+    """Schedule a coroutine the way the coordinator does (entry-tracked)."""
+    coordinator._background(coro, name)

@@ -14,7 +14,16 @@ with the Home Assistant fixtures scoped to `tests/ha/conftest.py` (the root
 builders shared by the engine/property/regression suites live in
 `tests/unit/control/builders.py`); the hass-side setup helpers
 (TRV-with-number registry setup, desired-state and calibration-mode drivers)
-live in `tests/ha/helpers.py`. Mutation testing targets `tests/unit/` alone
+live in `tests/ha/helpers.py` — which is also the **single point of access
+to coordinator internals**: tests that need to manipulate internal state
+(simulated clocks, injected learned models, store round-trips) go through
+its intention-named accessors (`runtime`, `set_maintenance_clock`,
+`window_timers`, `expire_startup_grace`, ...), never `coordinator._*`
+directly. This is lint-enforced: ruff's `SLF001` (flake8-self) flags private
+access on other objects everywhere — source and tests alike — with
+`helpers.py` the single exempted file. Production refactors may break that
+one helper section, but never the test files themselves. Mutation testing
+targets `tests/unit/` alone
 (`[tool.mutmut] tests_dir`), since those are the tests that kill `control/`
 mutants.
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-import time
 from typing import Any
 from unittest.mock import patch
 
@@ -20,9 +19,20 @@ from custom_components.climate_orchestrator.control.mpc.controller import MpcCon
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, AREA_TEMP_SENSOR, TRV_ENTITY
 from tests.ha.helpers import (
+    expire_persist_limiter,
+    has_runtime,
+    maintenance_clock,
+    mpc_payload,
+    mpc_store,
+    rmot,
+    runtime,
     select_calibration_mode,
     set_desired_preset,
+    set_maintenance_clock,
+    set_rmot,
     setup_trv_with_number,
+    state_payload,
+    state_store,
 )
 
 VALVE_NUMBER = "number.trv_1_valve_opening_degree"
@@ -121,7 +131,7 @@ async def test_mpc_state_is_persisted(
     async_mock_service(hass, "number", "set_value")
     coordinator = await _engage_mpc_heating(hass, config_entry, entity_id_for)
 
-    persisted = coordinator._mpc_persist_data()
+    persisted = mpc_payload(coordinator)
     assert TRV_ENTITY in persisted
     assert "gain" in persisted[TRV_ENTITY]
 
@@ -169,22 +179,22 @@ async def test_persisted_state_restored_on_load(
     """A fresh coordinator restores MPC + maintenance/rmot/bias/demand state."""
     config_entry.add_to_hass(hass)
     saver = SmartClimateCoordinator(hass, config_entry)
-    saver._runtime(TRV_ENTITY).mpc = MpcController()
-    saver._last_maintenance = 12345.0
-    saver._rmot = 18.5
-    saver._runtime(AC_ENTITY).ac_bias_integral = 1.25
-    saver._runtime(TRV_ENTITY).demand = Demand.HEAT
-    await saver._mpc_store.async_save(saver._mpc_persist_data())
-    await saver._maint_store.async_save(saver._state_persist_data())
+    runtime(saver, TRV_ENTITY).mpc = MpcController()
+    set_maintenance_clock(saver, 12345.0)
+    set_rmot(saver, 18.5)
+    runtime(saver, AC_ENTITY).ac_bias_integral = 1.25
+    runtime(saver, TRV_ENTITY).demand = Demand.HEAT
+    await mpc_store(saver).async_save(mpc_payload(saver))
+    await state_store(saver).async_save(state_payload(saver))
 
     fresh = SmartClimateCoordinator(hass, config_entry)
     await fresh.async_load_mpc()
 
-    assert fresh._runtime(TRV_ENTITY).mpc is not None
-    assert fresh._last_maintenance == 12345.0
-    assert fresh._rmot == 18.5
-    assert fresh._runtime(AC_ENTITY).ac_bias_integral == 1.25
-    assert fresh._runtime(TRV_ENTITY).demand is Demand.HEAT
+    assert runtime(fresh, TRV_ENTITY).mpc is not None
+    assert maintenance_clock(fresh) == 12345.0
+    assert rmot(fresh) == 18.5
+    assert runtime(fresh, AC_ENTITY).ac_bias_integral == 1.25
+    assert runtime(fresh, TRV_ENTITY).demand is Demand.HEAT
 
 
 async def test_mpc_fallback_without_valve_number(
@@ -213,15 +223,15 @@ async def test_corrupt_persisted_mpc_state_does_not_break_load(
     """A corrupt store entry is discarded (fresh learning), not a setup crash."""
     config_entry.add_to_hass(hass)
     saver = SmartClimateCoordinator(hass, config_entry)
-    await saver._mpc_store.async_save(
+    await mpc_store(saver).async_save(
         {TRV_ENTITY: {"gain": "garbage"}, AC_ENTITY: MpcController().to_dict()}
     )
 
     fresh = SmartClimateCoordinator(hass, config_entry)
     await fresh.async_load_mpc()
 
-    assert fresh._runtime(TRV_ENTITY).mpc is None  # corrupt entry discarded
-    assert fresh._runtime(AC_ENTITY).mpc is not None  # valid entry restored
+    assert runtime(fresh, TRV_ENTITY).mpc is None  # corrupt entry discarded
+    assert runtime(fresh, AC_ENTITY).mpc is not None  # valid entry restored
 
 
 async def test_persisted_state_for_unmanaged_devices_is_dropped(
@@ -234,13 +244,13 @@ async def test_persisted_state_for_unmanaged_devices_is_dropped(
     """
     config_entry.add_to_hass(hass)
     saver = SmartClimateCoordinator(hass, config_entry)
-    await saver._mpc_store.async_save(
+    await mpc_store(saver).async_save(
         {
             TRV_ENTITY: MpcController().to_dict(),
             "climate.removed_trv": MpcController().to_dict(),
         }
     )
-    await saver._maint_store.async_save(
+    await state_store(saver).async_save(
         {
             "last": 12345.0,
             "rmot": 18.5,
@@ -251,12 +261,12 @@ async def test_persisted_state_for_unmanaged_devices_is_dropped(
 
     fresh = SmartClimateCoordinator(hass, config_entry)
     await fresh.async_load_mpc()
-    assert fresh._runtime(TRV_ENTITY).mpc is not None
-    assert "climate.removed_trv" not in fresh._devices
-    assert "climate.removed_ac" not in fresh._devices
+    assert runtime(fresh, TRV_ENTITY).mpc is not None
+    assert not has_runtime(fresh, "climate.removed_trv")
+    assert not has_runtime(fresh, "climate.removed_ac")
     # The next persist no longer carries the stale keys.
-    assert "climate.removed_trv" not in fresh._mpc_persist_data()
-    assert "climate.removed_ac" not in fresh._state_persist_data()["ac_bias_integral"]
+    assert "climate.removed_trv" not in mpc_payload(fresh)
+    assert "climate.removed_ac" not in state_payload(fresh)["ac_bias_integral"]
 
 
 async def test_learned_state_saves_are_rate_limited(
@@ -268,20 +278,20 @@ async def test_learned_state_saves_are_rate_limited(
     a continuously-updated EMA) — SD-card wear on typical HA boxes.
     """
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
-    with patch.object(coordinator._maint_store, "async_delay_save") as delay_save:
+    with patch.object(state_store(coordinator), "async_delay_save") as delay_save:
         # Setup's first cycle already scheduled a save: within the interval.
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert delay_save.call_count == 0
 
         # Interval elapsed but nothing changed -> still no write scheduled.
-        coordinator._last_persist = time.monotonic() - 1000.0
+        expire_persist_limiter(coordinator)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert delay_save.call_count == 0
 
         # Interval elapsed and the payload changed -> exactly one schedule.
-        coordinator._rmot = 12.34
+        set_rmot(coordinator, 12.34)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert delay_save.call_count == 1
@@ -309,8 +319,8 @@ async def test_future_version_store_is_discarded_not_fatal(
 
     fresh = SmartClimateCoordinator(hass, config_entry)
     await fresh.async_load_mpc()  # must not raise
-    assert fresh._runtime(TRV_ENTITY).mpc is None
-    assert fresh._last_maintenance is None
+    assert runtime(fresh, TRV_ENTITY).mpc is None
+    assert maintenance_clock(fresh) is None
 
 
 async def test_unknown_older_schema_migrates_to_empty(
@@ -330,4 +340,4 @@ async def test_unknown_older_schema_migrates_to_empty(
 
     fresh = SmartClimateCoordinator(hass, config_entry)
     await fresh.async_load_mpc()  # must not raise
-    assert fresh._runtime(TRV_ENTITY).mpc is None
+    assert runtime(fresh, TRV_ENTITY).mpc is None

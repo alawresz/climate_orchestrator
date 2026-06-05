@@ -15,6 +15,10 @@ from custom_components.climate_orchestrator.control.mpc.controller import MpcCon
 from custom_components.climate_orchestrator.control.mpc.model import MIN_SAMPLES, Sample
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AREA_TEMP_SENSOR, TRV_ENTITY
+from tests.ha.helpers import (
+    runtime,
+    set_rmot,
+)
 
 
 async def test_home_average_sensors_report_aggregates(
@@ -58,7 +62,7 @@ async def test_adaptive_comfort_shifts_band_when_enabled(
     """A hot running-mean outdoor temp relaxes only the cool edge when on."""
     cid = init_integration.entry_id
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
-    coordinator._rmot = 30.0  # well above the onset (cool edge 24.5 + bias 1)
+    set_rmot(coordinator, 30.0)  # well above the onset (cool edge 24.5 + bias 1)
 
     await hass.services.async_call(
         "switch",
@@ -83,7 +87,7 @@ async def test_adaptive_comfort_shifts_band_when_enabled(
     assert float(high.state) == pytest.approx(expected_cool, abs=0.05)
 
     # Mild weather: outdoor 17 is well below the onset, so nothing shifts at all.
-    coordinator._rmot = 17.0
+    set_rmot(coordinator, 17.0)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     high = hass.states.get(entity_id_for("sensor", f"{cid}_adaptive_cool_setpoint"))
@@ -159,7 +163,7 @@ async def test_mpc_learning_status_ready_with_enough_history(
         controller.history.append(
             Sample(dt=1.0, temp=20.0, next_temp=20.1, valve=0.5, outdoor=5.0)
         )
-    coordinator._runtime(TRV_ENTITY).mpc = controller
+    runtime(coordinator, TRV_ENTITY).mpc = controller
 
     await coordinator.async_refresh()
     await hass.async_block_till_done()
