@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v0.28.3 (2026-06-05)
+
+### Bug Fixes
+
+- Support the documented HA floor (2025.2) on older installs
+  ([`74f378e`](https://github.com/alawresz/climate_orchestrator/commit/74f378ebd633b967efff915e0017a515ab162255))
+
+### Continuous Integration
+
+- Path-scoped jobs, HA floor canary, timeouts, concurrency, failure issues, actionlint
+  ([`1a71122`](https://github.com/alawresz/climate_orchestrator/commit/1a71122e0cae5548c67c03c57709c2ca43ff82c2))
+
+### Documentation
+
+- Clarify Python version gates and their roles in dev setup
+  ([`1ed279a`](https://github.com/alawresz/climate_orchestrator/commit/1ed279ad932d015fff0df7f5c300caa4949c76ab))
+
+
 ## v0.28.2 (2026-06-04)
 
 ### Bug Fixes
