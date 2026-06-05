@@ -1784,10 +1784,12 @@ opens, the coordinator records the open timestamp; the guard only suppresses
 that area's heating/cooling once the window has stayed open for at least the
 delay, so a brief airing doesn't interrupt an in-progress heat-up.</p>
 <p>The rule itself is a pure predicate (<code>control/window.py</code>,
-<code>window_suppresses(raw_open, opened_at, now, delay)</code>) over coordinator-owned
-per-area timing state, which keeps it trivially unit-testable. To avoid waiting
-for the next keepalive, opening a window schedules a one-shot <code>async_call_later</code>
-refresh that re-runs control right when the delay elapses. Frost protection
+<code>window_suppresses(raw_open, opened_at, now, delay)</code>), which keeps it
+trivially unit-testable; the stateful side — per-area open timestamps, their
+eviction when areas change, and the recheck timer — lives in <code>windows.py</code>'s
+<code>WindowMonitor</code>. To avoid waiting for the next keepalive, opening a window
+schedules a one-shot <code>async_call_later</code> refresh that re-runs control right
+when the delay elapses (one timer, earliest deadline wins). Frost protection
 still overrides an open window regardless of this delay.</p>
 <h2 id="presets">Presets<a class="headerlink" href="#presets" title="Permanent link">&para;</a></h2>
 <p>Presets are first-class and persisted. The active comfort <strong>band is defined
@@ -1878,7 +1880,7 @@ while a shift is active makes it re-snap to <code>new base + current shift</code
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 4, 2026 16:57:11 UTC">June 4, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 5, 2026 21:23:41 UTC">June 5, 2026</span>
   </span>
 
     

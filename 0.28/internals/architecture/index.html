@@ -1522,46 +1522,49 @@ its own controller, so concurrent jobs never share state.</p>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│       ├── events.py              # EventBridge: edge-triggered bus events + bell notifications
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│       ├── supervision.py         # DeviceSupervisor: command-ignored watchdog + manual-override takeover
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│       ├── repairs.py             # repair-issue helpers (raise/clear Repairs notices)
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│       ├── settings.py            # NumberSetting/SwitchSetting registries + RuntimeSettings resolver
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│       ├── entity.py              # shared base entity + hub DeviceInfo
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│       ├── diagnostics.py         # downloadable diagnostics dump
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│       ├── control/
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│       │   ├── engine.py          # arbitration: guards + capability gating + per-area offset (pure)
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│       │   ├── hysteresis.py      # OR-engage / AND-release demand law (pure)
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│       │   ├── comfort.py         # apparent temperature + dew point (pure)
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│       │   ├── adaptive_comfort.py# running-mean outdoor + saturating cool-edge relaxation (pure)
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│       │   ├── adaptive_bias.py   # self-tuning AC setpoint bias (integral feedback) (pure)
-<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>│       │   ├── window.py          # window-open suppression + grace debounce (pure)
-<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>│       │   ├── slope.py           # least-squares home temperature slope (pure)
-<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>│       │   ├── throttle.py        # AC setpoint write throttling (pure)
-<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│       │   ├── forecast.py        # hourly→per-step forecast expansion for preconditioning (pure)
-<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│       │   ├── numeric.py         # shared clamp() helper (pure)
-<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>│       │   ├── runtime_stats.py   # runtime-fraction + cycles/hour integrals (pure)
-<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>│       │   └── mpc/
-<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>│       │       ├── model.py       # first-order thermal model + system ID (scipy)
-<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>│       │       ├── observer.py    # Kalman state estimate
-<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>│       │       ├── optimizer.py   # receding-horizon valve solve; scalar or forecast series (scipy)
-<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>│       │       └── controller.py  # stateful per-room MPC (observe + optimise + persist)
-<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>│       ├── sensing/
-<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>│       │   ├── registry.py        # area matching, snapshot build, staleness guard
-<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>│       │   └── aggregate.py       # mean-or-none / slope helpers (pure)
-<a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>│       ├── devices/
-<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>│       │   ├── adapter.py         # ClimateAdapter: capabilities + read/apply over HA climate services
-<a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>│       │   ├── model.py           # DeviceCommand / Mode / AdapterCapabilities (pure)
-<a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>│       │   ├── command.py         # decision → device command (pure)
-<a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>│       │   ├── reconcile.py       # step-diff command minimisation (pure)
-<a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>│       │   └── trv.py             # TRV number discovery + local-offset helpers
-<a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>│       ├── climate.py             # the single whole-home ClimateEntity
-<a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>│       ├── sensor.py / binary_sensor.py / switch.py / number.py / select.py
-<a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>│       ├── icons.json / strings.json
-<a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>│       └── translations/en.json
-<a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>├── tests/                         # unit/ (mirrors the package) + ha/ (hass fixtures)
-<a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>├── pyproject.toml                 # uv-managed, ruff + mypy + pytest config
-<a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>├── .github/workflows/ci.yml       # ruff, mypy, pytest+coverage, hassfest, HACS (GitHub Actions)
-<a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>├── .github/workflows/release.yml  # python-semantic-release on green CI
-<a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a>├── hacs.json
-<a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>├── CHANGELOG.md
-<a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>└── README.md
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│       ├── windows.py             # WindowMonitor: per-area window debounce + grace-delay rechecks
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│       ├── persistence.py         # LearnedStateStores: schema-versioned stores + flash-wear limiter
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│       ├── adaptation.py          # WeatherAdaptation: rmot, adaptive band, forecast cache
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│       ├── settings.py            # NumberSetting/SwitchSetting registries + RuntimeSettings resolver
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│       ├── entity.py              # shared base entity + hub DeviceInfo
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│       ├── diagnostics.py         # downloadable diagnostics dump
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│       ├── control/
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│       │   ├── engine.py          # arbitration: guards + capability gating + per-area offset (pure)
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│       │   ├── hysteresis.py      # OR-engage / AND-release demand law (pure)
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>│       │   ├── comfort.py         # apparent temperature + dew point (pure)
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>│       │   ├── adaptive_comfort.py# running-mean outdoor + saturating cool-edge relaxation (pure)
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>│       │   ├── adaptive_bias.py   # self-tuning AC setpoint bias (integral feedback) (pure)
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>│       │   ├── window.py          # window-open suppression + grace debounce (pure)
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>│       │   ├── slope.py           # least-squares home temperature slope (pure)
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>│       │   ├── throttle.py        # AC setpoint write throttling (pure)
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>│       │   ├── forecast.py        # hourly→per-step forecast expansion for preconditioning (pure)
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>│       │   ├── numeric.py         # shared clamp() helper (pure)
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>│       │   ├── runtime_stats.py   # runtime-fraction + cycles/hour integrals (pure)
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>│       │   └── mpc/
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>│       │       ├── model.py       # first-order thermal model + system ID (scipy)
+<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>│       │       ├── observer.py    # Kalman state estimate
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>│       │       ├── optimizer.py   # receding-horizon valve solve; scalar or forecast series (scipy)
+<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>│       │       └── controller.py  # stateful per-room MPC (observe + optimise + persist)
+<a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>│       ├── sensing/
+<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>│       │   ├── registry.py        # area matching, snapshot build, staleness guard
+<a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>│       │   └── aggregate.py       # mean-or-none / slope helpers (pure)
+<a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>│       ├── devices/
+<a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>│       │   ├── adapter.py         # ClimateAdapter: capabilities + read/apply over HA climate services
+<a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>│       │   ├── model.py           # DeviceCommand / Mode / AdapterCapabilities (pure)
+<a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>│       │   ├── command.py         # decision → device command (pure)
+<a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>│       │   ├── reconcile.py       # step-diff command minimisation (pure)
+<a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>│       │   └── trv.py             # TRV number discovery + local-offset helpers
+<a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>│       ├── climate.py             # the single whole-home ClimateEntity
+<a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>│       ├── sensor.py / binary_sensor.py / switch.py / number.py / select.py
+<a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>│       ├── icons.json / strings.json
+<a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>│       └── translations/en.json
+<a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>├── tests/                         # unit/ (mirrors the package) + ha/ (hass fixtures)
+<a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a>├── pyproject.toml                 # uv-managed, ruff + mypy + pytest config
+<a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>├── .github/workflows/ci.yml       # ruff, mypy, pytest+coverage, hassfest, HACS (GitHub Actions)
+<a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>├── .github/workflows/release.yml  # python-semantic-release on green CI
+<a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>├── hacs.json
+<a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a>├── CHANGELOG.md
+<a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>└── README.md
 </code></pre></div>
 <p>Next: <a href="../sensing/">Sensing</a> — how each device's readings and the home-wide
 average are built.</p>
@@ -1585,7 +1588,7 @@ average are built.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 5, 2026 12:06:36 UTC">June 5, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 5, 2026 21:47:09 UTC">June 5, 2026</span>
   </span>
 
     
