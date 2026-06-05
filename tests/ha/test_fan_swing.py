@@ -6,7 +6,9 @@ from collections.abc import Callable
 
 from homeassistant.components.climate import (
     ATTR_FAN_MODE,
+    ATTR_SWING_MODE,
     SERVICE_SET_FAN_MODE,
+    SERVICE_SET_SWING_MODE,
     ClimateEntityFeature,
 )
 from homeassistant.components.climate import (
@@ -76,3 +78,26 @@ async def test_fan_mode_forwarded_to_ac(
         for c in calls
     )
     assert hass.states.get(climate_id).attributes["fan_mode"] == "low"
+
+
+async def test_swing_mode_forwarded_to_ac(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Setting the swing mode forwards it to the AC and sticks for display."""
+    await _advertise_ac_modes(hass, init_integration)
+    climate_id = entity_id_for("climate", init_integration.entry_id)
+    calls = async_mock_service(hass, CLIMATE_DOMAIN, SERVICE_SET_SWING_MODE)
+
+    component: EntityComponent = hass.data[CLIMATE_DOMAIN]
+    entity = component.get_entity(climate_id)
+    assert entity is not None
+    await entity.async_set_swing_mode("vertical")
+
+    assert any(
+        c.data[ATTR_ENTITY_ID] == AC_ENTITY and c.data[ATTR_SWING_MODE] == "vertical"
+        for c in calls
+    )
+    # The last set value sticks (rather than re-reading the first AC).
+    assert hass.states.get(climate_id).attributes["swing_mode"] == "vertical"

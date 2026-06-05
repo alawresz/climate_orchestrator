@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.exceptions import HomeAssistantError
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.climate_orchestrator.const import (
@@ -163,3 +166,125 @@ async def test_hourly_forecast_cache_is_capped(
 
     assert len(forecast_cache(coordinator)) == 48  # _FORECAST_MAX_HOURS
     assert forecast_cache(coordinator)[0] == 0.0
+
+
+async def _setup_preconditioning_entry(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+    entry_id: str,
+) -> MockConfigEntry:
+    """Set up a TRV + weather entry with the preconditioning switch on."""
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat", {"hvac_modes": ["off", "heat"]})
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=DEFAULT_TITLE,
+        data={CONF_TRVS: [TRV_ENTITY], CONF_WEATHER_ENTITY: WEATHER},
+        entry_id=entry_id,
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    await hass.services.async_call(
+        "switch",
+        "turn_on",
+        {
+            ATTR_ENTITY_ID: entity_id_for(
+                "switch", f"{entry.entry_id}_forecast_preconditioning"
+            )
+        },
+        blocking=True,
+    )
+    return entry
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        None,
+        {"weather.elsewhere": {"forecast": [{"temperature": 5.0}]}},
+        {WEATHER: "warm with a chance of rain"},
+        {WEATHER: {"forecast": "sunny"}},
+        {
+            WEATHER: {
+                "forecast": [
+                    42,
+                    {"temperature": "hot"},
+                    {"temperature": True},
+                    {"temperature": float("inf")},
+                    {"datetime": "x"},
+                ]
+            }
+        },
+    ],
+)
+async def test_malformed_forecast_response_is_ignored(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+    response: dict[str, Any] | None,
+) -> None:
+    """Whatever shape a broken weather entity returns, the cache stays empty.
+
+    The service response is loosely typed JSON; every narrowing step must
+    hold — a junk payload no-ops the feature instead of poisoning the
+    optimiser (or raising mid-cycle).
+    """
+
+    async def _get_forecasts(_call: ServiceCall) -> dict[str, Any] | None:
+        return response
+
+    hass.services.async_register(
+        "weather",
+        "get_forecasts",
+        _get_forecasts,
+        supports_response=SupportsResponse.ONLY,
+    )
+    entry = await _setup_preconditioning_entry(
+        hass, living_area, register_entity_in_area, entity_id_for, "sc_precond_bad"
+    )
+
+    coordinator: SmartClimateCoordinator = entry.runtime_data
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert forecast_cache(coordinator) == []
+    settings = resolve_settings(hass, entry.entry_id)
+    assert precondition_series(coordinator, 1.0, settings) is None
+
+
+async def test_forecast_fetch_failure_is_swallowed(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """A raising weather service must not break the control cycle."""
+
+    outage = HomeAssistantError("weather provider outage")
+
+    async def _get_forecasts(_call: ServiceCall) -> dict[str, Any]:
+        raise outage
+
+    hass.services.async_register(
+        "weather",
+        "get_forecasts",
+        _get_forecasts,
+        supports_response=SupportsResponse.ONLY,
+    )
+    entry = await _setup_preconditioning_entry(
+        hass, living_area, register_entity_in_area, entity_id_for, "sc_precond_err"
+    )
+
+    coordinator: SmartClimateCoordinator = entry.runtime_data
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert forecast_cache(coordinator) == []
+    settings = resolve_settings(hass, entry.entry_id)
+    assert precondition_series(coordinator, 1.0, settings) is None
+    # The cycle survived: the coordinator still produced a snapshot.
+    assert coordinator.last_update_success

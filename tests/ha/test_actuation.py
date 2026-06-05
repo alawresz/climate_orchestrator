@@ -15,6 +15,8 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
+from custom_components.climate_orchestrator.devices.adapter import ClimateAdapter
+from custom_components.climate_orchestrator.devices.model import DeviceCommand, Mode
 from tests.conftest import AC_ENTITY, AREA_TEMP_SENSOR, TRV_ENTITY
 from tests.ha.helpers import (
     TRV_ATTRS,
@@ -277,6 +279,32 @@ async def test_command_failures_log_once_per_outage(
         "accepting commands again" in r.getMessage() and TRV_ENTITY in r.getMessage()
         for r in caplog.records
     )
+
+
+async def test_adapter_reads_an_unavailable_device_as_unavailable(
+    hass: HomeAssistant,
+) -> None:
+    """An offline (or unknown) entity reads as a fully empty device state."""
+    hass.states.async_set(TRV_ENTITY, STATE_UNAVAILABLE)
+    state = ClimateAdapter(hass, TRV_ENTITY).read()
+    assert state.available is False
+    assert state.hvac_mode is None
+    assert state.current_temp is None
+    assert state.target_temp is None
+
+
+async def test_adapter_apply_is_a_noop_for_an_unavailable_device(
+    hass: HomeAssistant,
+) -> None:
+    """Commands to a device that isn't there are dropped, not service-called."""
+    set_hvac = async_mock_service(hass, "climate", "set_hvac_mode")
+    set_temp = async_mock_service(hass, "climate", "set_temperature")
+
+    adapter = ClimateAdapter(hass, "climate.gone")
+    await adapter.apply(DeviceCommand(hvac_mode=Mode.HEAT, target_temp=21.0))
+
+    assert not set_hvac
+    assert not set_temp
 
 
 async def test_dead_window_timer_areas_are_pruned(

@@ -12,6 +12,7 @@ from homeassistant.helpers import entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.climate_orchestrator.const import RUNTIME_WINDOW_SECONDS
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from custom_components.climate_orchestrator.models import RuntimeSample
 from tests.conftest import (
@@ -120,6 +121,41 @@ async def test_runtime_and_cycle_counters(
     )
     # Two off->on transitions in the window.
     assert coordinator.device_cycles_per_hour(TRV_ENTITY) == pytest.approx(2.0, abs=0.1)
+
+
+async def test_runtime_samples_are_pruned_to_the_window(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Old samples are dropped each cycle, keeping one to anchor the integral.
+
+    Without pruning, the per-device sample deques would grow for the whole
+    coordinator lifetime; with over-pruning, the integral would lose the
+    sample spanning the window edge.
+    """
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    samples = runtime(coordinator, TRV_ENTITY).run_samples
+    samples.clear()
+    old = time.monotonic() - 3 * RUNTIME_WINDOW_SECONDS
+    samples.append(RuntimeSample(at=old, running=True))
+    samples.append(RuntimeSample(at=old + 1.0, running=False))
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    # The cycle appended one fresh sample and pruned down to it plus exactly
+    # one pre-cutoff sample.
+    assert len(samples) == 2
+    assert samples[0].at == old + 1.0
+
+
+async def test_diagnostics_for_an_unknown_device_are_neutral(
+    init_integration: MockConfigEntry,
+) -> None:
+    """Counter accessors must not invent state for unmanaged entity ids."""
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    assert coordinator.device_action("climate.unknown") == "idle"
+    assert coordinator.device_runtime_fraction("climate.unknown") is None
+    assert coordinator.device_cycles_per_hour("climate.unknown") is None
 
 
 async def test_dehumidify_action_and_dew_point_binary_sensor(

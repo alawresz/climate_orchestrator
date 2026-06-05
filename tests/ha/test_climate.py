@@ -22,6 +22,7 @@ from homeassistant.components.climate import (
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     SERVICE_TURN_OFF,
+    SERVICE_TURN_ON,
     STATE_UNAVAILABLE,
 )
 from homeassistant.core import HomeAssistant, State
@@ -31,7 +32,12 @@ from pytest_homeassistant_custom_component.common import (
     mock_restore_cache,
 )
 
-from custom_components.climate_orchestrator.const import DEFAULT_PRESETS
+from custom_components.climate_orchestrator.const import (
+    CONF_TRVS,
+    DEFAULT_PRESETS,
+    DEFAULT_TITLE,
+    DOMAIN,
+)
 from custom_components.climate_orchestrator.control.comfort import apparent_temperature
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, AREA_HUMIDITY_SENSOR, AREA_TEMP_SENSOR, TRV_ENTITY
@@ -206,6 +212,44 @@ async def test_restores_mode_and_preset_across_restart(
     assert state.attributes[ATTR_PRESET_MODE] == "sleep"
 
 
+async def test_restores_single_setpoint_manual_band(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """A heat-only entity restores its one manual setpoint, not a band.
+
+    Single-setpoint hardware persists ``temperature`` (no low/high pair); the
+    restore path must map it back onto the edge the hardware actually uses.
+    """
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat", {"hvac_modes": ["off", "heat"]})
+    mock_restore_cache(
+        hass,
+        [
+            State(
+                "climate.climate_orchestrator",
+                HVACMode.HEAT,
+                {"preset_mode": "manual", "temperature": 19.5},
+            )
+        ],
+    )
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=DEFAULT_TITLE,
+        data={CONF_TRVS: [TRV_ENTITY]},  # no ACs: single heat setpoint
+        entry_id="sc_manual_single",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id_for("climate", entry.entry_id))
+    assert state.attributes[ATTR_PRESET_MODE] == "manual"
+    assert state.attributes["temperature"] == 19.5
+
+
 async def test_stays_available_when_one_device_drops(
     hass: HomeAssistant, init_integration: MockConfigEntry, climate_id: str
 ) -> None:
@@ -227,3 +271,31 @@ async def test_unavailable_only_when_everything_gone(
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert hass.states.get(climate_id).state == STATE_UNAVAILABLE
+
+
+async def test_unavailable_when_the_coordinator_update_fails(
+    hass: HomeAssistant, init_integration: MockConfigEntry, climate_id: str
+) -> None:
+    """A failed coordinator update takes the entity unavailable, and back."""
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    coordinator.async_set_update_error(RuntimeError("update failed"))
+    await hass.async_block_till_done()
+    assert hass.states.get(climate_id).state == STATE_UNAVAILABLE
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(climate_id).state != STATE_UNAVAILABLE
+
+
+async def test_turn_on_enters_the_supported_mode(
+    hass: HomeAssistant, climate_id: str
+) -> None:
+    """climate.turn_on lands in the hardware's on-mode, not a guess."""
+    assert hass.states.get(climate_id).state == HVACMode.OFF
+    await hass.services.async_call(
+        CLIMATE_DOMAIN,
+        SERVICE_TURN_ON,
+        {ATTR_ENTITY_ID: climate_id},
+        blocking=True,
+    )
+    assert hass.states.get(climate_id).state == HVACMode.HEAT_COOL

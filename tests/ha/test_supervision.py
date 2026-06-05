@@ -181,6 +181,48 @@ async def test_frost_protection_punches_through_override(
     assert coordinator.last_decisions[TRV_ENTITY].reason == "frost_protection"
 
 
+async def test_device_going_unavailable_ends_its_override(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """An override on a device that vanished is moot: it ends, with an event."""
+    events = async_capture_events(hass, EVENT_CLIMATE_ORCHESTRATOR)
+    coordinator, _, _ = await _establish_compliance(hass, init_integration)
+    await _human_touches_trv(hass)
+    assert runtime(coordinator, TRV_ENTITY).override_until is not None
+
+    hass.states.async_set(TRV_ENTITY, STATE_UNAVAILABLE)
+    await refresh(hass, init_integration)
+
+    assert runtime(coordinator, TRV_ENTITY).override_until is None
+    ended = _events_of(events, EVENT_TYPE_OVERRIDE_ENDED)
+    assert ended
+    assert ended[0].data["reason"] == "unavailable"
+
+
+async def test_rejoining_device_without_a_command_starts_no_override(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+) -> None:
+    """A device (re)appearing with no active command isn't a human takeover.
+
+    The TRV is unavailable throughout setup, so no command is ever built for
+    it; its first real state is a transition the detector must ignore.
+    """
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, STATE_UNAVAILABLE)
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator: SmartClimateCoordinator = config_entry.runtime_data
+    hass.states.async_set(TRV_ENTITY, "heat", _TRV_ATTRS)
+    await hass.async_block_till_done()
+
+    assert runtime(coordinator, TRV_ENTITY).override_until is None
+
+
 async def test_zero_duration_disables_takeover(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,

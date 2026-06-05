@@ -17,11 +17,13 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.climate_orchestrator.const import DOMAIN
 from custom_components.climate_orchestrator.control.mpc.controller import MpcController
-from tests.conftest import TRV_ENTITY
+from tests.conftest import AREA_TEMP_SENSOR, TRV_ENTITY
 from tests.ha.helpers import (
     maintenance_clock,
     runtime,
+    set_desired_preset,
     set_maintenance_clock,
+    set_maintenance_running,
     setup_trv_with_number,
 )
 
@@ -155,6 +157,65 @@ async def test_auto_maintenance_without_valves_warns_and_restarts_clock(
     await coordinator.async_refresh()
     await hass.async_block_till_done(wait_background_tasks=True)
     assert "found no valve" not in caplog.text
+
+
+async def test_auto_maintenance_defers_while_a_trv_heats(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Due maintenance waits rather than interrupting active heating.
+
+    Cycling the valve to 100 then 0 mid-heat would visibly disturb the room;
+    the run simply stays due until a cycle where no TRV demands heat.
+    """
+    coordinator = await setup_trv_with_number(
+        hass, config_entry, living_area, number_value="50"
+    )
+    set_value = async_mock_service(hass, "number", "set_value")
+    cid = config_entry.entry_id
+    await hass.services.async_call(
+        "switch",
+        "turn_on",
+        {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_auto_valve_maintenance")},
+        blocking=True,
+    )
+    overdue = time.time() - 30 * 86400
+    set_maintenance_clock(coordinator, overdue)
+
+    # A cold room with the system on: the TRV heats this cycle.
+    set_desired_preset(hass, entity_id_for("climate", cid))
+    hass.states.async_set(AREA_TEMP_SENSOR, "17.0")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert coordinator.device_action(TRV_ENTITY) == "heating"
+    # No maintenance ran: the clock still reads overdue, no valve cycling.
+    assert maintenance_clock(coordinator) == overdue
+    written = [
+        c.data["value"] for c in set_value if c.data[ATTR_ENTITY_ID] == VALVE_NUMBER
+    ]
+    assert 100.0 not in written
+
+
+async def test_overlapping_maintenance_triggers_do_not_stack(
+    hass: HomeAssistant, config_entry: MockConfigEntry, living_area: str
+) -> None:
+    """A maintenance trigger while one is already running is a quiet no-op."""
+    coordinator = await setup_trv_with_number(
+        hass, config_entry, living_area, number_value="50"
+    )
+    set_value = async_mock_service(hass, "number", "set_value")
+
+    set_maintenance_running(coordinator, value=True)
+    try:
+        assert await coordinator.async_run_valve_maintenance(dwell=0) is True
+    finally:
+        set_maintenance_running(coordinator, value=False)
+
+    # The overlapping trigger reported success but cycled nothing.
+    assert not [c for c in set_value if c.data[ATTR_ENTITY_ID] == VALVE_NUMBER]
 
 
 async def test_valve_maintenance_without_valves_raises_translated_error(

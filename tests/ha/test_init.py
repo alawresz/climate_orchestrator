@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from typing import Any
+from unittest.mock import patch
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
@@ -100,6 +101,50 @@ async def test_unload_entry(
     assert await hass.config_entries.async_unload(init_integration.entry_id)
     await hass.async_block_till_done()
     assert init_integration.state is ConfigEntryState.NOT_LOADED
+
+
+async def test_failed_platform_unload_keeps_the_entry_loaded(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """If the platforms refuse to unload, the coordinator isn't shut down.
+
+    Tearing the coordinator down under still-loaded platforms would leave
+    their entities pointing at a dead coordinator.
+    """
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    with patch(
+        "homeassistant.config_entries.ConfigEntries.async_unload_platforms",
+        return_value=False,
+    ):
+        assert not await hass.config_entries.async_unload(init_integration.entry_id)
+    assert init_integration.state is ConfigEntryState.FAILED_UNLOAD
+    # The coordinator deliberately kept running (the platforms still hold it);
+    # stop it by hand so the test doesn't leave its refresh timer behind.
+    await coordinator.async_shutdown()
+
+
+async def test_entry_without_devices_is_inert_but_healthy(
+    hass: HomeAssistant,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """A config selecting no devices sets up and reports OK, not degraded.
+
+    With nothing managed there is nothing to warm up or supervise; the entity
+    surface exists and simply does nothing.
+    """
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=DEFAULT_TITLE,
+        data={CONF_TRVS: []},
+        entry_id="sc_empty",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.LOADED
+    status = hass.states.get(entity_id_for("sensor", f"{entry.entry_id}_status"))
+    assert status.state == "ok"
 
 
 async def test_migration_passes_current_version_through(

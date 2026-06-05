@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.climate_orchestrator.const import RELEASE_OFFSET_DEFAULT
+from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from custom_components.climate_orchestrator.settings import (
     NUMBER_SETTINGS,
     resolve_settings,
@@ -23,6 +24,20 @@ async def test_resolve_returns_defaults(
     assert settings.release_offset == RELEASE_OFFSET_DEFAULT
     assert settings.frost_protection is True
     assert settings.ac_heating_assist is False
+
+
+async def test_current_settings_resolves_before_the_first_cycle(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """A fresh coordinator resolves settings on demand (no cycle cache yet).
+
+    Entities can read ``current_settings()`` before the first control cycle
+    has populated the per-cycle cache; it must fall back to a live resolve.
+    """
+    config_entry.add_to_hass(hass)
+    coordinator = SmartClimateCoordinator(hass, config_entry)
+    settings = coordinator.current_settings()
+    assert settings.release_offset == RELEASE_OFFSET_DEFAULT
 
 
 async def test_resolve_reflects_entity_changes(

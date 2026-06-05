@@ -8,8 +8,10 @@ from datetime import timedelta
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.climate_orchestrator.models import HomeAvgSource
 from custom_components.climate_orchestrator.sensing.registry import build_snapshot
@@ -206,6 +208,94 @@ async def test_stale_home_override_falls_back_to_computed(
     assert data.home_avg_temperature is None
     assert data.home_temp_source is HomeAvgSource.FALLBACK
     assert "sensor.whole_home_temp" in data.stale_sensors
+
+
+def _device_in_area(hass: HomeAssistant, area_id: str) -> str:
+    """Create a registry device assigned to ``area_id`` and return its id.
+
+    The device-registry helpers require a real config entry to attach to.
+    """
+    entry = MockConfigEntry(domain="test")
+    entry.add_to_hass(hass)
+    device_reg = dr.async_get(hass)
+    device = device_reg.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={("test", f"dev_{area_id}")},
+    )
+    device_reg.async_update_device(device.id, area_id=area_id)
+    return device.id
+
+
+async def test_entity_inherits_its_devices_area(
+    hass: HomeAssistant, living_area: str
+) -> None:
+    """An entity with no own area resolves through its device's area.
+
+    This is the *common* real-world topology: TRVs usually carry the area
+    assignment on the device, and the climate entity inherits it.
+    """
+    device_id = _device_in_area(hass, living_area)
+    er.async_get(hass).async_get_or_create(
+        "climate",
+        "test",
+        "u_trv_on_device",
+        suggested_object_id="trv_1",
+        device_id=device_id,
+    )
+    hass.states.async_set(TRV_ENTITY, "heat")
+
+    reading = build_snapshot(hass, [TRV_ENTITY]).readings[TRV_ENTITY]
+    assert reading.area_id == living_area
+    assert reading.area_temperature_sensor == AREA_TEMP_SENSOR
+    assert reading.area_temperature == 21.0  # the living_area fixture's value
+
+
+async def test_window_sensor_on_a_device_in_the_area_is_found(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+) -> None:
+    """A window sensor attached at device level still guards the area.
+
+    Zigbee door/window sensors typically have the area on their *device*;
+    the binary_sensor entity itself carries no area of its own.
+    """
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat")
+
+    device_id = _device_in_area(hass, living_area)
+    window = er.async_get(hass).async_get_or_create(
+        "binary_sensor",
+        "test",
+        "u_device_window",
+        suggested_object_id="device_window",
+        device_id=device_id,
+        original_device_class="window",
+    )
+    hass.states.async_set(window.entity_id, "on")
+
+    assert build_snapshot(hass, [TRV_ENTITY]).readings[TRV_ENTITY].window_open is True
+
+
+async def test_entity_with_a_deleted_area_resolves_no_sensors(
+    hass: HomeAssistant,
+) -> None:
+    """An area id that no longer exists in the registry yields no sensors.
+
+    Deleting an area doesn't reload the entry, so a snapshot can race the
+    registry cleanup and see a dangling area id.
+    """
+    registry = er.async_get(hass)
+    entry = registry.async_get_or_create(
+        "climate", "test", "u_ghost_area", suggested_object_id="trv_1"
+    )
+    registry.async_update_entity(entry.entity_id, area_id="ghost_area")
+    hass.states.async_set(TRV_ENTITY, "heat")
+
+    reading = build_snapshot(hass, [TRV_ENTITY]).readings[TRV_ENTITY]
+    assert reading.area_id == "ghost_area"
+    assert reading.area_temperature_sensor is None
+    assert reading.area_temperature is None
 
 
 async def test_non_finite_sensor_reading_is_dropped(

@@ -27,8 +27,11 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.climate_orchestrator.const import (
     BOOST_OFFSET_DEFAULT,
+    CONF_ACS,
     CONF_PRESETS,
+    CONF_TRVS,
     DEFAULT_PRESETS,
+    DEFAULT_TITLE,
     DOMAIN,
     EVENT_CLIMATE_ORCHESTRATOR,
     EVENT_TYPE_BOOST_ENDED,
@@ -312,6 +315,173 @@ async def test_boost_deselected_mid_boost_reverts_to_previous_preset(
     state = hass.states.get(entity_id_for("climate", config_entry.entry_id))
     assert state.attributes[ATTR_PRESET_MODE] == "sleep"
     assert "boost_until" not in state.attributes
+
+
+async def test_reselecting_boost_restarts_the_clock(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Picking boost again mid-boost re-arms the timer instead of stacking one."""
+    events = async_capture_events(hass, EVENT_CLIMATE_ORCHESTRATOR)
+    climate_id = entity_id_for("climate", init_integration.entry_id)
+    await _select_preset(hass, climate_id, "boost")
+
+    freezer.tick(timedelta(minutes=20))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    await _select_preset(hass, climate_id, "boost")  # restart the 30-min clock
+
+    # 35 min after the first selection: the original timer would have fired
+    # by now, but the re-selection cancelled it — the boost is still running.
+    freezer.tick(timedelta(minutes=15))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get(climate_id).attributes[ATTR_PRESET_MODE] == "boost"
+    assert len(_events_of(events, EVENT_TYPE_BOOST_STARTED)) == 1  # no second start
+
+    freezer.tick(timedelta(minutes=16))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get(climate_id).attributes[ATTR_PRESET_MODE] == "home"
+
+
+async def test_boost_restored_without_context_reverts_to_the_default_preset(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A restored boost with no previous-preset attribute still ends sanely.
+
+    When the deadline hits, the revert target is unknown — the entity falls
+    back to the default preset instead of crashing or staying boosted.
+    """
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat")
+    until = dt_util.utcnow() + timedelta(minutes=10)
+    mock_restore_cache(
+        hass,
+        [
+            State(
+                "climate.climate_orchestrator",
+                "heat",
+                {
+                    "preset_mode": "boost",
+                    "boost_until": until.isoformat(),
+                    "boost_direction": "heat",
+                    # no boost_previous_preset (corrupt/partial storage)
+                },
+            )
+        ],
+    )
+
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    climate_id = entity_id_for("climate", config_entry.entry_id)
+    assert hass.states.get(climate_id).attributes[ATTR_PRESET_MODE] == "boost"
+
+    freezer.tick(timedelta(minutes=11))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert hass.states.get(climate_id).attributes[ATTR_PRESET_MODE] == "home"
+
+
+async def test_boost_restore_preserves_cool_direction(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """A cool-direction boost restores pushing the cool edge, not the heat edge."""
+    register_entity_in_area(TRV_ENTITY, living_area)
+    register_entity_in_area(AC_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat")
+    hass.states.async_set(AC_ENTITY, "off")
+    until = dt_util.utcnow() + timedelta(minutes=10)
+    mock_restore_cache(
+        hass,
+        [
+            State(
+                "climate.climate_orchestrator",
+                "heat_cool",
+                {
+                    "preset_mode": "boost",
+                    "boost_until": until.isoformat(),
+                    "boost_previous_preset": "sleep",
+                    "boost_direction": "cool",
+                },
+            )
+        ],
+    )
+
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id_for("climate", config_entry.entry_id))
+    assert state.attributes["boost_direction"] == "cool"
+    sleep_heat, sleep_cool = DEFAULT_PRESETS["sleep"]
+    assert state.attributes["target_temp_high"] == sleep_cool - BOOST_OFFSET_DEFAULT
+    assert state.attributes["target_temp_low"] == sleep_heat
+
+
+async def test_boost_direction_follows_heat_only_hardware(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """A warm room cannot flip a heat-only setup's boost into cooling."""
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat", {"hvac_modes": ["off", "heat"]})
+    # Above the band midpoint: a dual setup would pick "cool" here.
+    hass.states.async_set(AREA_TEMP_SENSOR, "27.0", {"device_class": "temperature"})
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=DEFAULT_TITLE,
+        data={CONF_TRVS: [TRV_ENTITY]},  # no ACs
+        entry_id="sc_boost_heat_only",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    climate_id = entity_id_for("climate", entry.entry_id)
+    await _select_preset(hass, climate_id, "boost")
+    assert hass.states.get(climate_id).attributes["boost_direction"] == "heat"
+
+
+async def test_boost_direction_follows_cool_only_hardware(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """A cold room cannot flip a cool-only setup's boost into heating."""
+    register_entity_in_area(AC_ENTITY, living_area)
+    hass.states.async_set(AC_ENTITY, "off", {"hvac_modes": ["off", "cool"]})
+    # Below the band midpoint: a dual setup would pick "heat" here.
+    hass.states.async_set(AREA_TEMP_SENSOR, "15.0", {"device_class": "temperature"})
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=DEFAULT_TITLE,
+        data={CONF_ACS: [AC_ENTITY]},  # no TRVs
+        entry_id="sc_boost_cool_only",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    climate_id = entity_id_for("climate", entry.entry_id)
+    await _select_preset(hass, climate_id, "boost")
+    assert hass.states.get(climate_id).attributes["boost_direction"] == "cool"
 
 
 async def test_boost_deselected_creates_no_entities(

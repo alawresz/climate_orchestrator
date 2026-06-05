@@ -197,6 +197,26 @@ async def test_persisted_state_restored_on_load(
     assert runtime(fresh, TRV_ENTITY).demand is Demand.HEAT
 
 
+async def test_offset_fallback_without_calibration_number(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Offset mode without a discoverable calibration number degrades gracefully."""
+    cid = init_integration.entry_id
+    await select_calibration_mode(hass, cid, "offset")
+    set_value = async_mock_service(hass, "number", "set_value")
+    set_desired_preset(hass, entity_id_for("climate", cid))
+    hass.states.async_set(AREA_TEMP_SENSOR, "17.0")
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    # No calibration number on the TRV's (absent) device -> no writes, no crash.
+    assert not set_value
+    assert hass.states.get(entity_id_for("climate", cid)).state != "unavailable"
+
+
 async def test_mpc_fallback_without_valve_number(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -295,6 +315,55 @@ async def test_learned_state_saves_are_rate_limited(
         await coordinator.async_refresh()
         await hass.async_block_till_done()
         assert delay_save.call_count == 1
+
+
+async def test_learned_mpc_saves_are_rate_limited_and_deduped(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """The MPC store gets the same flash-wear discipline as the slow state.
+
+    A due interval with an unchanged payload must not schedule a rewrite of
+    the same bytes.
+    """
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    runtime(coordinator, TRV_ENTITY).mpc = MpcController()
+    with patch.object(mpc_store(coordinator), "async_delay_save") as delay_save:
+        # Interval elapsed and a learned controller exists -> one schedule.
+        expire_persist_limiter(coordinator)
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert delay_save.call_count == 1
+
+        # Due again but the learned state hasn't moved -> no redundant write.
+        expire_persist_limiter(coordinator)
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert delay_save.call_count == 1
+
+
+async def test_same_major_minor_drift_is_read_forward_compatibly(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    hass_storage: dict[str, Any],
+) -> None:
+    """A same-major payload with a different minor version loads as-is.
+
+    Minor drift within the same schema major is forward-compatible by policy:
+    the migrate hook passes the payload through and the loaders validate
+    field-by-field anyway.
+    """
+    config_entry.add_to_hass(hass)
+    key = f"climate_orchestrator.{config_entry.entry_id}.mpc"
+    hass_storage[key] = {
+        "version": 1,
+        "minor_version": 2,
+        "key": key,
+        "data": {TRV_ENTITY: MpcController().to_dict()},
+    }
+
+    fresh = SmartClimateCoordinator(hass, config_entry)
+    await fresh.async_load_mpc()
+    assert runtime(fresh, TRV_ENTITY).mpc is not None  # not discarded
 
 
 async def test_future_version_store_is_discarded_not_fatal(

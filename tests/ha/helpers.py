@@ -183,6 +183,13 @@ def set_maintenance_clock(
     coordinator._last_maintenance = when
 
 
+def set_maintenance_running(
+    coordinator: SmartClimateCoordinator, *, value: bool
+) -> None:
+    """Mark a valve-maintenance run as in flight (re-entrancy tests)."""
+    coordinator._maintenance_running = value
+
+
 def rmot(coordinator: SmartClimateCoordinator) -> float | None:
     """The running-mean outdoor temperature driving adaptive comfort."""
     return coordinator.running_mean_outdoor

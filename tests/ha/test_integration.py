@@ -12,8 +12,10 @@ services, which would otherwise clobber an earlier mock.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import timedelta
 import time
 
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.climate import (
     ATTR_HVAC_MODE,
     SERVICE_SET_HVAC_MODE,
@@ -32,8 +34,10 @@ from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import entity_registry as er
+import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
+    async_fire_time_changed,
     async_mock_service,
 )
 
@@ -301,6 +305,38 @@ async def test_self_tuning_ac_bias_lowers_the_setpoint(
     assert _commanded(set_temp, AC_ENTITY, ATTR_TEMPERATURE, 21.5)
 
 
+async def test_ac_setpoint_throttle_holds_the_previous_raw_value(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """A too-soon setpoint change keeps the previously commanded AC value.
+
+    The held value replaces the freshly computed target *inside* the command,
+    so the recorded command reflects what the device was actually asked for.
+    """
+    await _setup_living(hass, config_entry, living_area, register_entity_in_area)
+    _mock_climate_services(hass)
+    hass.states.async_set(AREA_TEMP_SENSOR, "27.0")
+
+    coordinator: SmartClimateCoordinator = config_entry.runtime_data
+    climate_id = entity_id_for("climate", config_entry.entry_id)
+    # high 24.5 -> target 24.2 - bias 1.5 = 22.7, snapped to the 0.5 step.
+    await _drive(hass, coordinator, climate_id)
+    first = runtime(coordinator, AC_ENTITY).command
+    assert first is not None
+    assert first.target_temp == pytest.approx(22.5)
+
+    # The band moves a whole degree, but we're still inside the minimum write
+    # interval -> the throttle keeps the previous setpoint in the command.
+    await _drive(hass, coordinator, climate_id, high=23.5)
+    second = runtime(coordinator, AC_ENTITY).command
+    assert second is not None
+    assert second.target_temp == first.target_temp  # held, not 21.5
+
+
 async def test_window_recheck_rearms_when_no_timer_is_pending(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,
@@ -349,3 +385,61 @@ async def test_window_recheck_rearms_when_no_timer_is_pending(
 
     # The cycle re-armed a one-shot recheck for the remaining grace time.
     assert window_recheck_deadline(coordinator) is not None
+
+
+async def test_window_recheck_reruns_control_when_the_delay_elapses(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """The grace-delay timer fires on its own and requests a control re-run.
+
+    Unlike the deferral test above, nothing fakes the timestamps here: real
+    (frozen) time passes, the one-shot timer fires, and the next cycle sees
+    the window as having been open past its grace period.
+    """
+    await _setup_living(hass, config_entry, living_area, register_entity_in_area)
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        SERVICE_SET_VALUE,
+        {
+            ATTR_ENTITY_ID: entity_id_for(
+                "number", f"{config_entry.entry_id}_window_open_delay"
+            ),
+            "value": 10.0,
+        },
+        blocking=True,
+    )
+    set_hvac, _ = _mock_climate_services(hass)
+    registry = er.async_get(hass)
+    window = registry.async_get_or_create(
+        "binary_sensor",
+        "test",
+        "u_window",
+        suggested_object_id="living_window",
+        original_device_class="window",
+    )
+    registry.async_update_entity(window.entity_id, area_id=living_area)
+    hass.states.async_set(window.entity_id, "on")
+    hass.states.async_set(AREA_TEMP_SENSOR, "17.0")
+
+    coordinator: SmartClimateCoordinator = config_entry.runtime_data
+    climate_id = entity_id_for("climate", config_entry.entry_id)
+    await _drive(hass, coordinator, climate_id)
+    assert _commanded(set_hvac, TRV_ENTITY, ATTR_HVAC_MODE, "heat")
+    assert window_recheck_deadline(coordinator) is not None
+
+    freezer.tick(timedelta(minutes=10, seconds=2))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    # The one-shot timer fired (and consumed itself) ...
+    assert window_recheck_deadline(coordinator) is None
+    # ... and control now treats the window as open past its grace period.
+    set_hvac.clear()
+    await _drive(hass, coordinator, climate_id)
+    assert not _commanded(set_hvac, TRV_ENTITY, ATTR_HVAC_MODE, "heat")
+    assert coordinator.last_decisions[TRV_ENTITY].reason == "window_open"
