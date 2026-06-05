@@ -195,22 +195,20 @@ def set_rmot(coordinator: SmartClimateCoordinator, value: float) -> None:
 
 def window_timers(coordinator: SmartClimateCoordinator) -> dict[str, float]:
     """Per-area window-open-since timers (mutate to inject/inspect)."""
-    return coordinator._window_open_since
+    return coordinator._windows._open_since
 
 
 def cancel_window_recheck(coordinator: SmartClimateCoordinator) -> None:
     """Drop any pending window grace-delay recheck timer."""
-    if coordinator._window_recheck_unsub is not None:
-        coordinator._window_recheck_unsub()
-        coordinator._window_recheck_unsub = None
-        coordinator._window_recheck_at = None
+    coordinator._windows.shutdown()
 
 
 def window_recheck_deadline(coordinator: SmartClimateCoordinator) -> float | None:
     """Monotonic deadline of the pending window recheck (None = none armed)."""
-    if coordinator._window_recheck_unsub is None:
+    monitor = coordinator._windows
+    if monitor._recheck_unsub is None:
         return None
-    return coordinator._window_recheck_at
+    return monitor._recheck_at
 
 
 def forecast_cache(coordinator: SmartClimateCoordinator) -> list[float]:

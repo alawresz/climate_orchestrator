@@ -215,10 +215,12 @@ that area's heating/cooling once the window has stayed open for at least the
 delay, so a brief airing doesn't interrupt an in-progress heat-up.
 
 The rule itself is a pure predicate (`control/window.py`,
-`window_suppresses(raw_open, opened_at, now, delay)`) over coordinator-owned
-per-area timing state, which keeps it trivially unit-testable. To avoid waiting
-for the next keepalive, opening a window schedules a one-shot `async_call_later`
-refresh that re-runs control right when the delay elapses. Frost protection
+`window_suppresses(raw_open, opened_at, now, delay)`), which keeps it
+trivially unit-testable; the stateful side — per-area open timestamps, their
+eviction when areas change, and the recheck timer — lives in `windows.py`'s
+`WindowMonitor`. To avoid waiting for the next keepalive, opening a window
+schedules a one-shot `async_call_later` refresh that re-runs control right
+when the delay elapses (one timer, earliest deadline wins). Frost protection
 still overrides an open window regardless of this delay.
 
 ## Presets

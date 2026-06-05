@@ -32,7 +32,6 @@ from homeassistant.helpers import (
     entity_registry as er,
 )
 from homeassistant.helpers.event import (
-    async_call_later,
     async_track_state_change_event,
 )
 from homeassistant.helpers.storage import Store
@@ -97,7 +96,6 @@ from .control.mpc.controller import MpcController, preconditioned_valve_pct
 from .control.runtime_stats import cycles_per_hour, runtime_fraction
 from .control.slope import temperature_slope_per_min
 from .control.throttle import throttle_setpoint
-from .control.window import window_suppresses
 from .devices.adapter import ClimateAdapter
 from .devices.command import build_command
 from .devices.model import DeviceCommand, Mode
@@ -127,6 +125,7 @@ from .settings import (
 )
 from .supervision import DeviceSupervisor
 from .util import as_float, float_state
+from .windows import WindowMonitor
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -320,9 +319,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self._last_cycle: float | None = None
         # Per-area monotonic timestamp of when its window most recently opened,
         # plus a one-shot timer to re-run control when the grace delay expires.
-        self._window_open_since: dict[str, float] = {}
-        self._window_recheck_unsub: CALLBACK_TYPE | None = None
-        self._window_recheck_at: float | None = None  # monotonic deadline
+        self._windows = WindowMonitor(hass, self._request_window_recheck)
         # Trailing (time, home-avg-temp) samples and the latest slope (K/min).
         self._temp_samples: deque[tuple[float, float]] = deque(
             maxlen=_SLOPE_MAX_SAMPLES
@@ -605,15 +602,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         data = replace(data, status=self._compute_status(data))
         self._update_temp_slope(data.home_avg_temperature)
         self._ensure_subscription(data.tracked_entities)
-        # Evict window timers for areas no longer backing any managed device
-        # (a registry area change doesn't reload the entry, so without this
-        # the dict would keep dead area keys for the coordinator's lifetime).
-        live_areas = {
+        self._windows.prune(
             r.area_id for r in data.readings.values() if r.area_id is not None
-        }
-        for area_id in list(self._window_open_since):
-            if area_id not in live_areas:
-                del self._window_open_since[area_id]
+        )
         # Actuation must never break the read-only snapshot/update — but a
         # *repeatedly* failing control loop must not stay silent in the log
         # either: count consecutive failures and raise a repair past the
@@ -725,68 +716,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         return elapsed if elapsed > 0 else UPDATE_INTERVAL_SECONDS / 60.0
 
     @callback
-    def _window_open(self, reading: DeviceReading, delay_seconds: float) -> bool:
-        """Debounced window-open for a device: open only after the grace delay.
-
-        Tracks when each area's window first opened and suppresses heating/
-        cooling once it has stayed open for ``delay_seconds``. Schedules a
-        one-shot refresh so control re-runs exactly when the delay elapses
-        (rather than waiting for the next keepalive).
-        """
-        raw_open = reading.window_open
-        area_id = reading.area_id
-        if not raw_open:
-            if area_id is not None:
-                self._window_open_since.pop(area_id, None)
-            return False
-        if area_id is None:
-            # No area key to debounce against; honour the delay only as on/off.
-            return delay_seconds <= 0.0
-
-        now = time.monotonic()
-        opened_at = self._window_open_since.get(area_id)
-        if opened_at is None:
-            self._window_open_since[area_id] = opened_at = now
-            if delay_seconds > 0.0:
-                self._schedule_window_recheck(delay_seconds)
-        elif (
-            self._window_recheck_unsub is None
-            and (remaining := delay_seconds - (now - opened_at)) > 0.0
-        ):
-            # Re-arm: a window still inside its grace period but with no timer
-            # pending (e.g. an earlier-deadline window fired and was gone by
-            # then) would otherwise only be caught by the next keepalive.
-            self._schedule_window_recheck(remaining)
-        return window_suppresses(raw_open, opened_at, now, delay_seconds)
-
-    @callback
-    def _schedule_window_recheck(self, delay_seconds: float) -> None:
-        """Re-run control shortly after a window's grace delay expires.
-
-        One timer, earliest deadline wins: a window opening later must not
-        postpone an earlier window's recheck (the keepalive would still catch
-        it, but up to a minute late). The recheck refresh re-evaluates every
-        area, so the earliest deadline serves all pending windows.
-        """
-        now = time.monotonic()
-        deadline = now + delay_seconds
-        if self._window_recheck_unsub is not None:
-            pending = self._window_recheck_at
-            if pending is not None and pending <= deadline:
-                return  # an earlier (or equal) recheck is already pending
-            self._window_recheck_unsub()
-        self._window_recheck_at = deadline
-
-        @callback
-        def _fire(_now: object) -> None:
-            self._window_recheck_unsub = None
-            self._window_recheck_at = None
-            self._background(self.async_request_refresh(), "window recheck refresh")
-
-        # A small margin ensures the elapsed check passes when it fires.
-        self._window_recheck_unsub = async_call_later(
-            self.hass, delay_seconds + 0.5, _fire
-        )
+    def _request_window_recheck(self) -> None:
+        """Refresh control when a window's grace delay elapses (WindowMonitor)."""
+        self._background(self.async_request_refresh(), "window recheck refresh")
 
     async def _write_number_if_changed(self, entity_id: str, value: float) -> None:
         """Write a number entity, skipping no-op changes (update minimization)."""
@@ -1372,7 +1304,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         # area's window yet still be suppressed by a window open in another room.
         delay_s = settings.window_open_delay * 60.0
         window_state = {
-            eid: self._window_open(reading, delay_s)
+            eid: self._windows.suppresses(reading, delay_s)
             for eid in self.device_ids
             if (reading := data.readings.get(eid)) is not None
         }
@@ -1590,10 +1522,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if self._unsub_state is not None:
             self._unsub_state()
             self._unsub_state = None
-        if self._window_recheck_unsub is not None:
-            self._window_recheck_unsub()
-            self._window_recheck_unsub = None
-            self._window_recheck_at = None
+        self._windows.shutdown()
         if any(rt.mpc is not None for rt in self._devices.values()):
             await self._mpc_store.async_save(self._mpc_persist_data())
         # The rate limiter may be holding back up to _PERSIST_INTERVAL of
