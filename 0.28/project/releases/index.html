@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -1367,10 +1367,12 @@
 
 <h1 id="releases">Releases<a class="headerlink" href="#releases" title="Permanent link">&para;</a></h1>
 <p>Versioning is automated with <strong>python-semantic-release</strong> (PSR) driven by
-Conventional Commits. The version is the single tag; <code>[tool.semantic_release]</code>
-keeps both <code>pyproject.toml</code> (<code>version_toml</code>) and
-<code>custom_components/climate_orchestrator/manifest.json</code> (<code>version_variables</code>) in
-lock-step with it.</p>
+Conventional Commits. The git tag is the source of truth; the only stamped
+file is <code>custom_components/climate_orchestrator/manifest.json</code>
+(<code>version_variables</code>) — what HA and HACS actually read. <code>pyproject.toml</code>
+keeps a frozen <code>0.0.0</code> placeholder on purpose: <code>uv.lock</code> records the (virtual)
+project's version, so stamping pyproject on every release would invalidate
+the lockfile and fail CI's <code>uv lock --check</code> until someone re-ran <code>uv lock</code>.</p>
 <div class="panzoom-box" data-key="alt" id="panzoom0" oncontextmenu="return false;">
     
     <nav class="panzoom-nav">
@@ -1437,7 +1439,7 @@ push run) can never trigger a release before the push run's tests finish. It
 checks out whichever branch CI ran on and runs PSR, which:</p>
 <ol>
 <li>reads the branch config to decide stable vs prerelease,</li>
-<li>bumps <code>pyproject.toml</code> + <code>manifest.json</code>,</li>
+<li>bumps <code>manifest.json</code>,</li>
 <li>updates <code>CHANGELOG.md</code> (changelog update mode — appends new entries rather
    than regenerating the file),</li>
 <li>runs <code>build_command</code> to produce <code>dist/climate_orchestrator.zip</code> (the
@@ -1446,11 +1448,19 @@ checks out whichever branch CI ran on and runs PSR, which:</p>
 <li>publishes the GitHub Release with the zip attached
    (<code>[tool.semantic_release.publish]</code>).</li>
 </ol>
+<p>The workflow then re-downloads the published asset and verifies the two
+things HACS depends on — <code>manifest.json</code> at the zip root, with a <code>version</code>
+matching the tag — so a packaging regression fails the release loudly instead
+of surfacing as a broken install.</p>
 <h2 id="provenance-and-hacs-consumption">Provenance and HACS consumption<a class="headerlink" href="#provenance-and-hacs-consumption" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>actions/attest-build-provenance</code> records verifiable build provenance for
   the zip; verify with
-  <code>gh attestation verify climate_orchestrator.zip -R &lt;repo&gt;</code>.</li>
+  <code>gh attestation verify climate_orchestrator.zip -R &lt;repo&gt;</code>. The Sigstore
+  bundle is also attached to the release as
+  <code>climate_orchestrator.zip.intoto.jsonl</code>, so the provenance is visible to
+  scanners (OpenSSF Scorecard's Signed-Releases check) and verifiable offline
+  (<code>cosign verify-blob --bundle</code>).</li>
 <li>HACS installs that exact asset: <code>hacs.json</code> sets <code>zip_release</code> plus
   <code>filename</code>, so HACS downloads the published <code>climate_orchestrator.zip</code> from
   the GitHub Release rather than cloning the repository tree.</li>
@@ -1479,7 +1489,7 @@ checks out whichever branch CI ran on and runs PSR, which:</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 5, 2026 11:49:11 UTC">June 5, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 5, 2026 13:01:05 UTC">June 5, 2026</span>
   </span>
 
     

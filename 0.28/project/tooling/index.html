@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -1595,13 +1595,16 @@ pay for the full test run: a pull request is classified by its diff against
 the base branch, a push by its diff against the <strong>last release tag</strong> — exactly
 the commits semantic-release would put in the next release, so a code push can
 never reach a release with its tests skipped by a later docs-only push. PRs
-from branches in this repo skip CI entirely (the push event already covers
-them; fork PRs still run). A concurrency group cancels obsolete in-flight runs
+from this repo's <code>feat/**</code>/<code>fix/**</code> branches skip CI entirely (the push event
+already covers them); fork PRs and other branch names — Dependabot's
+<code>dependabot/**</code> in particular — still run, since those have no push runs to
+lean on. A concurrency group cancels obsolete in-flight runs
 when the same ref is pushed again, and every job carries a 30-minute timeout
 (here and in the other workflows) so nothing can burn runners for GitHub's
 6-hour default. The jobs:</p>
 <ul>
-<li><strong>lint</strong> (every change) — <code>uv run ruff check .</code> + <code>ruff format --check</code>,
+<li><strong>lint</strong> (every change) — <code>uv lock --check</code> (the committed lockfile must
+  match <code>pyproject.toml</code>), <code>uv run ruff check .</code> + <code>ruff format --check</code>,
   codespell (same pinned hook as pre-commit), the <code>strings.json</code> ↔
   <code>translations/en.json</code> byte-identity check, and two workflow linters:
   <strong>zizmor</strong> (security) and <strong>actionlint</strong> (correctness: expression errors +
@@ -1626,8 +1629,8 @@ when the same ref is pushed again, and every job carries a 30-minute timeout
   over the CDN; the SVG source stays in the repo-root <code>brand/</code>.</li>
 </ul>
 <p>Two scheduled workflows complement CI; each files (or bumps) a <code>ci</code>-labelled
-tracking issue when it fails, because nobody reliably reads scheduled-run
-emails:</p>
+tracking issue when it fails and closes it again on the first green run,
+with a comment naming the commit it recovered at:</p>
 <ul>
 <li>A weekly <strong><code>links.yml</code></strong> runs lychee over the README, the changelog, the
   docs chapters, and the issue/PR templates to catch dead <em>external</em> links
@@ -1638,16 +1641,37 @@ emails:</p>
   errors often surface upstream breakage before tests do), and the test suite
   against the <strong>oldest supported HA</strong> (hacs.json's floor, currently 2025.2,
   via the matching PHACC pin in an unlocked Python 3.13 env) — the claimed
-  floor is only honest while something tests it. Scheduled, so neither gates
-  PRs; a red floor run means either a compat fix or raising the floor.</li>
+  floor is only honest while something tests it. The floor run excludes the
+  syrupy snapshot tests: their on-disk format tracks the locked syrupy (5.x),
+  which the old PHACC's syrupy 4.x can't read, and the math they pin doesn't
+  vary with HA. Scheduled, so neither gates PRs; a red floor run means either
+  a compat fix or raising the floor.</li>
 </ul>
+<p>Three further automation workflows round things out. A weekly
+<strong><code>scorecard.yml</code></strong> runs OpenSSF Scorecard over the repo's supply-chain
+practices (pinned actions, token permissions, update tooling), feeding the
+Security → Code scanning panel and the README badge. <strong><code>codeql.yml</code></strong> runs
+CodeQL on every push to main and weekly, analyzing both the Python source and
+the GitHub Actions workflows (the <code>actions</code> query pack complements zizmor on
+workflow-injection patterns) — modest expected Python yield next to
+ruff/mypy, but it keeps security static analysis continuous.
+The repo also ships a root <strong><code>SECURITY.md</code></strong> (private vulnerability
+reporting, supported versions, artifact verification).
+<strong><code>dependabot-automerge.yml</code></strong> arms auto-merge (squash) on Dependabot's
+grouped minor/patch PRs once CI is green — semver-major bumps stay manual; it
+relies on the repo's "Allow auto-merge" setting plus required status checks
+on <code>main</code>, and accepts that the GITHUB_TOKEN-performed merge commit triggers
+no push CI of its own (the PR was fully gated, <code>chore(deps)</code> never releases,
+and the next push diffs against the last release tag, which includes it).</p>
 <p><strong><code>docs.yml</code> (documentation deploy):</strong> builds the versioned MkDocs site with
 mike and publishes it to GitHub Pages through the Actions deploy path. Only
 released versions are published: a stable release deploys <strong>X.Y</strong> and
-re-points <strong>latest</strong> (dispatched explicitly from <code>release.yml</code>, because
-GitHub fires no <code>release</code> events for releases created with the workflow
-token); <code>workflow_dispatch</code> can bootstrap or repair any version, or refresh
-the current one after a docs-only commit that cut no release. There is no
+re-points <strong>latest</strong>, dispatched explicitly from <code>release.yml</code>. There is
+deliberately no <code>release</code> trigger — PSR publishes with the release app's
+token, whose release events fire for stables and prereleases alike, and a
+prerelease must never move the docs. <code>workflow_dispatch</code> can bootstrap or
+repair any version, or refresh the current one after a docs-only commit
+that cut no release. There is no
 rolling <em>dev</em> build of <code>main</code> — semantic-release versions nearly every
 change, so main never drifts far ahead of the newest numbered docs. The PR
 gate (<code>mkdocs build --strict</code>) lives in <code>ci.yml</code>; see <a href="../releases/">Releases</a>
@@ -1691,7 +1715,7 @@ release.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 5, 2026 12:06:36 UTC">June 5, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 5, 2026 17:17:02 UTC">June 5, 2026</span>
   </span>
 
     
