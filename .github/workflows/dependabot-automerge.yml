@@ -1,0 +1,44 @@
+name: Dependabot auto-merge
+
+# Dependabot's weekly minor/patch group PRs merge themselves once CI goes
+# green; semver-major bumps stay manual. Two repository settings are
+# required for this to work: "Allow auto-merge" (Settings → General), and
+# required status checks on main — GitHub refuses to arm auto-merge on a
+# branch with no requirements to wait for.
+#
+# Known limitation, accepted: the eventual merge is performed with the
+# workflow token, and pushes made by GITHUB_TOKEN don't trigger workflows —
+# so the merge commit itself gets no push CI run on main. Nothing escapes
+# testing: the PR was fully gated, `chore(deps)` commits never release, and
+# the next real push diffs against the last release tag, which includes
+# these changes.
+on: pull_request
+
+permissions: {}
+
+jobs:
+  automerge:
+    name: Arm auto-merge on minor/patch updates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    permissions:
+      contents: write # merge the PR
+      pull-requests: write # arm auto-merge
+    steps:
+      - name: Fetch update metadata
+        id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Arm auto-merge (squash)
+        # For grouped PRs, update-type is the highest semver in the group;
+        # the dependabot config groups only minor+patch, so majors (and any
+        # individual security PRs that are majors) fall through to manual.
+        # Squash keeps Dependabot's `chore(deps): ...` PR title as the
+        # commit subject, which python-semantic-release treats as no-release.
+        if: steps.meta.outputs.update-type != 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"

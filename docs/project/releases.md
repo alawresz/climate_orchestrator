@@ -62,6 +62,11 @@ checks out whichever branch CI ran on and runs PSR, which:
 6. publishes the GitHub Release with the zip attached
    (`[tool.semantic_release.publish]`).
 
+The workflow then re-downloads the published asset and verifies the two
+things HACS depends on — `manifest.json` at the zip root, with a `version`
+matching the tag — so a packaging regression fails the release loudly instead
+of surfacing as a broken install.
+
 ## Provenance and HACS consumption
 
 - `actions/attest-build-provenance` records verifiable build provenance for

@@ -19,12 +19,16 @@ jobs:
     name: Detect what changed
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Same-repo branches already run CI via the push event; the pull_request
-    # event would double every job. Forks have no push runs here, so their
-    # PRs still get CI.
+    # Skip the pull_request event only when the push event already covers the
+    # PR's head branch (same-repo feat/** and fix/** — those would double
+    # every job). Forks and other branch names (e.g. Dependabot's
+    # dependabot/**) have no push runs here, so their PRs get CI from this
+    # event — auto-merge gates on these checks.
     if: >-
       github.event_name == 'push' ||
-      github.event.pull_request.head.repo.full_name != github.repository
+      github.event.pull_request.head.repo.full_name != github.repository ||
+      !(startsWith(github.event.pull_request.head.ref, 'feat/') ||
+        startsWith(github.event.pull_request.head.ref, 'fix/'))
     outputs:
       code: ${{ steps.filter.outputs.code }}
       docs: ${{ steps.filter.outputs.docs }}
@@ -77,6 +81,10 @@ jobs:
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           python-version: "3.14"
+      - name: Lockfile in sync with pyproject.toml
+        # A pyproject edit without a re-run of `uv lock` drifts silently —
+        # the locked env would no longer reflect the declared dependencies.
+        run: uv lock --check
       - name: Install dependencies
         run: uv sync --dev
       - name: Ruff lint + format check

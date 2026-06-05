@@ -59,6 +59,26 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.release.outputs.tag }}
+      - name: Verify the published zip
+        # The zip is what HACS actually installs; the attestation proves who
+        # built it, not that it's well-formed. Re-download the published
+        # asset and check the two things HACS depends on: manifest.json at
+        # the zip root, with a version matching the tag.
+        if: steps.release.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          tmp="$(mktemp -d)"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern climate_orchestrator.zip --dir "$tmp"
+          unzip -q "$tmp/climate_orchestrator.zip" -d "$tmp/zip"
+          test -f "$tmp/zip/manifest.json"
+          version="$(python3 -c \
+            'import json,sys; print(json.load(open(sys.argv[1]))["version"])' \
+            "$tmp/zip/manifest.json")"
+          test "v$version" = "$TAG"
+          echo "zip OK: manifest.json at root, version $version matches $TAG"
       - name: Deploy versioned docs
         # PSR creates the GitHub Release with the default GITHUB_TOKEN, and
         # GitHub never fires `release` events for token-created releases — so

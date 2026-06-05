@@ -111,13 +111,16 @@ pay for the full test run: a pull request is classified by its diff against
 the base branch, a push by its diff against the **last release tag** — exactly
 the commits semantic-release would put in the next release, so a code push can
 never reach a release with its tests skipped by a later docs-only push. PRs
-from branches in this repo skip CI entirely (the push event already covers
-them; fork PRs still run). A concurrency group cancels obsolete in-flight runs
+from this repo's `feat/**`/`fix/**` branches skip CI entirely (the push event
+already covers them); fork PRs and other branch names — Dependabot's
+`dependabot/**` in particular — still run, since those have no push runs to
+lean on. A concurrency group cancels obsolete in-flight runs
 when the same ref is pushed again, and every job carries a 30-minute timeout
 (here and in the other workflows) so nothing can burn runners for GitHub's
 6-hour default. The jobs:
 
-- **lint** (every change) — `uv run ruff check .` + `ruff format --check`,
+- **lint** (every change) — `uv lock --check` (the committed lockfile must
+  match `pyproject.toml`), `uv run ruff check .` + `ruff format --check`,
   codespell (same pinned hook as pre-commit), the `strings.json` ↔
   `translations/en.json` byte-identity check, and two workflow linters:
   **zizmor** (security) and **actionlint** (correctness: expression errors +
@@ -142,7 +145,7 @@ when the same ref is pushed again, and every job carries a 30-minute timeout
   over the CDN; the SVG source stays in the repo-root `brand/`.
 
 Two scheduled workflows complement CI; each files (or bumps) a `ci`-labelled
-tracking issue when it fails and closes it again on the first green run, 
+tracking issue when it fails and closes it again on the first green run,
 with a comment naming the commit it recovered at:
 
 - A weekly **`links.yml`** runs lychee over the README, the changelog, the
@@ -159,6 +162,17 @@ with a comment naming the commit it recovered at:
   which the old PHACC's syrupy 4.x can't read, and the math they pin doesn't
   vary with HA. Scheduled, so neither gates PRs; a red floor run means either
   a compat fix or raising the floor.
+
+Two further automation workflows round things out. A weekly
+**`scorecard.yml`** runs OpenSSF Scorecard over the repo's supply-chain
+practices (pinned actions, token permissions, update tooling), feeding the
+Security → Code scanning panel and the README badge.
+**`dependabot-automerge.yml`** arms auto-merge (squash) on Dependabot's
+grouped minor/patch PRs once CI is green — semver-major bumps stay manual; it
+relies on the repo's "Allow auto-merge" setting plus required status checks
+on `main`, and accepts that the GITHUB_TOKEN-performed merge commit triggers
+no push CI of its own (the PR was fully gated, `chore(deps)` never releases,
+and the next push diffs against the last release tag, which includes it).
 
 **`docs.yml` (documentation deploy):** builds the versioned MkDocs site with
 mike and publishes it to GitHub Pages through the Actions deploy path. Only
