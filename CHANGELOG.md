@@ -2,6 +2,46 @@
 
 <!-- version list -->
 
+## v0.28.4 (2026-06-05)
+
+### Bug Fixes
+
+- Handle mid-boost deselection by restoring to previous preset if available
+  ([`a36329a`](https://github.com/alawresz/climate_orchestrator/commit/a36329a89424cda1784b17552da60251c3478080))
+
+- Handle mid-boost deselection by restoring to previous preset if available
+  ([`1bf1384`](https://github.com/alawresz/climate_orchestrator/commit/1bf13843c8f9955631dfdba9dffe64cdb08a3793))
+
+### Continuous Integration
+
+- Add backfill-releases workflow to retroactively update GitHub Releases
+  ([`0b62b45`](https://github.com/alawresz/climate_orchestrator/commit/0b62b453253040078541f0eec49881a714898d33))
+
+- Add CodeQL workflow for SAST and README badge integration
+  ([`4681ad2`](https://github.com/alawresz/climate_orchestrator/commit/4681ad2df2addf86ee2afafb3bb6c038e4a93ea2))
+
+- Add workflows for OpenSSF Scorecard and Dependabot auto-merge
+  ([`7e5b892`](https://github.com/alawresz/climate_orchestrator/commit/7e5b8929558faf557f0ae78e39fb08e037be68c4))
+
+- Auto-close tracking issues on recovery for canary workflows
+  ([`9761a84`](https://github.com/alawresz/climate_orchestrator/commit/9761a8423b898d5d29a52c5cc0e541c674b2de1d))
+
+- Enhance workflows with tighter permissions, Sigstore bundles, and SECURITY.md
+  ([`aa9fd7c`](https://github.com/alawresz/climate_orchestrator/commit/aa9fd7cf74557ac4ec165a2ef9be4e089278133e))
+
+- Exclude syrupy snapshot tests from HA floor runs, update paths
+  ([`b6a8f5c`](https://github.com/alawresz/climate_orchestrator/commit/b6a8f5c3a8c8fc8d21111144989995968a103e37))
+
+- Fix packaging process
+  ([`be180e6`](https://github.com/alawresz/climate_orchestrator/commit/be180e63a65025919614da1343299c722e7c8455))
+
+- Release via a dedicated GitHub App to pass the main ruleset
+  ([`2dc94a4`](https://github.com/alawresz/climate_orchestrator/commit/2dc94a4667d4aa35f7cfc1dc6a3927bc0ac36c8e))
+
+- Remove backfill-releases workflow as it is no longer needed
+  ([`49a56bf`](https://github.com/alawresz/climate_orchestrator/commit/49a56bf8e38ee5041f968ce972647cb8b474ef32))
+
+
 ## v0.28.3 (2026-06-05)
 
 ### Bug Fixes
