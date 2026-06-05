@@ -96,6 +96,7 @@ climate_orchestrator/
 │       ├── repairs.py             # repair-issue helpers (raise/clear Repairs notices)
 │       ├── windows.py             # WindowMonitor: per-area window debounce + grace-delay rechecks
 │       ├── persistence.py         # LearnedStateStores: schema-versioned stores + flash-wear limiter
+│       ├── adaptation.py          # WeatherAdaptation: rmot, adaptive band, forecast cache
 │       ├── settings.py            # NumberSetting/SwitchSetting registries + RuntimeSettings resolver
 │       ├── entity.py              # shared base entity + hub DeviceInfo
 │       ├── diagnostics.py         # downloadable diagnostics dump

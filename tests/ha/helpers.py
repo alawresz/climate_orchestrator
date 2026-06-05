@@ -185,12 +185,12 @@ def set_maintenance_clock(
 
 def rmot(coordinator: SmartClimateCoordinator) -> float | None:
     """The running-mean outdoor temperature driving adaptive comfort."""
-    return coordinator._rmot
+    return coordinator.running_mean_outdoor
 
 
 def set_rmot(coordinator: SmartClimateCoordinator, value: float) -> None:
     """Seed the running-mean outdoor temperature (skip the slow EMA warm-up)."""
-    coordinator._rmot = value
+    coordinator._adaptation.rmot = value
 
 
 def window_timers(coordinator: SmartClimateCoordinator) -> dict[str, float]:
@@ -213,14 +213,14 @@ def window_recheck_deadline(coordinator: SmartClimateCoordinator) -> float | Non
 
 def forecast_cache(coordinator: SmartClimateCoordinator) -> list[float]:
     """The cached hourly forecast temperatures."""
-    return coordinator._forecast_hourly
+    return coordinator._adaptation._forecast_hourly
 
 
 def precondition_series(
     coordinator: SmartClimateCoordinator, dt_minutes: float, settings: Any
 ) -> list[float] | None:
     """The forecast series the MPC preconditioner would optimise against."""
-    return coordinator._precondition_series(dt_minutes, settings)
+    return coordinator._adaptation.precondition_series(dt_minutes, settings)
 
 
 def expire_startup_grace(coordinator: SmartClimateCoordinator) -> None:

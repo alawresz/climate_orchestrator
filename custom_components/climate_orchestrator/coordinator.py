@@ -36,6 +36,7 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .adaptation import WeatherAdaptation
 from .const import (
     AC_SETPOINT_KEEPALIVE_SECONDS,
     AC_SETPOINT_MIN_CHANGE,
@@ -57,19 +58,12 @@ from .const import (
     DEFAULT_PRESET,
     DEFAULT_PRESETS,
     DOMAIN,
-    PRECONDITION_FORECAST_REFRESH_SECONDS,
-    PRECONDITION_MAX_STEPS,
-    RMOT_TAU_SECONDS,
     RUNTIME_WINDOW_SECONDS,
     STARTUP_GRACE_SECONDS,
     UPDATE_INTERVAL_SECONDS,
     VALVE_MAINTENANCE_DWELL_SECONDS,
 )
 from .control.adaptive_bias import effective_bias, update_bias_integral
-from .control.adaptive_comfort import (
-    adaptive_band,
-    running_mean_update,
-)
 from .control.comfort import effective_temperature
 from .control.engine import (
     DeviceDecision,
@@ -78,7 +72,6 @@ from .control.engine import (
     GlobalInput,
     decide,
 )
-from .control.forecast import expand_forecast
 from .control.hysteresis import Demand
 from .control.mpc.controller import MpcController, preconditioned_valve_pct
 from .control.runtime_stats import cycles_per_hour, runtime_fraction
@@ -124,10 +117,6 @@ NUMBER_WRITE_EPSILON = 0.1
 # Trailing window (seconds) and sample cap for the home temperature-slope figure.
 _SLOPE_WINDOW_SECONDS = 900.0
 _SLOPE_MAX_SAMPLES = 240
-# Cap on cached hourly forecast entries. The longest look-ahead is 8 h; two
-# days is already generous — a buggy weather entity must not grow the cache.
-_FORECAST_MAX_HOURS = 48
-
 _LOGGER = logging.getLogger(__name__)
 
 type SmartClimateConfigEntry = ConfigEntry["SmartClimateCoordinator"]
@@ -279,12 +268,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self._maintenance_running = False
         self._last_maintenance: float | None = None
         # Adaptive comfort: running-mean outdoor temp and the shifted band.
-        self._rmot: float | None = None
-        self._adaptive_band: Band | None = None
+        self._adaptation = WeatherAdaptation(hass)
         # Cached hourly outdoor forecast (°C, from the weather entity) for
         # forecast-based preconditioning, plus when it was last fetched.
-        self._forecast_hourly: list[float] = []
-        self._forecast_fetched_at = 0.0
         # Collaborators: bus events/notifications, and the per-device
         # watchdog + manual-override supervision.
         self._events = EventBridge(hass, entry.entry_id)
@@ -370,7 +356,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             if isinstance(maint.get("rmot"), int | float) and math.isfinite(
                 maint["rmot"]
             ):
-                self._rmot = float(maint["rmot"])
+                self._adaptation.rmot = float(maint["rmot"])
             if isinstance(integral := maint.get("ac_bias_integral"), dict):
                 for k, v in integral.items():
                     if k in managed and isinstance(v, int | float) and math.isfinite(v):
@@ -386,7 +372,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     def _state_persist_data(self) -> dict[str, Any]:
         return {
             "last": self._last_maintenance,
-            "rmot": self._rmot,
+            "rmot": self._adaptation.rmot,
             "ac_bias_integral": {
                 k: rt.ac_bias_integral for k, rt in self._devices.items()
             },
@@ -685,7 +671,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             runtime.mpc = MpcController()
         controller = runtime.mpc
         last_valve = 0.0 if runtime.valve is None else runtime.valve
-        series = self._precondition_series(ctx.dt_min, ctx.settings)
+        series = self._adaptation.precondition_series(ctx.dt_min, ctx.settings)
 
         def _observe_and_optimize() -> float:
             controller.observe(
@@ -767,105 +753,6 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             )
         return None
 
-    @callback
-    def _apply_adaptive_comfort(
-        self,
-        base_band: Band,
-        outdoor: float | None,
-        settings: RuntimeSettings,
-        dt_min: float,
-    ) -> Band:
-        """Update the running-mean outdoor temp and return the band to control on.
-
-        Adaptive comfort only relaxes *cooling* in the heat: once the
-        running-mean outdoor temperature climbs past the cool edge (plus the
-        onset bias), the cool setpoint drifts up by a smooth, saturating amount
-        capped at ``max_shift``. The heat edge is never touched, so a device is
-        never made to work harder than the user's preset. The shifted band is
-        always computed for the preview sensors; it's only *applied* when the
-        toggle is on.
-        """
-        self._rmot = running_mean_update(
-            self._rmot, outdoor, dt_seconds=dt_min * 60.0, tau_seconds=RMOT_TAU_SECONDS
-        )
-        heat_edge, cool_edge = adaptive_band(
-            base_band.heat_edge,
-            base_band.cool_edge,
-            self._rmot,
-            settings.adaptive_cooling_comfort_max_shift,
-            bias=settings.adaptive_cooling_comfort_onset_bias,
-            response=settings.adaptive_cooling_comfort_response,
-        )
-        self._adaptive_band = Band(heat_edge=heat_edge, cool_edge=cool_edge)
-        return self._adaptive_band if settings.adaptive_cooling_comfort else base_band
-
-    async def _refresh_forecast(self, settings: RuntimeSettings) -> None:
-        """Fetch and cache the weather entity's hourly outdoor forecast.
-
-        Only when preconditioning is enabled and a weather entity is configured;
-        rate-limited to ``PRECONDITION_FORECAST_REFRESH_SECONDS``. Failures are
-        swallowed (the feature simply no-ops without a forecast).
-        """
-        if not settings.forecast_preconditioning or self.weather_entity is None:
-            self._forecast_hourly = []
-            return
-        now = time.monotonic()
-        if (
-            self._forecast_hourly
-            and now - self._forecast_fetched_at < PRECONDITION_FORECAST_REFRESH_SECONDS
-        ):
-            return
-        try:
-            response = await self.hass.services.async_call(
-                "weather",
-                "get_forecasts",
-                {"entity_id": self.weather_entity, "type": "hourly"},
-                blocking=True,
-                return_response=True,
-            )
-        except Exception:  # noqa: BLE001 - any forecast failure must not break the cycle
-            _LOGGER.debug("climate_orchestrator: forecast fetch failed", exc_info=True)
-            return
-        # The service response is loosely typed JSON; narrow every step.
-        if not isinstance(response, dict):
-            return
-        device_block = response.get(self.weather_entity)
-        if not isinstance(device_block, dict):
-            return
-        entries = device_block.get("forecast")
-        if not isinstance(entries, list):
-            return
-        temps: list[float] = []
-        for entry in entries:
-            if isinstance(entry, dict):
-                temp = entry.get("temperature")
-                if (
-                    isinstance(temp, int | float)
-                    and not isinstance(temp, bool)
-                    and math.isfinite(temp)
-                ):
-                    temps.append(float(temp))
-        if temps:
-            self._forecast_hourly = temps[:_FORECAST_MAX_HOURS]
-            self._forecast_fetched_at = now
-
-    @callback
-    def _precondition_series(
-        self, dt_min: float, settings: RuntimeSettings
-    ) -> list[float] | None:
-        """Per-step outdoor forecast series for the valve optimiser, or ``None``.
-
-        Interpolates the cached hourly forecast onto the control step over the
-        preconditioning look-ahead; ``None`` when the feature is off or there's
-        no forecast yet.
-        """
-        if not settings.forecast_preconditioning or not self._forecast_hourly:
-            return None
-        steps = round(settings.preconditioning_horizon * 60.0 / dt_min)
-        steps = max(1, min(steps, PRECONDITION_MAX_STEPS))
-        series = expand_forecast(self._forecast_hourly, dt_min, steps)
-        return series or None
-
     @property
     def comfort_influence(self) -> float:
         """The comfort-index humidity influence factor (live)."""
@@ -876,7 +763,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     @property
     def running_mean_outdoor(self) -> float | None:
         """Running-mean outdoor temperature driving adaptive comfort (°C)."""
-        return self._rmot
+        return self._adaptation.rmot
 
     @property
     def adaptive_band_high(self) -> float | None:
@@ -885,7 +772,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         Only the cool edge is ever relaxed; the heat edge is never touched, so
         there is no matching "low" accessor.
         """
-        return self._adaptive_band.cool_edge if self._adaptive_band else None
+        return self._adaptation.adaptive_band_high
 
     @callback
     def hvac_action_reason(self) -> str:
@@ -1171,11 +1058,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         settings = self._cycle_settings = resolve_settings(
             self.hass, self.entry.entry_id
         )
-        await self._refresh_forecast(settings)
+        await self._adaptation.refresh_forecast(settings, self.weather_entity)
         dt_min = self._cycle_minutes()
         hvac_mode, base_band = self._desired()
         outdoor = self._outdoor_temp()
-        band = self._apply_adaptive_comfort(base_band, outdoor, settings, dt_min)
+        band = self._adaptation.apply(base_band, outdoor, settings, dt_min)
         environment_issues(
             self.hass,
             settings,
