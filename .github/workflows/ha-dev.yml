@@ -93,6 +93,11 @@ jobs:
         # builds an ephemeral unlocked env instead: PHACC 0.13.215 is the last
         # build pinned to HA 2025.2.x and brings the whole matching test
         # stack; the rest mirrors the dev group's non-PHACC test deps.
+        #
+        # The syrupy snapshot tests are excluded: PHACC pins syrupy==4.8.0,
+        # which can't read snapshots written by the locked syrupy 5.x (the
+        # default snapshot directory moved). They pin pure control math that
+        # doesn't vary with the HA version — regular CI covers them.
         env:
           HYPOTHESIS_PROFILE: ci
         run: >-
@@ -103,6 +108,7 @@ jobs:
           --with "pytest-randomly>=3.15"
           --with "pytest-timeout>=2.3"
           pytest --timeout=120
+          --ignore=tests/unit/test_snapshot_regression.py
       - name: File a tracking issue on failure
         if: failure()
         env:

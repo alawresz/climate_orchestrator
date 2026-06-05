@@ -154,8 +154,11 @@ emails:
   errors often surface upstream breakage before tests do), and the test suite
   against the **oldest supported HA** (hacs.json's floor, currently 2025.2,
   via the matching PHACC pin in an unlocked Python 3.13 env) — the claimed
-  floor is only honest while something tests it. Scheduled, so neither gates
-  PRs; a red floor run means either a compat fix or raising the floor.
+  floor is only honest while something tests it. The floor run excludes the
+  syrupy snapshot tests: their on-disk format tracks the locked syrupy (5.x),
+  which the old PHACC's syrupy 4.x can't read, and the math they pin doesn't
+  vary with HA. Scheduled, so neither gates PRs; a red floor run means either
+  a compat fix or raising the floor.
 
 **`docs.yml` (documentation deploy):** builds the versioned MkDocs site with
 mike and publishes it to GitHub Pages through the Actions deploy path. Only
