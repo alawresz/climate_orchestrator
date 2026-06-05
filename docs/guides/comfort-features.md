@@ -46,7 +46,9 @@ it's still just a band, so every guard (window-open, frost, outdoor gating,
 per-area offsets) keeps working, and the adaptive cooling-comfort shift is
 suspended so it can't water the boost down. Selecting any preset or touching
 the setpoints ends the boost early; re-selecting Boost restarts the clock; a
-restart mid-boost resumes it with the original deadline.
+restart mid-boost resumes it with the original deadline. Deselecting the
+boost preset in the options while a boost is running ends it on the next
+reload, landing on the preset it would have reverted to.
 
 ## The manual band
 

@@ -235,6 +235,50 @@ async def test_expired_boost_reverts_on_restart(
     assert "boost_until" not in state.attributes
 
 
+async def test_boost_deselected_mid_boost_reverts_to_previous_preset(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Deselecting boost while one runs lands on the preset it would revert to.
+
+    The boost itself cannot resume (the preset no longer exists), but its
+    context must not be dropped: the entity restores to boost_previous_preset
+    rather than silently falling back to the default.
+    """
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat")
+    until = dt_util.utcnow() + timedelta(minutes=10)
+    mock_restore_cache(
+        hass,
+        [
+            State(
+                "climate.climate_orchestrator",
+                "heat",
+                {
+                    "preset_mode": "boost",
+                    "boost_until": until.isoformat(),
+                    "boost_previous_preset": "sleep",
+                    "boost_direction": "heat",
+                },
+            )
+        ],
+    )
+
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        config_entry, options={CONF_PRESETS: ["home", "away", "sleep"]}
+    )
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id_for("climate", config_entry.entry_id))
+    assert state.attributes[ATTR_PRESET_MODE] == "sleep"
+    assert "boost_until" not in state.attributes
+
+
 async def test_boost_deselected_creates_no_entities(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,

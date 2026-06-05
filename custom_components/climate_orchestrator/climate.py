@@ -194,10 +194,19 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
         if last.state in self.hvac_modes:
             self._attr_hvac_mode = HVACMode(last.state)
         preset = last.attributes.get("preset_mode")
-        # Restoring a preset that has since been deselected in the options
-        # falls through to the __init__ default (home if enabled, else manual).
-        if preset in (self._attr_preset_modes or []):
+        enabled = self._attr_preset_modes or []
+        if preset == PRESET_BOOST and preset not in enabled:
+            # A boost was running, but the boost preset has since been
+            # deselected in the options. The boost itself cannot resume, so
+            # land on the preset it would have reverted to instead of
+            # silently dropping to the default.
+            previous = last.attributes.get("boost_previous_preset")
+            if previous in enabled:
+                self._attr_preset_mode = previous
+        elif preset in enabled:
             self._attr_preset_mode = preset
+        # Any other deselected preset falls through to the __init__ default
+        # (home if enabled, else manual).
         # as_float: restored attributes come from JSON, which round-trips
         # NaN/Infinity — garbage and non-finite values are both dropped.
         low = as_float(last.attributes.get(ATTR_TARGET_TEMP_LOW))
