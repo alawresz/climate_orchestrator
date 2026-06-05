@@ -88,16 +88,16 @@ jobs:
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           python-version: "3.13"
-      - name: pytest against HA 2024.12 (the hacs.json floor)
+      - name: pytest against HA 2025.2 (the hacs.json floor)
         # The lockfile targets current HA (requires-python >=3.14), so this
-        # builds an ephemeral unlocked env instead: PHACC 0.13.193 is the last
-        # build pinned to HA 2024.12.x and brings the whole matching test
+        # builds an ephemeral unlocked env instead: PHACC 0.13.215 is the last
+        # build pinned to HA 2025.2.x and brings the whole matching test
         # stack; the rest mirrors the dev group's non-PHACC test deps.
         env:
           HYPOTHESIS_PROFILE: ci
         run: >-
           uv run --no-project --python 3.13
-          --with "pytest-homeassistant-custom-component==0.13.193"
+          --with "pytest-homeassistant-custom-component==0.13.215"
           --with "scipy>=1.11"
           --with "hypothesis>=6.0"
           --with "pytest-randomly>=3.15"

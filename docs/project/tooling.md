@@ -152,7 +152,7 @@ emails:
   the supported HA range: the test suite **plus mypy** against HA's latest
   *pre-release* (uv `--prerelease=allow` upgrade over the locked venv — type
   errors often surface upstream breakage before tests do), and the test suite
-  against the **oldest supported HA** (hacs.json's floor, currently 2024.12,
+  against the **oldest supported HA** (hacs.json's floor, currently 2025.2,
   via the matching PHACC pin in an unlocked Python 3.13 env) — the claimed
   floor is only honest while something tests it. Scheduled, so neither gates
   PRs; a red floor run means either a compat fix or raising the floor.

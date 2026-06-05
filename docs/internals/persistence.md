@@ -40,8 +40,11 @@ positively recognise is discarded rather than risk a mis-read.
   field-by-field anyway).
 - **An unknown older major** is discarded by the migrate hook
   (`_async_migrate_func` returns `{}` with a warning).
-- **A newer major** — the downgrade case, where `Store` raises before any hook
-  runs — is caught and discarded too.
+- **A newer major** — the downgrade case — is discarded too. On HA ≥ 2026.3
+  `Store` raises `UnsupportedStorageVersionError` before any hook runs (caught
+  in `_load_safely`); older HA hands the payload to the migrate hook instead,
+  which discards it like any unknown major. The exception import is guarded
+  accordingly.
 
 Learned state is always re-learnable, so no schema surprise can fail setup.
 

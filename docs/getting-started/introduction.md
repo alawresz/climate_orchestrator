@@ -53,7 +53,7 @@ tour; if you just want it running, jump to [Installation](installation.md).
 
 ## Requirements
 
-- Home Assistant `2024.12` or newer.
+- Home Assistant `2025.2` or newer.
 - `scipy` (declared in the manifest; Home Assistant installs it automatically on
   first setup).
 - Each managed device's **HA area** should have a temperature (and ideally

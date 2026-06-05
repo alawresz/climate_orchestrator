@@ -8,7 +8,7 @@ for comfort, and drives TRVs with a Model Predictive Controller. It is built
 test-first with modern tooling.
 
 - **Domain:** `climate_orchestrator`
-- **Target Home Assistant:** 2024.12+ (matching current
+- **Target Home Assistant:** 2025.2+ (matching current
   `pytest-homeassistant-custom-component` support)
 
 ## Target hardware

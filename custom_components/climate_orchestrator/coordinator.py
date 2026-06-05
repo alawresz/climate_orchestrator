@@ -28,7 +28,6 @@ from homeassistant.core import (
     HomeAssistant,
     callback,
 )
-from homeassistant.exceptions import UnsupportedStorageVersionError
 from homeassistant.helpers import (
     entity_registry as er,
 )
@@ -38,6 +37,17 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+try:
+    from homeassistant.exceptions import UnsupportedStorageVersionError
+except ImportError:
+    # HA < 2026.3 has no downgrade signal: Store hands a newer-major payload
+    # to ``_async_migrate_func`` instead, and our hook discards unknown
+    # majors itself — so this fallback is never raised; it only keeps the
+    # except clause in ``_load_safely`` valid on older installs.
+    class UnsupportedStorageVersionError(Exception):  # type: ignore[no-redef]
+        """Downgrade marker for Home Assistant releases before 2026.3."""
+
 
 from .const import (
     AC_SETPOINT_KEEPALIVE_SECONDS,
