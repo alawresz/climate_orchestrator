@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 
 import pytest
@@ -306,6 +307,22 @@ def test_from_dict_sanitises_history_kalman_and_params() -> None:
     assert len(ctrl.history) == 1
     assert ctrl.kalman is not None
     assert ctrl.kalman.variance == MAX_VARIANCE
+
+
+def test_from_dict_warns_when_history_samples_are_dropped(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """to_dict only writes finite samples, so any drop means corruption."""
+    good = {"dt": 1.0, "temp": 20.0, "next_temp": 20.1, "valve": 0.5, "outdoor": 5.0}
+    bad = dict(good, temp=float("nan"))
+    with caplog.at_level(logging.WARNING):
+        MpcController.from_dict({"gain": 0.1, "loss": 0.01, "history": [good, bad]})
+    assert "Discarded 1 corrupt MPC history sample" in caplog.text
+
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        MpcController.from_dict({"gain": 0.1, "loss": 0.01, "history": [good]})
+    assert "Discarded" not in caplog.text
 
 
 def test_from_dict_drops_non_finite_kalman_state() -> None:

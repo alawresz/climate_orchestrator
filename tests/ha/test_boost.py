@@ -235,6 +235,41 @@ async def test_expired_boost_reverts_on_restart(
     assert "boost_until" not in state.attributes
 
 
+async def test_garbage_boost_until_reverts_instead_of_crashing(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """A non-string boost_until (corrupt storage) is treated as expired."""
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat")
+    mock_restore_cache(
+        hass,
+        [
+            State(
+                "climate.climate_orchestrator",
+                "heat",
+                {
+                    "preset_mode": "boost",
+                    "boost_until": 12345,  # not a datetime string
+                    "boost_previous_preset": "sleep",
+                    "boost_direction": "heat",
+                },
+            )
+        ],
+    )
+
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id_for("climate", config_entry.entry_id))
+    assert state.attributes[ATTR_PRESET_MODE] == "sleep"
+    assert "boost_until" not in state.attributes
+
+
 async def test_boost_deselected_mid_boost_reverts_to_previous_preset(
     hass: HomeAssistant,
     config_entry: MockConfigEntry,

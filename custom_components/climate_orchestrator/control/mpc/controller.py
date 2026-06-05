@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import asdict
+import logging
 import math
 from typing import TYPE_CHECKING, Any
 
@@ -28,6 +29,8 @@ from .optimizer import DEFAULT_HORIZON, optimize_valve
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+_LOGGER = logging.getLogger(__name__)
 
 DEFAULT_MAX_HISTORY = 200
 # Transitions longer than this (HA freeze, restart gap, long device outage)
@@ -185,6 +188,7 @@ class MpcController:
             ),
             max_history=max_history,
         )
+        dropped = 0
         for sample in data.get("history", []):
             restored = Sample(**sample)
             if all(
@@ -198,6 +202,17 @@ class MpcController:
                 )
             ):
                 controller.history.append(restored)
+            else:
+                dropped += 1
+        if dropped:
+            # to_dict only ever writes finite samples, so any drop means the
+            # store was corrupted — say so instead of silently re-learning.
+            _LOGGER.warning(
+                "Discarded %d corrupt MPC history sample(s) on restore;"
+                " the model continues from the remaining %d",
+                dropped,
+                len(controller.history),
+            )
         if (kalman := data.get("kalman")) is not None:
             state = KalmanState(**kalman)
             if (

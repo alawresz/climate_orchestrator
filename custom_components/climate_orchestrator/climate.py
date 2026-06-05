@@ -230,7 +230,12 @@ class SmartClimateClimateEntity(SmartClimateBaseEntity, RestoreEntity, ClimateEn
             self._boost_previous = previous
         if last.attributes.get("boost_direction") == "cool":
             self._boost_demand = "cool"
-        until = dt_util.parse_datetime(last.attributes.get("boost_until") or "")
+        # Restored attributes are arbitrary JSON: parse_datetime raises
+        # TypeError on non-strings, so type-check before parsing.
+        raw_until = last.attributes.get("boost_until")
+        until = (
+            dt_util.parse_datetime(raw_until) if isinstance(raw_until, str) else None
+        )
         remaining = (
             (until - dt_util.utcnow()).total_seconds() if until is not None else 0.0
         )
