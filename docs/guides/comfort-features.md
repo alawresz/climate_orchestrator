@@ -121,7 +121,9 @@ valve more now to stay ahead of the loss.
 To keep comfort safe it only ever *raises* the valve: the commanded opening is the
 larger of the normal (react-to-now) result and the forecast-aware result, so the
 forecast can pre-heat but never under-heat the present. The forecast is refreshed
-about every 15 minutes. Needs a weather entity that provides an hourly forecast;
+about every 15 minutes; if the weather entity stops responding, a cached
+forecast older than ~3 hours is ignored rather than trusted (the optimiser
+falls back to planning against the current outdoor temperature). Needs a weather entity that provides an hourly forecast;
 without one, a repair notice points you to add it (or turn the feature off).
 
 See [Hardware](hardware.md) for what MPC calibration mode actually does, and the

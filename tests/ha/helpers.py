@@ -216,6 +216,11 @@ def forecast_cache(coordinator: SmartClimateCoordinator) -> list[float]:
     return coordinator._adaptation._forecast_hourly
 
 
+def expire_forecast(coordinator: SmartClimateCoordinator) -> None:
+    """Age the cached forecast past the staleness cap (dead weather entity)."""
+    coordinator._adaptation._forecast_fetched_at = time.monotonic() - 4.0 * 3600.0
+
+
 def precondition_series(
     coordinator: SmartClimateCoordinator, dt_minutes: float, settings: Any
 ) -> list[float] | None:

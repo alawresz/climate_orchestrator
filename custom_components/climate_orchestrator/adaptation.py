@@ -36,6 +36,10 @@ _LOGGER = logging.getLogger(__name__)
 # Cap on cached hourly forecast entries. The longest look-ahead is 8 h; two
 # days is already generous — a buggy weather entity must not grow the cache.
 _FORECAST_MAX_HOURS = 48
+# A forecast this stale is worse than none: the optimiser would precondition
+# against weather from hours ago. Refreshes retry every cycle once due, so
+# 3 h means a *persistently* failing weather entity, not a blip.
+_FORECAST_MAX_AGE_SECONDS = 3.0 * 3600.0
 
 
 class WeatherAdaptation:
@@ -163,6 +167,10 @@ class WeatherAdaptation:
         is no forecast yet.
         """
         if not settings.forecast_preconditioning or not self._forecast_hourly:
+            return None
+        if time.monotonic() - self._forecast_fetched_at > _FORECAST_MAX_AGE_SECONDS:
+            # The weather entity has been failing for hours; preconditioning
+            # against its last words would steer the valve on dead data.
             return None
         steps = round(settings.preconditioning_horizon * 60.0 / dt_min)
         steps = max(1, min(steps, PRECONDITION_MAX_STEPS))
