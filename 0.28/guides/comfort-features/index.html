@@ -1551,7 +1551,9 @@ valve more now to stay ahead of the loss.</p>
 <p>To keep comfort safe it only ever <em>raises</em> the valve: the commanded opening is the
 larger of the normal (react-to-now) result and the forecast-aware result, so the
 forecast can pre-heat but never under-heat the present. The forecast is refreshed
-about every 15 minutes. Needs a weather entity that provides an hourly forecast;
+about every 15 minutes; if the weather entity stops responding, a cached
+forecast older than ~3 hours is ignored rather than trusted (the optimiser
+falls back to planning against the current outdoor temperature). Needs a weather entity that provides an hourly forecast;
 without one, a repair notice points you to add it (or turn the feature off).</p>
 <p>See <a href="../hardware/">Hardware</a> for what MPC calibration mode actually does, and the
 <a href="../../internals/mpc/">MPC deep dive</a> for the maths.</p>
@@ -1576,7 +1578,7 @@ without one, a repair notice points you to add it (or turn the feature off).</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 5, 2026 16:19:47 UTC">June 5, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 5, 2026 22:16:38 UTC">June 5, 2026</span>
   </span>
 
     
