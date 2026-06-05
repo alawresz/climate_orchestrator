@@ -1,7 +1,9 @@
 # Tooling and CI
 
-The project targets Python 3.12+ (HA's runtime) with current best practices
-enforced by ruff + mypy in CI.
+The project develops against current Home Assistant's Python while keeping the
+source loadable on the oldest supported HA install — two distinct version
+gates, explained [below](#python-versions-two-gates) — with current best
+practices enforced by ruff + mypy in CI.
 
 ## Stack at a glance
 
@@ -24,6 +26,34 @@ enforced by ruff + mypy in CI.
 dependency set; `uv sync --dev` reproduces it and `uv run <task>` executes
 inside it. CI installs uv (with Python 3.14, HA's runtime) via
 `astral-sh/setup-uv`.
+
+## Python versions: two gates
+
+The integration is **not installed as a Python package**: the release zip is
+built from `custom_components/climate_orchestrator/` alone, HACS copies that
+folder into the user's config, and HA imports it as plain modules. No packaging
+metadata travels with it — the only dependency file HA reads is
+`manifest.json` (that's how `scipy` gets installed). `pyproject.toml` is the
+dev-tooling project only (`[tool.uv] package = false`), so its constraints
+never gate a user's install. Two settings therefore govern two different
+things:
+
+- **`requires-python` (currently `>=3.14.2`)** — the dev/test environment
+  floor, tracking current HA's runtime. It exists so uv resolves one coherent
+  lockfile instead of keeping resolution forks for old interpreters (pinned to
+  ancient, CVE-laden HA releases). mypy's `python_version` matches it because
+  mypy parses the installed `homeassistant` sources.
+- **`ruff target-version` (currently `py313`)** — the source-compatibility
+  floor: the oldest Python an HA install we support might run. Since nothing
+  enforces a version at install time, ruff is the only guard that the code
+  stays *loadable* there.
+
+This split is why `from __future__ import annotations` stays in every module:
+the `TC` ruleset moves type-only imports into `if TYPE_CHECKING:` blocks, and
+on pre-3.14 interpreters (eager annotation evaluation, no PEP 649) those
+annotations would otherwise `NameError` at import. The future imports become
+droppable only when the minimum supported HA guarantees Python 3.14 and
+`target-version` is bumped to match.
 
 ## ruff ruleset rationale
 
