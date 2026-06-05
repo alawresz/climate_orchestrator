@@ -73,7 +73,11 @@ of surfacing as a broken install.
 
 - `actions/attest-build-provenance` records verifiable build provenance for
   the zip; verify with
-  `gh attestation verify climate_orchestrator.zip -R <repo>`.
+  `gh attestation verify climate_orchestrator.zip -R <repo>`. The Sigstore
+  bundle is also attached to the release as
+  `climate_orchestrator.zip.intoto.jsonl`, so the provenance is visible to
+  scanners (OpenSSF Scorecard's Signed-Releases check) and verifiable offline
+  (`cosign verify-blob --bundle`).
 - HACS installs that exact asset: `hacs.json` sets `zip_release` plus
   `filename`, so HACS downloads the published `climate_orchestrator.zip` from
   the GitHub Release rather than cloning the repository tree.

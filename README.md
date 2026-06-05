@@ -6,7 +6,6 @@
 [![codecov](https://codecov.io/gh/alawresz/climate_orchestrator/graph/badge.svg)](https://codecov.io/gh/alawresz/climate_orchestrator)
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/alawresz/climate_orchestrator/badge)](https://scorecard.dev/viewer/?uri=github.com/alawresz/climate_orchestrator)
-[![License: MIT](https://img.shields.io/github/license/alawresz/climate_orchestrator)](./LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 One thermostat for the whole house. Instead of controlling each radiator valve

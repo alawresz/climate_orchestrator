@@ -139,8 +139,9 @@ fail_under = 95
 
 [tool.codespell]
 # Shared by the pre-commit hook and the CI step. `hass` is the Home Assistant
-# fixture/handle, not a misspelt "hash"; skip the lockfile and syrupy snapshots.
-ignore-words-list = "hass"
+# fixture/handle, not a misspelt "hash"; `intoto` is the in-toto provenance
+# format; skip the lockfile and syrupy snapshots.
+ignore-words-list = "hass,intoto"
 skip = "*.lock,*.ambr,./.git,./htmlcov,./mutants"
 
 [tool.mutmut]

@@ -8,14 +8,10 @@ on:
     types: [completed]
     branches: [main, "feat/**", "fix/**"]
 
-# Needs write access to push the version-bump commit + tag and create the release.
-permissions:
-  contents: write
-  # For the build-provenance attestation of the HACS zip asset.
-  id-token: write
-  attestations: write
-  # To dispatch the versioned-docs deploy (docs.yml) after a release.
-  actions: write
+# All write scopes live on the release job itself (least privilege at the
+# workflow level; there is only one job, but scanners score the two levels
+# differently and job-level is the tighter habit).
+permissions: {}
 
 concurrency:
   group: release-${{ github.event.workflow_run.head_branch }}
@@ -26,6 +22,14 @@ jobs:
     name: Semantic release
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      # Push the version-bump commit + tag and create the release.
+      contents: write
+      # For the build-provenance attestation of the HACS zip asset.
+      id-token: write
+      attestations: write
+      # To dispatch the versioned-docs deploy (docs.yml) after a release.
+      actions: write
     # Only release CI runs from this repo's own branches — a fork PR whose
     # branch happens to match feat/** must never reach a contents:write job.
     # And only *push* runs: pull_request runs of CI skip their jobs for
@@ -41,15 +45,22 @@ jobs:
       # is accepted by design for this job).
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3 # zizmor: ignore[artipacked]
         with:
-          # Release from the branch CI ran on (main or dev).
-          ref: ${{ github.event.workflow_run.head_branch }}
-          fetch-depth: 0
+          fetch-depth: 0 # PSR walks history; also fetches all branches
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Switch to the branch CI validated
+        # Checkout stays on the default branch (no event data in action
+        # inputs); the branch switch happens here, where the job guard above
+        # has already proven it is a same-repo branch from the workflow_run
+        # branches filter — and env interpolation keeps the name out of the
+        # shell syntax.
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: git checkout "$HEAD_BRANCH"
       - name: Python Semantic Release
         id: release
         # Reads [tool.semantic_release] branch config to decide stable vs
-        # prerelease, bumps pyproject.toml + manifest.json, updates the
-        # changelog, commits + tags, and publishes the GitHub Release.
+        # prerelease, bumps manifest.json, updates the changelog, commits +
+        # tags, and publishes the GitHub Release.
         uses: python-semantic-release/python-semantic-release@350c48fcb3ffcdfd2e0a235206bc2ecea6b69df0 # v10.5.3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -98,7 +109,21 @@ jobs:
       - name: Attest build provenance of the HACS zip
         # Verifiable provenance for the exact artifact HACS installs:
         #   gh attestation verify climate_orchestrator.zip -R <owner>/<repo>
+        id: attest
         if: steps.release.outputs.released == 'true'
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
           subject-path: dist/climate_orchestrator.zip
+      - name: Attach the provenance bundle to the release
+        # The attestation store is the authoritative copy (gh attestation
+        # verify works without this); attaching the Sigstore bundle as a
+        # release asset makes the provenance visible to scanners and usable
+        # offline (cosign verify-blob --bundle).
+        if: steps.release.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          cp "$BUNDLE" climate_orchestrator.zip.intoto.jsonl
+          gh release upload "$TAG" climate_orchestrator.zip.intoto.jsonl --clobber

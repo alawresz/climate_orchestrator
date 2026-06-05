@@ -163,10 +163,14 @@ with a comment naming the commit it recovered at:
   vary with HA. Scheduled, so neither gates PRs; a red floor run means either
   a compat fix or raising the floor.
 
-Two further automation workflows round things out. A weekly
+Three further automation workflows round things out. A weekly
 **`scorecard.yml`** runs OpenSSF Scorecard over the repo's supply-chain
 practices (pinned actions, token permissions, update tooling), feeding the
-Security → Code scanning panel and the README badge.
+Security → Code scanning panel and the README badge. **`codeql.yml`** runs
+CodeQL's Python SAST on source changes and weekly — modest expected yield
+next to ruff/mypy/zizmor, but it keeps security static analysis continuous.
+The repo also ships a root **`SECURITY.md`** (private vulnerability
+reporting, supported versions, artifact verification).
 **`dependabot-automerge.yml`** arms auto-merge (squash) on Dependabot's
 grouped minor/patch PRs once CI is green — semver-major bumps stay manual; it
 relies on the repo's "Allow auto-merge" setting plus required status checks
