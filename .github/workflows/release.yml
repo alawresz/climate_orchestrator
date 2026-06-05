@@ -40,13 +40,24 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     steps:
+      - name: Mint an installation token for the release app
+        # PSR authenticates as a dedicated GitHub App on the main
+        # ruleset's bypass list. The installation token is short-lived.
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          # Scope the minted token to exactly what PSR needs: pushing the
+          # bump commit + tag and creating the release with its assets.
+          permission-contents: write
       # PSR pushes the version-bump commit + tag with the checked-out
       # credentials, so they must persist here (zizmor's artipacked finding
       # is accepted by design for this job).
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3 # zizmor: ignore[artipacked]
         with:
           fetch-depth: 0 # PSR walks history; also fetches all branches
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
       - name: Switch to the branch CI validated
         # Checkout stays on the default branch (no event data in action
         # inputs); the branch switch happens here, where the job guard above
@@ -60,15 +71,15 @@ jobs:
         id: release
         # Reads [tool.semantic_release] branch config to decide stable vs
         # prerelease, bumps manifest.json, updates the changelog, commits +
-        # tags, and publishes the GitHub Release.
+        # tags, and publishes the GitHub Release (as the release app).
         uses: python-semantic-release/python-semantic-release@350c48fcb3ffcdfd2e0a235206bc2ecea6b69df0 # v10.5.3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
       - name: Upload the HACS zip to the release
         if: steps.release.outputs.released == 'true'
         uses: python-semantic-release/publish-action@68eaac9f1f594e9ec4b985245d06355734f43eea # v10.5.3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
           tag: ${{ steps.release.outputs.tag }}
       - name: Verify the published zip
         # The zip is what HACS actually installs; the attestation proves who
@@ -91,11 +102,10 @@ jobs:
           test "v$version" = "$TAG"
           echo "zip OK: manifest.json at root, version $version matches $TAG"
       - name: Deploy versioned docs
-        # PSR creates the GitHub Release with the default GITHUB_TOKEN, and
-        # GitHub never fires `release` events for token-created releases — so
-        # docs.yml's `on: release` trigger won't see ours. workflow_dispatch
-        # IS token-triggerable, so kick the versioned deploy explicitly.
-        # Stable releases only: prereleases must not move the docs.
+        # docs.yml deliberately has no `release` trigger: app-token-created
+        # releases fire release events for stables AND prereleases, and a
+        # prerelease must never move the docs. This explicit dispatch is the
+        # only deploy path — stable releases only.
         if: >-
           steps.release.outputs.released == 'true' &&
           github.event.workflow_run.head_branch == 'main'

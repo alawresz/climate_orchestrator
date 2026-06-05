@@ -11,17 +11,17 @@ name: Docs
 # drifts far ahead of the newest numbered version.
 #
 # - Stable release   -> release.yml dispatches this workflow with version
-#                       "X.Y" + latest (GitHub doesn't fire `release` events
-#                       for GITHUB_TOKEN-created releases, so the trigger
-#                       below only covers hand-published ones).
+#                       "X.Y" + latest. Deliberately NO `release` trigger
+#                       here: PSR publishes with the release app's token,
+#                       whose release events fire for stables AND
+#                       prereleases — and a prerelease must never move the
+#                       docs.
 # - Manual dispatch  -> bootstrap/repair any version by hand, or refresh the
 #                       current version after a docs-only (`docs:`) commit
 #                       that didn't cut a release.
 #
 # The strict no-deploy build gating PRs lives in ci.yml.
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       version:
@@ -67,27 +67,11 @@ jobs:
       - name: Resolve docs version
         id: ver
         env:
-          EVENT: ${{ github.event_name }}
-          TAG: ${{ github.event.release.tag_name }}
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_LATEST: ${{ inputs.set_latest }}
         run: |
-          case "$EVENT" in
-            release)
-              # vX.Y.Z -> X.Y (patches update their minor's docs)
-              v="${TAG#v}"; v="${v%.*}"
-              echo "version=$v" >> "$GITHUB_OUTPUT"
-              echo "latest=true" >> "$GITHUB_OUTPUT"
-              ;;
-            workflow_dispatch)
-              echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
-              echo "latest=$INPUT_LATEST" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              echo "unexpected trigger: $EVENT" >&2
-              exit 1
-              ;;
-          esac
+          echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "latest=$INPUT_LATEST" >> "$GITHUB_OUTPUT"
       - name: Update the version database with mike
         env:
           VERSION: ${{ steps.ver.outputs.version }}

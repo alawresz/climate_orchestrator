@@ -183,10 +183,12 @@ and the next push diffs against the last release tag, which includes it).
 **`docs.yml` (documentation deploy):** builds the versioned MkDocs site with
 mike and publishes it to GitHub Pages through the Actions deploy path. Only
 released versions are published: a stable release deploys **X.Y** and
-re-points **latest** (dispatched explicitly from `release.yml`, because
-GitHub fires no `release` events for releases created with the workflow
-token); `workflow_dispatch` can bootstrap or repair any version, or refresh
-the current one after a docs-only commit that cut no release. There is no
+re-points **latest**, dispatched explicitly from `release.yml`. There is
+deliberately no `release` trigger — PSR publishes with the release app's
+token, whose release events fire for stables and prereleases alike, and a
+prerelease must never move the docs. `workflow_dispatch` can bootstrap or
+repair any version, or refresh the current one after a docs-only commit
+that cut no release. There is no
 rolling *dev* build of `main` — semantic-release versions nearly every
 change, so main never drifts far ahead of the newest numbered docs. The PR
 gate (`mkdocs build --strict`) lives in `ci.yml`; see [Releases](releases.md)
