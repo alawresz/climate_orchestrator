@@ -181,7 +181,7 @@ source = ["custom_components/climate_orchestrator"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 95
+fail_under = 97
 
 [tool.codespell]
 # Shared by the pre-commit hook and the CI step. `hass` is the Home Assistant

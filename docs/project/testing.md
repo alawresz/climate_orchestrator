@@ -74,7 +74,7 @@ adaptive-cooling-comfort outputs. Regenerate intentionally with
 
 ## Coverage gate
 
-**pytest-cov** targets ≥ 95% line **+ branch** coverage on `control/`,
+**pytest-cov** targets ≥ 97% line **+ branch** coverage on `control/`,
 `sensing/`, `devices/`, gated in CI. Coverage is *not* forced in
 `pyproject.toml` `addopts` — that would break single-file runs (`fail_under`)
 and mutmut's per-mutant subset runs; CI passes `--cov` explicitly. Run it
@@ -85,7 +85,12 @@ uv run pytest --cov=custom_components/climate_orchestrator
 ```
 
 A `codecov.yml` splits coverage into components (control / devices / sensing /
-shell) for visibility; the hard 95% gate stays in pytest.
+shell) for visibility; the hard 97% gate stays in pytest. The few lines left
+uncovered are deliberate: defensive guards unreachable through the public
+surface (e.g. the target-mode branch of `_calibration_writes`, which its only
+caller already filters out) and the `UnsupportedStorageVersionError` import
+fallback, which only executes on HA < 2026.3 and is exercised by the floor
+canary rather than the gated run (excluded via `pragma: no cover`).
 
 ## Mutation testing (mutmut)
 

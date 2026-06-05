@@ -21,7 +21,7 @@ from .const import DOMAIN
 
 try:
     from homeassistant.exceptions import UnsupportedStorageVersionError
-except ImportError:
+except ImportError:  # pragma: no cover - only runs on HA < 2026.3 (floor canary)
     # HA < 2026.3 has no downgrade signal: Store hands a newer-major payload
     # to ``_async_migrate_func`` instead, and our hook discards unknown
     # majors itself — so this fallback is never raised; it only keeps the
