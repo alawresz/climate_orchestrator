@@ -72,6 +72,20 @@ jobs:
               --label ci \
               --body "The weekly HA pre-release canary failed: $url"
           fi
+      - name: Close the tracking issue on recovery
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Canary: tests failing against the HA pre-release"
+        run: |
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$number" ]; then
+            url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            commit="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA"
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" \
+              --comment "Passing again as of ${GITHUB_SHA:0:7} ($commit) — green run: $url"
+          fi
 
   pytest-ha-floor:
     name: pytest against the oldest supported HA
@@ -131,4 +145,18 @@ jobs:
             gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" \
               --label ci \
               --body "$body"
+          fi
+      - name: Close the tracking issue on recovery
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Canary: tests failing against the oldest supported HA"
+        run: |
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$number" ]; then
+            url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            commit="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA"
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" \
+              --comment "Passing again as of ${GITHUB_SHA:0:7} ($commit) — green run: $url"
           fi

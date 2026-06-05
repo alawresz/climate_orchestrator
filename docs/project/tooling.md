@@ -142,8 +142,8 @@ when the same ref is pushed again, and every job carries a 30-minute timeout
   over the CDN; the SVG source stays in the repo-root `brand/`.
 
 Two scheduled workflows complement CI; each files (or bumps) a `ci`-labelled
-tracking issue when it fails, because nobody reliably reads scheduled-run
-emails:
+tracking issue when it fails and closes it again on the first green run, 
+with a comment naming the commit it recovered at:
 
 - A weekly **`links.yml`** runs lychee over the README, the changelog, the
   docs chapters, and the issue/PR templates to catch dead *external* links
