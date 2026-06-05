@@ -95,6 +95,7 @@ climate_orchestrator/
 │       ├── supervision.py         # DeviceSupervisor: command-ignored watchdog + manual-override takeover
 │       ├── repairs.py             # repair-issue helpers (raise/clear Repairs notices)
 │       ├── windows.py             # WindowMonitor: per-area window debounce + grace-delay rechecks
+│       ├── persistence.py         # LearnedStateStores: schema-versioned stores + flash-wear limiter
 │       ├── settings.py            # NumberSetting/SwitchSetting registries + RuntimeSettings resolver
 │       ├── entity.py              # shared base entity + hub DeviceInfo
 │       ├── diagnostics.py         # downloadable diagnostics dump

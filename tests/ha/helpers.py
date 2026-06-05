@@ -158,17 +158,17 @@ def state_payload(coordinator: SmartClimateCoordinator) -> dict[str, Any]:
 
 def mpc_store(coordinator: SmartClimateCoordinator) -> Any:
     """The learned-MPC Store (simulate restores by saving crafted payloads)."""
-    return coordinator._mpc_store
+    return coordinator._stores._mpc_store
 
 
 def state_store(coordinator: SmartClimateCoordinator) -> Any:
     """The slow-state Store (maintenance clock, rmot, bias integrals)."""
-    return coordinator._maint_store
+    return coordinator._stores._state_store
 
 
 def expire_persist_limiter(coordinator: SmartClimateCoordinator) -> None:
     """Make the flash-wear rate limiter consider a persist due now."""
-    coordinator._last_persist = time.monotonic() - 1000.0
+    coordinator._stores._last_persist = time.monotonic() - 1000.0
 
 
 def maintenance_clock(coordinator: SmartClimateCoordinator) -> float | None:

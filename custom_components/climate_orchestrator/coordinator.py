@@ -34,19 +34,7 @@ from homeassistant.helpers import (
 from homeassistant.helpers.event import (
     async_track_state_change_event,
 )
-from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-
-try:
-    from homeassistant.exceptions import UnsupportedStorageVersionError
-except ImportError:
-    # HA < 2026.3 has no downgrade signal: Store hands a newer-major payload
-    # to ``_async_migrate_func`` instead, and our hook discards unknown
-    # majors itself — so this fallback is never raised; it only keeps the
-    # except clause in ``_load_safely`` valid on older installs.
-    class UnsupportedStorageVersionError(Exception):  # type: ignore[no-redef]
-        """Downgrade marker for Home Assistant releases before 2026.3."""
-
 
 from .const import (
     AC_SETPOINT_KEEPALIVE_SECONDS,
@@ -114,6 +102,7 @@ from .models import (
     SmartClimateData,
     Status,
 )
+from .persistence import LearnedStateStores
 from .repairs import calibration_issue, environment_issues, toggle_issue
 from .sensing.registry import build_snapshot
 from .settings import (
@@ -130,45 +119,8 @@ from .windows import WindowMonitor
 if TYPE_CHECKING:
     from collections.abc import Coroutine
 
-_MPC_STORE_VERSION = 1
-
-
-class _LearnedStateStore(Store[dict[str, Any]]):
-    """Learned-state store with explicit schema-migration semantics.
-
-    Everything persisted here is re-learnable in hours, so the migration
-    policy is deliberately blunt: a payload whose schema we don't positively
-    recognise is discarded rather than risk a mis-read. Same-major minor
-    drift reads forward-compatibly (loaders validate field-by-field anyway).
-    """
-
-    async def _async_migrate_func(
-        self,
-        old_major_version: int,
-        _old_minor_version: int,
-        old_data: dict[str, Any],
-    ) -> dict[str, Any]:
-        if old_major_version == _MPC_STORE_VERSION:
-            return old_data
-        _LOGGER.warning(
-            "climate_orchestrator: discarding persisted state with unknown"
-            " schema v%s (current v%s); it will be re-learned",
-            old_major_version,
-            _MPC_STORE_VERSION,
-        )
-        return {}
-
-
 # Skip number writes within this of the current value (update minimization).
 NUMBER_WRITE_EPSILON = 0.1
-_MPC_SAVE_DELAY = 30.0
-# Learned state (MPC history, rmot EMA, bias integrals) moves slowly but
-# *continuously*, so saving "on change" degenerates to saving every cycle —
-# one flash write per ~90 s, forever, on SD-card Home Assistant boxes. Persist
-# at most every this many seconds instead; a crash loses only that much slow
-# drift (clean stops still flush pending saves via the Store itself).
-_PERSIST_INTERVAL = 900.0
-
 # Trailing window (seconds) and sample cap for the home temperature-slope figure.
 _SLOPE_WINDOW_SECONDS = 900.0
 _SLOPE_MAX_SAMPLES = 240
@@ -308,9 +260,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self._cycle_settings: RuntimeSettings | None = None
         # Flash-wear rate limiting for the learned-state stores: when a save
         # was last scheduled, and the payloads it was scheduled with.
-        self._last_persist: float | None = None
-        self._mpc_scheduled: dict[str, Any] | None = None
-        self._state_scheduled: dict[str, Any] | None = None
+
         # All mutable per-device state, one DeviceRuntime per managed entity.
         self._devices: dict[str, DeviceRuntime] = {}
         # The last cycle's decisions, replaced wholesale every control run (so
@@ -339,11 +289,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         # watchdog + manual-override supervision.
         self._events = EventBridge(hass, entry.entry_id)
         self._supervisor = DeviceSupervisor(hass, entry.entry_id, self._events)
-        self._mpc_store: Store[dict[str, Any]] = _LearnedStateStore(
-            hass, _MPC_STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.mpc"
-        )
-        self._maint_store: Store[dict[str, Any]] = _LearnedStateStore(
-            hass, _MPC_STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.maintenance"
+        self._stores = LearnedStateStores(
+            hass,
+            entry.entry_id,
+            mpc_payload=self._mpc_persist_data,
+            state_payload=self._state_persist_data,
         )
 
     @callback
@@ -382,26 +332,6 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             self.hass, coro, name=f"{DOMAIN} {name}"
         )
 
-    @staticmethod
-    async def _load_store(
-        store: Store[dict[str, Any]], label: str
-    ) -> dict[str, Any] | None:
-        """Load a learned-state store; a newer-schema payload never breaks setup.
-
-        ``Store`` raises before our migrate hook when the stored *major*
-        version exceeds the current one (downgrade scenario) — learned state
-        is re-learnable, so discard it instead of failing the entry.
-        """
-        try:
-            return await store.async_load()
-        except UnsupportedStorageVersionError:
-            _LOGGER.warning(
-                "climate_orchestrator: persisted %s state was written by a"
-                " newer release; discarding it (it will be re-learned)",
-                label,
-            )
-            return None
-
     async def async_load_mpc(self) -> None:
         """Restore persisted MPC + maintenance state (call before first refresh).
 
@@ -410,7 +340,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         from the config would cycle store -> runtime -> store forever.
         """
         managed = set(self.device_ids)
-        data = await self._load_store(self._mpc_store, "MPC")
+        data = await self._stores.load_mpc()
         if data:
             for trv_id, payload in data.items():
                 if trv_id not in managed:
@@ -429,7 +359,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                         "climate_orchestrator: discarding corrupt MPC state for %s",
                         trv_id,
                     )
-        maint = await self._load_store(self._maint_store, "maintenance")
+        maint = await self._stores.load_state()
         if maint:
             # isfinite: Python's json happily round-trips NaN/Infinity, so a
             # corrupted store could otherwise poison comparisons downstream.
@@ -470,43 +400,6 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             for trv_id, rt in self._devices.items()
             if (controller := rt.mpc) is not None
         }
-
-    @callback
-    def _maybe_persist(self) -> None:
-        """Schedule learned-state saves, rate-limited for flash wear.
-
-        Called every control cycle, but a store is only (delay-)saved when at
-        least ``_PERSIST_INTERVAL`` has passed since the last scheduled save
-        *and* its payload actually differs from what was last scheduled.
-        """
-        now = time.monotonic()
-        if (
-            self._last_persist is not None
-            and now - self._last_persist < _PERSIST_INTERVAL
-        ):
-            return
-        scheduled = False
-        if (mpc := self._mpc_persist_data()) and mpc != self._mpc_scheduled:
-            self._mpc_scheduled = mpc
-            self._mpc_store.async_delay_save(self._mpc_persist_data, _MPC_SAVE_DELAY)
-            scheduled = True
-        if (state := self._state_persist_data()) != self._state_scheduled:
-            self._state_scheduled = state
-            self._maint_store.async_delay_save(
-                self._state_persist_data, _MPC_SAVE_DELAY
-            )
-            scheduled = True
-        if scheduled:
-            self._last_persist = now
-
-    @staticmethod
-    async def async_remove_stores(hass: HomeAssistant, entry_id: str) -> None:
-        """Delete the entry's persisted stores (called on entry removal)."""
-        for suffix in ("mpc", "maintenance"):
-            store: Store[dict[str, Any]] = Store(
-                hass, _MPC_STORE_VERSION, f"{DOMAIN}.{entry_id}.{suffix}"
-            )
-            await store.async_remove()
 
     @property
     def _options(self) -> dict[str, object]:
@@ -1338,7 +1231,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self._record_runtime(decisions)
         await self._apply_writes(writes)
         self._events.dispatch_cycle(data, window_state, settings, decisions)
-        self._maybe_persist()
+        self._stores.maybe_persist()
         self._maybe_auto_maintenance(settings, decisions)
 
     async def _apply_writes(
@@ -1412,7 +1305,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             if (runtime := self._devices.get(trv_id)) is not None:
                 runtime.mpc = None
                 runtime.valve = None
-        await self._mpc_store.async_save(self._mpc_persist_data())
+        await self._stores.save_mpc_now()
         await self.async_request_refresh()
 
     async def _write_number(self, entity_id: str, value: float) -> None:
@@ -1459,12 +1352,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                 )
                 await asyncio.sleep(dwell)
             self._last_maintenance = time.time()
-            state = self._state_persist_data()
-            await self._maint_store.async_save(state)
-            # Sync the flash-wear rate limiter: this payload is on disk, so
-            # the next due cycle must not schedule a redundant write of it.
-            self._state_scheduled = state
-            self._last_persist = time.monotonic()
+            await self._stores.save_state_now()
         finally:
             self._maintenance_running = False
             # Restore normal valve positions on the next cycle.
@@ -1487,10 +1375,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if self._last_maintenance is None:
             # First run after install: start the clock rather than acting now.
             self._last_maintenance = now
-            self._background(
-                self._maint_store.async_save(self._state_persist_data()),
-                "maintenance clock save",
-            )
+            self._background(self._stores.save_state_now(), "maintenance clock save")
             return
         if now - self._last_maintenance < settings.valve_maintenance_interval * 86400:
             return
@@ -1510,7 +1395,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if await self.async_run_valve_maintenance():
             return
         self._last_maintenance = time.time()
-        await self._maint_store.async_save(self._state_persist_data())
+        await self._stores.save_state_now()
         _LOGGER.warning(
             "climate_orchestrator: auto valve maintenance found no valve"
             " opening numbers on the configured TRVs; retrying next interval"
@@ -1524,8 +1409,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             self._unsub_state = None
         self._windows.shutdown()
         if any(rt.mpc is not None for rt in self._devices.values()):
-            await self._mpc_store.async_save(self._mpc_persist_data())
-        # The rate limiter may be holding back up to _PERSIST_INTERVAL of
-        # slow-moving state — flush it now that we're going away for real.
-        await self._maint_store.async_save(self._state_persist_data())
+            await self._stores.save_mpc_now()
+        # The rate limiter may be holding back slow-moving state — flush it
+        # now that we're going away for real.
+        await self._stores.save_state_now()
         await super().async_shutdown()

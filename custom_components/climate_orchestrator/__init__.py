@@ -14,6 +14,7 @@ from homeassistant.helpers import entity_registry as er
 
 from .const import CONFIG_ENTRY_VERSION, DEFAULT_PRESETS, PLATFORMS, PRESET_BOOST
 from .coordinator import SmartClimateConfigEntry, SmartClimateCoordinator
+from .persistence import async_remove_stores
 from .settings import enabled_presets, preset_number_key
 
 if TYPE_CHECKING:
@@ -63,7 +64,7 @@ async def async_remove_entry(
     hass: HomeAssistant, entry: SmartClimateConfigEntry
 ) -> None:
     """Clean up the entry's persisted learned state (.storage files)."""
-    await SmartClimateCoordinator.async_remove_stores(hass, entry.entry_id)
+    await async_remove_stores(hass, entry.entry_id)
 
 
 async def async_migrate_entry(

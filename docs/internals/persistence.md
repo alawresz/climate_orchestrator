@@ -6,7 +6,10 @@ bounded.
 
 ## Stores and what they hold
 
-A coordinator-owned `Store` (versioned) holds:
+`persistence.py`'s `LearnedStateStores` owns the entry's two versioned
+stores and their write discipline (rate limiting, payload dedupe,
+downgrade-safe loads); the coordinator supplies the payloads and maps
+restored data back onto runtime state. The stores hold:
 
 - learned MPC parameters/observer state per device,
 - preset values,
@@ -31,7 +34,7 @@ after a restart reasserting the configured band is the safer default.
 
 ## Schema versioning
 
-The store subclass `_LearnedStateStore` (`coordinator.py`) carries explicit
+The store subclass `_LearnedStateStore` (`persistence.py`) carries explicit
 schema-migration semantics. Everything persisted is re-learnable in hours, so
 the migration policy is deliberately blunt: a payload whose schema we don't
 positively recognise is discarded rather than risk a mis-read.
