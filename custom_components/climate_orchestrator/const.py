@@ -74,6 +74,9 @@ PRECONDITION_MAX_STEPS: Final = 600
 # A single control-cycle failure is contained by design (logged, retried next
 # cycle). This many *consecutive* failures means devices are no longer being
 # commanded at all — surface a repair instead of failing silently in the log.
+# Why 3: one failure is a transient (network blip, device mid-reload); three
+# in a row is ~4.5 min of no commands at the 90 s cadence — long enough to be
+# a real fault, short enough to surface before rooms drift noticeably.
 CONTROL_FAILURE_ISSUE_THRESHOLD: Final = 3
 
 # Command-ignored watchdog: a device whose service calls *succeed* but whose
@@ -82,6 +85,9 @@ CONTROL_FAILURE_ISSUE_THRESHOLD: Final = 3
 # integration) — surface a repair. Time-based rather than cycle-counted:
 # refreshes also fire on every state change, and a burst of unrelated sensor
 # updates must not fast-forward a device that simply reports back slowly.
+# Why 5 min: battery Zigbee TRVs report on wake intervals of roughly a minute,
+# so this allows several missed echoes before declaring non-compliance, while
+# still beating a human noticing a cold room.
 COMMAND_IGNORED_SECONDS: Final = 300.0
 
 # --- Events --------------------------------------------------------------------
@@ -118,6 +124,10 @@ MANUAL_OVERRIDE_DURATION_MAX: Final = 480.0
 # back transient repairs (no temperature source, stale sensor) — sensors often
 # take tens of seconds to report in after a Home Assistant restart. Once the
 # window elapses with still no reading, the missing-source repair is genuine.
+# Why 2 min: Zigbee/MQTT integrations typically restore entity states well
+# under a minute after startup; doubling that covers slow meshes without
+# hiding a genuinely missing source for long. Raise this first if a slow
+# setup flashes `degraded` on every restart.
 STARTUP_GRACE_SECONDS: Final = 120.0
 
 # --- Presets -----------------------------------------------------------------
@@ -163,6 +173,10 @@ COOL_OFF_OUTDOOR_DEFAULT: Final = 16.0
 AC_SETPOINT_BIAS_DEFAULT: Final = 1.5
 # Adaptive AC bias (integral feedback): ceiling on total bias, integral gain
 # (°C added per °C-minute of error), and decay applied when not cooling.
+# KI 0.05 means a sustained 1 °C error grows the bias by ~1 °C every 20 min —
+# slow enough not to overshoot a compressor's own lag, fast enough to converge
+# within an afternoon. Sane range ~0.01-0.1; the BIAS_MAX ceiling (not the
+# gain) is what bounds integral windup.
 AC_SETPOINT_BIAS_MAX_DEFAULT: Final = 4.0
 ADAPTIVE_BIAS_KI: Final = 0.05
 ADAPTIVE_BIAS_DECAY: Final = 0.5

@@ -195,7 +195,12 @@ gate (`mkdocs build --strict`) lives in `ci.yml`; see [Releases](releases.md)
 for where the dispatch hooks into the release flow.
 
 `__init__.async_migrate_entry` scaffolds config-entry migration
-(`CONFIG_ENTRY_VERSION`, refuses future-version downgrades).
+(`CONFIG_ENTRY_VERSION`, refuses future-version downgrades). When a change
+alters the config/options *schema* (renaming a key, changing its shape — not
+merely adding an optional key with a safe default): bump
+`CONFIG_ENTRY_VERSION` in `const.py` **and** the config flow's `VERSION`
+together, add the upgrade step to `async_migrate_entry`, and test it by
+setting up a `MockConfigEntry` carrying the old version and data shape.
 `quality_scale.yaml` tracks the HA integration quality scale — maintenance
 rules in [Contributing](contributing.md).
 

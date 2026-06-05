@@ -36,7 +36,12 @@ def set_desired_preset(
     *,
     target: float = 22.5,
 ) -> None:
-    """Fake the whole-home entity's desired state (home preset band)."""
+    """Fake the whole-home entity's desired state (home preset band).
+
+    Writes the state directly instead of going through the climate services —
+    for suites that haven't set up the climate platform (pure coordinator
+    tests); prefer real service calls when the entity exists.
+    """
     hass.states.async_set(
         climate_id, mode, {"temperature": target, "preset_mode": "home"}
     )
@@ -45,7 +50,11 @@ def set_desired_preset(
 async def select_calibration_mode(
     hass: HomeAssistant, entry_id: str, mode: str
 ) -> None:
-    """Pick a TRV calibration mode via the select entity, as the UI would."""
+    """Pick a TRV calibration mode via the select entity, as the UI would.
+
+    Requires the integration set up for ``entry_id`` (the select platform
+    must have created the calibration-mode entity).
+    """
     entity_id = er.async_get(hass).async_get_entity_id(
         "select", DOMAIN, f"{entry_id}_calibration_mode"
     )
@@ -72,6 +81,11 @@ async def setup_trv_with_number(
     Registers the TRV in ``area_id`` together with a number entity on the
     same device, named so the valve/calibration hints can discover it — the
     full device/entity-registry wiring the mpc/offset test paths need.
+
+    Call INSTEAD of the ``init_integration`` fixture (it sets up the config
+    entry itself); ``number_suffix`` must match one of the discovery hints
+    (``valve_opening_degree`` for mpc, ``local_temperature_calibration``
+    for offset) or the calibration paths fall back to ``target``.
     """
     config_entry.add_to_hass(hass)
     device = dr.async_get(hass).async_get_or_create(
