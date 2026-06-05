@@ -18,6 +18,10 @@ jobs:
   lychee:
     name: Check markdown links
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write # files the failure-tracking issue
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -34,3 +38,23 @@ jobs:
             ".github/ISSUE_TEMPLATE/*.yml"
             ".github/PULL_REQUEST_TEMPLATE.md"
           fail: true
+      - name: File a tracking issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Canary: the weekly link check is failing"
+        run: |
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" \
+              --body "Still failing: $url"
+          else
+            # --force: idempotent (updates instead of failing if it exists).
+            gh label create ci --repo "$GITHUB_REPOSITORY" --force \
+              --description "Automated CI failure tracking" --color D93F0B
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" \
+              --label ci \
+              --body "The weekly link check failed (dead external link?): $url"
+          fi

@@ -8,17 +8,71 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # A newer push to the same ref obsoletes the running build. Safe to cancel:
+  # release.yml only reacts to runs that *completed successfully*.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  lint-and-test:
-    name: Lint, type-check, test
+  changes:
+    name: Detect what changed
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Same-repo branches already run CI via the push event; the pull_request
+    # event would double every job. Forks have no push runs here, so their
+    # PRs still get CI.
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name != github.repository
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      docs: ${{ steps.filter.outputs.docs }}
+      integration: ${{ steps.filter.outputs.integration }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
-          # Full history: the docs build's git-revision-date-localized plugin
-          # derives per-page "last updated" dates from git log.
-          fetch-depth: 0
+          fetch-depth: 0 # the diff base is a tag / another branch
+      - name: Classify changed paths
+        id: filter
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            # A PR is judged by everything it changes against its base.
+            base="origin/$GITHUB_BASE_REF"
+          else
+            # A push is judged against the last release tag: exactly the
+            # commits semantic-release would put in the next release. (Diffing
+            # against the previous push instead would let an untested code
+            # push slip into a release if a later docs-only push went green.)
+            base="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+          fi
+          if [ -n "$base" ]; then
+            changed="$(git diff --name-only "$base"...HEAD)"
+          else
+            changed="" # no tag yet: run everything
+          fi
+          echo "$changed"
+          classify() {
+            if [ -z "$base" ] || echo "$changed" | grep -qE "$2"; then
+              echo "$1=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$1=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+          classify code '^(custom_components|tests|\.github/workflows)/|^(pyproject\.toml|uv\.lock|\.pre-commit-config\.yaml)$'
+          classify docs '^docs/|^(mkdocs\.yml|README\.md|CHANGELOG\.md)$'
+          classify integration '^custom_components/|^hacs\.json$'
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
       - name: Install uv (with Python 3.14, HA's runtime)
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
@@ -40,9 +94,27 @@ jobs:
           custom_components/climate_orchestrator/translations/en.json
       - name: Workflow security lint (zizmor)
         run: uvx zizmor --no-progress .github/workflows
-      - name: Docs build (strict)
-        # Same command as the Pages deploy — a broken docs link fails the PR.
-        run: uv run --group docs mkdocs build --strict
+      - name: Workflow correctness lint (actionlint)
+        # Complements zizmor (security): expression/syntax errors and
+        # shellcheck over run blocks. actionlint-py ships the real binary.
+        run: uvx --from actionlint-py==1.7.12.24 actionlint
+
+  test:
+    name: Type-check & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Install uv (with Python 3.14, HA's runtime)
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: "3.14"
+      - name: Install dependencies
+        run: uv sync --dev
       - name: mypy
         run: uv run mypy custom_components/climate_orchestrator
       - name: pytest (with coverage + JUnit results)
@@ -73,9 +145,33 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
+  docs:
+    name: Docs build (strict)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          # Full history: the git-revision-date-localized plugin derives
+          # per-page "last updated" dates from git log.
+          fetch-depth: 0
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: "3.14"
+      - name: MkDocs build (strict)
+        # Same command as the Pages deploy — a broken docs link fails the PR.
+        run: uv run --only-group docs mkdocs build --strict
+
   hassfest:
     name: hassfest (HA manifest/structure validation)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.integration == 'true'
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -87,6 +183,9 @@ jobs:
   hacs:
     name: HACS validation
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: changes
+    if: needs.changes.outputs.integration == 'true'
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:

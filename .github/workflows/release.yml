@@ -25,10 +25,15 @@ jobs:
   release:
     name: Semantic release
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # Only release CI runs from this repo's own branches — a fork PR whose
     # branch happens to match feat/** must never reach a contents:write job.
+    # And only *push* runs: pull_request runs of CI skip their jobs for
+    # same-repo branches (the push run is the real gate), so an all-skipped
+    # PR run finishing "success" first must not trigger a release.
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_repository.full_name == github.repository
     steps:
       # PSR pushes the version-bump commit + tag with the checked-out

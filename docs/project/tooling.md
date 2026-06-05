@@ -105,37 +105,57 @@ fixture/handle, not a misspelt "hash"), and the `strings.json` ↔
 
 ## CI workflows (GitHub Actions)
 
-CI is `.github/workflows/ci.yml`, which also unlocks HACS distribution. Jobs:
+CI is `.github/workflows/ci.yml`, which also unlocks HACS distribution. Jobs
+are **path-scoped** by a leading `changes` job so a docs-only change doesn't
+pay for the full test run: a pull request is classified by its diff against
+the base branch, a push by its diff against the **last release tag** — exactly
+the commits semantic-release would put in the next release, so a code push can
+never reach a release with its tests skipped by a later docs-only push. PRs
+from branches in this repo skip CI entirely (the push event already covers
+them; fork PRs still run). A concurrency group cancels obsolete in-flight runs
+when the same ref is pushed again, and every job carries a 30-minute timeout
+(here and in the other workflows) so nothing can burn runners for GitHub's
+6-hour default. The jobs:
 
-- **lint-and-test** — `uv sync --dev`, then `uv run ruff check .`,
-  `uv run ruff format --check .`,
-  `uv run mypy custom_components/climate_orchestrator`, and
-  `uv run pytest --cov-report=xml --junitxml=junit.xml`. Coverage goes to
+- **lint** (every change) — `uv run ruff check .` + `ruff format --check`,
+  codespell (same pinned hook as pre-commit), the `strings.json` ↔
+  `translations/en.json` byte-identity check, and two workflow linters:
+  **zizmor** (security) and **actionlint** (correctness: expression errors +
+  shellcheck over `run:` blocks, via the `actionlint-py` binary wheel).
+- **test** (code changes) — `uv run mypy custom_components/climate_orchestrator`
+  and `uv run pytest --cov-report=xml --junitxml=junit.xml`. Coverage goes to
   Codecov, and the JUnit file feeds **Codecov Test Analytics** (per-test run
   times, failure rates, flake detection — uploaded with
   `report_type: test_results`, even when pytest fails, since failure data is
   the point). CI pytest runs with `--timeout=120` (pytest-timeout; a CI-only
   flag, like coverage) and `HYPOTHESIS_PROFILE=ci` (no deadline —
   loaded-runner deadline flake protection).
-- **hassfest** — `home-assistant/actions/hassfest` validates the
-  manifest/structure, including `strings.json` — which is kept byte-identical
-  to `translations/en.json` (sync-checked in CI and pre-commit).
-- **hacs** — `hacs/action` with `category: integration`. `ignore: brands`
-  stays: that check looks for the domain in `home-assistant/brands`, while
-  since HA 2026.3 the icons ship *inside* the integration —
-  `custom_components/climate_orchestrator/brand/icon.png` + `icon@2x.png`,
-  served via the local brands proxy API and taking priority over the CDN; the
-  SVG source stays in the repo-root `brand/`.
+- **docs** (docs changes) — the strict no-deploy MkDocs build; the same
+  command as the Pages deploy, so a broken link or anchor fails the PR.
+- **hassfest** (integration changes) — `home-assistant/actions/hassfest`
+  validates the manifest/structure, including `strings.json`.
+- **hacs** (integration changes) — `hacs/action` with `category: integration`.
+  `ignore: brands` stays: that check looks for the domain in
+  `home-assistant/brands`, while since HA 2026.3 the icons ship *inside* the
+  integration — `custom_components/climate_orchestrator/brand/icon.png` +
+  `icon@2x.png`, served via the local brands proxy API and taking priority
+  over the CDN; the SVG source stays in the repo-root `brand/`.
 
-Two scheduled workflows complement CI:
+Two scheduled workflows complement CI; each files (or bumps) a `ci`-labelled
+tracking issue when it fails, because nobody reliably reads scheduled-run
+emails:
 
 - A weekly **`links.yml`** runs lychee over the README, the changelog, the
   docs chapters, and the issue/PR templates to catch dead *external* links
   (internal docs links are gated per-PR by the strict MkDocs build).
-- A weekly **`ha-dev.yml`** canary re-runs the test suite against Home
-  Assistant's latest *pre-release* (uv `--prerelease=allow` upgrade over the
-  locked venv) to catch upstream breaking changes weeks before they reach
-  users — scheduled, so it never gates PRs.
+- A weekly **`ha-dev.yml`** ("HA compatibility") canary covers both ends of
+  the supported HA range: the test suite **plus mypy** against HA's latest
+  *pre-release* (uv `--prerelease=allow` upgrade over the locked venv — type
+  errors often surface upstream breakage before tests do), and the test suite
+  against the **oldest supported HA** (hacs.json's floor, currently 2024.12,
+  via the matching PHACC pin in an unlocked Python 3.13 env) — the claimed
+  floor is only honest while something tests it. Scheduled, so neither gates
+  PRs; a red floor run means either a compat fix or raising the floor.
 
 **`docs.yml` (documentation deploy):** builds the versioned MkDocs site with
 mike and publishes it to GitHub Pages through the Actions deploy path. Only

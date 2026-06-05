@@ -46,9 +46,11 @@ zero.
 ## The release workflow
 
 A single workflow, **`release.yml`**, handles both stable and prerelease. It is
-triggered by a *successful* CI run on `main`, `feat/**`, or `fix/**`
-(`workflow_run`), so a red commit is never tagged. It checks out whichever
-branch CI ran on and runs PSR, which:
+triggered by a *successful* CI run of a **push** event on `main`, `feat/**`,
+or `fix/**` (`workflow_run`), so a red commit is never tagged — and a
+same-repo pull-request CI run (whose jobs are skipped as duplicates of the
+push run) can never trigger a release before the push run's tests finish. It
+checks out whichever branch CI ran on and runs PSR, which:
 
 1. reads the branch config to decide stable vs prerelease,
 2. bumps `pyproject.toml` + `manifest.json`,

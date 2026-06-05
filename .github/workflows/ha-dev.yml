@@ -1,11 +1,16 @@
-name: HA pre-release
+name: HA compatibility
 
-# Weekly canary: run the test suite against Home Assistant's latest
-# *pre-release* (beta) instead of the locked stable version. The integration
-# leans on HA internals (coordinator patterns, restore, storage, service
-# calls), so upstream breaking changes are caught here weeks before they ship
-# to users. Scheduled runs never gate PRs — a red run is a heads-up, not a
-# blocker.
+# Weekly canaries at both ends of the supported HA range. Scheduled runs never
+# gate PRs — a red run is a heads-up, not a blocker — but each failure files
+# (or bumps) a tracking issue so it can't go unnoticed.
+#
+# - pre-release: the test suite + mypy against HA's latest *beta*. The
+#   integration leans on HA internals (coordinator patterns, restore, storage,
+#   service calls), so upstream breaking changes are caught here weeks before
+#   they ship to users.
+# - floor: the test suite against the oldest supported HA (hacs.json's
+#   `homeassistant` floor) on Python 3.13 — the claim that old installs can
+#   run current releases is only honest if something tests it.
 on:
   schedule:
     - cron: "0 6 * * 2" # Tuesdays 06:00 UTC (HA betas branch on Wednesdays)
@@ -16,8 +21,12 @@ permissions:
 
 jobs:
   pytest-ha-prerelease:
-    name: pytest against HA pre-release
+    name: pytest + mypy against HA pre-release
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write # files the failure-tracking issue
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -38,3 +47,82 @@ jobs:
         env:
           HYPOTHESIS_PROFILE: ci
         run: uv run pytest --timeout=120
+      - name: mypy
+        # Beta breakage often shows up as signature changes before any test
+        # fails; run even if pytest already failed for the fuller picture.
+        if: ${{ !cancelled() }}
+        run: uv run mypy custom_components/climate_orchestrator
+      - name: File a tracking issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Canary: tests failing against the HA pre-release"
+        run: |
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" \
+              --body "Still failing: $url"
+          else
+            # --force: idempotent (updates instead of failing if it exists).
+            gh label create ci --repo "$GITHUB_REPOSITORY" --force \
+              --description "Automated CI failure tracking" --color D93F0B
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" \
+              --label ci \
+              --body "The weekly HA pre-release canary failed: $url"
+          fi
+
+  pytest-ha-floor:
+    name: pytest against the oldest supported HA
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write # files the failure-tracking issue
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Install uv (with Python 3.13, the source-compat floor)
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          python-version: "3.13"
+      - name: pytest against HA 2024.12 (the hacs.json floor)
+        # The lockfile targets current HA (requires-python >=3.14), so this
+        # builds an ephemeral unlocked env instead: PHACC 0.13.193 is the last
+        # build pinned to HA 2024.12.x and brings the whole matching test
+        # stack; the rest mirrors the dev group's non-PHACC test deps.
+        env:
+          HYPOTHESIS_PROFILE: ci
+        run: >-
+          uv run --no-project --python 3.13
+          --with "pytest-homeassistant-custom-component==0.13.193"
+          --with "scipy>=1.11"
+          --with "hypothesis>=6.0"
+          --with "pytest-randomly>=3.15"
+          --with "pytest-timeout>=2.3"
+          pytest --timeout=120
+      - name: File a tracking issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Canary: tests failing against the oldest supported HA"
+        run: |
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$TITLE\" in:title" --json number --jq '.[0].number // empty')"
+          body="The weekly oldest-supported-HA canary failed: $url —
+          either the code needs a compat fix, or the supported floor in
+          hacs.json + the docs needs raising."
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" \
+              --body "Still failing: $url"
+          else
+            # --force: idempotent (updates instead of failing if it exists).
+            gh label create ci --repo "$GITHUB_REPOSITORY" --force \
+              --description "Automated CI failure tracking" --color D93F0B
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" \
+              --label ci \
+              --body "$body"
+          fi

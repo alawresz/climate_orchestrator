@@ -43,6 +43,7 @@ jobs:
   build:
     name: Build versioned site (mike)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write # mike pushes its version database to the gh-pages branch
     steps:
@@ -111,6 +112,7 @@ jobs:
     name: Deploy to GitHub Pages
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       pages: write
       id-token: write
