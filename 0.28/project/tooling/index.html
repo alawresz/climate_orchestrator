@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -1149,6 +1149,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#python-versions-two-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python versions: two gates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ruff-ruleset-rationale" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1352,6 +1363,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#python-versions-two-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python versions: two gates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ruff-ruleset-rationale" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1432,8 +1454,10 @@
 
 
 <h1 id="tooling-and-ci">Tooling and CI<a class="headerlink" href="#tooling-and-ci" title="Permanent link">&para;</a></h1>
-<p>The project targets Python 3.12+ (HA's runtime) with current best practices
-enforced by ruff + mypy in CI.</p>
+<p>The project develops against current Home Assistant's Python while keeping the
+source loadable on the oldest supported HA install — two distinct version
+gates, explained <a href="#python-versions-two-gates">below</a> — with current best
+practices enforced by ruff + mypy in CI.</p>
 <h2 id="stack-at-a-glance">Stack at a glance<a class="headerlink" href="#stack-at-a-glance" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1497,6 +1521,32 @@ enforced by ruff + mypy in CI.</p>
 dependency set; <code>uv sync --dev</code> reproduces it and <code>uv run &lt;task&gt;</code> executes
 inside it. CI installs uv (with Python 3.14, HA's runtime) via
 <code>astral-sh/setup-uv</code>.</p>
+<h2 id="python-versions-two-gates">Python versions: two gates<a class="headerlink" href="#python-versions-two-gates" title="Permanent link">&para;</a></h2>
+<p>The integration is <strong>not installed as a Python package</strong>: the release zip is
+built from <code>custom_components/climate_orchestrator/</code> alone, HACS copies that
+folder into the user's config, and HA imports it as plain modules. No packaging
+metadata travels with it — the only dependency file HA reads is
+<code>manifest.json</code> (that's how <code>scipy</code> gets installed). <code>pyproject.toml</code> is the
+dev-tooling project only (<code>[tool.uv] package = false</code>), so its constraints
+never gate a user's install. Two settings therefore govern two different
+things:</p>
+<ul>
+<li><strong><code>requires-python</code> (currently <code>&gt;=3.14.2</code>)</strong> — the dev/test environment
+  floor, tracking current HA's runtime. It exists so uv resolves one coherent
+  lockfile instead of keeping resolution forks for old interpreters (pinned to
+  ancient, CVE-laden HA releases). mypy's <code>python_version</code> matches it because
+  mypy parses the installed <code>homeassistant</code> sources.</li>
+<li><strong><code>ruff target-version</code> (currently <code>py313</code>)</strong> — the source-compatibility
+  floor: the oldest Python an HA install we support might run. Since nothing
+  enforces a version at install time, ruff is the only guard that the code
+  stays <em>loadable</em> there.</li>
+</ul>
+<p>This split is why <code>from __future__ import annotations</code> stays in every module:
+the <code>TC</code> ruleset moves type-only imports into <code>if TYPE_CHECKING:</code> blocks, and
+on pre-3.14 interpreters (eager annotation evaluation, no PEP 649) those
+annotations would otherwise <code>NameError</code> at import. The future imports become
+droppable only when the minimum supported HA guarantees Python 3.14 and
+<code>target-version</code> is bumped to match.</p>
 <h2 id="ruff-ruleset-rationale">ruff ruleset rationale<a class="headerlink" href="#ruff-ruleset-rationale" title="Permanent link">&para;</a></h2>
 <p>ruff provides both formatting and linting in one tool. Beyond the basics, the
 ruleset enables: pycodestyle, pyflakes, isort, pyupgrade, flake8-bugbear,
@@ -1539,37 +1589,57 @@ fixture/handle, not a misspelt "hash"), and the <code>strings.json</code> ↔
 <code>translations/en.json</code> sync check (see
 <a href="../contributing/#project-conventions">Contributing</a>).</p>
 <h2 id="ci-workflows-github-actions">CI workflows (GitHub Actions)<a class="headerlink" href="#ci-workflows-github-actions" title="Permanent link">&para;</a></h2>
-<p>CI is <code>.github/workflows/ci.yml</code>, which also unlocks HACS distribution. Jobs:</p>
+<p>CI is <code>.github/workflows/ci.yml</code>, which also unlocks HACS distribution. Jobs
+are <strong>path-scoped</strong> by a leading <code>changes</code> job so a docs-only change doesn't
+pay for the full test run: a pull request is classified by its diff against
+the base branch, a push by its diff against the <strong>last release tag</strong> — exactly
+the commits semantic-release would put in the next release, so a code push can
+never reach a release with its tests skipped by a later docs-only push. PRs
+from branches in this repo skip CI entirely (the push event already covers
+them; fork PRs still run). A concurrency group cancels obsolete in-flight runs
+when the same ref is pushed again, and every job carries a 30-minute timeout
+(here and in the other workflows) so nothing can burn runners for GitHub's
+6-hour default. The jobs:</p>
 <ul>
-<li><strong>lint-and-test</strong> — <code>uv sync --dev</code>, then <code>uv run ruff check .</code>,
-  <code>uv run ruff format --check .</code>,
-  <code>uv run mypy custom_components/climate_orchestrator</code>, and
-  <code>uv run pytest --cov-report=xml --junitxml=junit.xml</code>. Coverage goes to
+<li><strong>lint</strong> (every change) — <code>uv run ruff check .</code> + <code>ruff format --check</code>,
+  codespell (same pinned hook as pre-commit), the <code>strings.json</code> ↔
+  <code>translations/en.json</code> byte-identity check, and two workflow linters:
+  <strong>zizmor</strong> (security) and <strong>actionlint</strong> (correctness: expression errors +
+  shellcheck over <code>run:</code> blocks, via the <code>actionlint-py</code> binary wheel).</li>
+<li><strong>test</strong> (code changes) — <code>uv run mypy custom_components/climate_orchestrator</code>
+  and <code>uv run pytest --cov-report=xml --junitxml=junit.xml</code>. Coverage goes to
   Codecov, and the JUnit file feeds <strong>Codecov Test Analytics</strong> (per-test run
   times, failure rates, flake detection — uploaded with
   <code>report_type: test_results</code>, even when pytest fails, since failure data is
   the point). CI pytest runs with <code>--timeout=120</code> (pytest-timeout; a CI-only
   flag, like coverage) and <code>HYPOTHESIS_PROFILE=ci</code> (no deadline —
   loaded-runner deadline flake protection).</li>
-<li><strong>hassfest</strong> — <code>home-assistant/actions/hassfest</code> validates the
-  manifest/structure, including <code>strings.json</code> — which is kept byte-identical
-  to <code>translations/en.json</code> (sync-checked in CI and pre-commit).</li>
-<li><strong>hacs</strong> — <code>hacs/action</code> with <code>category: integration</code>. <code>ignore: brands</code>
-  stays: that check looks for the domain in <code>home-assistant/brands</code>, while
-  since HA 2026.3 the icons ship <em>inside</em> the integration —
-  <code>custom_components/climate_orchestrator/brand/icon.png</code> + <code>icon@2x.png</code>,
-  served via the local brands proxy API and taking priority over the CDN; the
-  SVG source stays in the repo-root <code>brand/</code>.</li>
+<li><strong>docs</strong> (docs changes) — the strict no-deploy MkDocs build; the same
+  command as the Pages deploy, so a broken link or anchor fails the PR.</li>
+<li><strong>hassfest</strong> (integration changes) — <code>home-assistant/actions/hassfest</code>
+  validates the manifest/structure, including <code>strings.json</code>.</li>
+<li><strong>hacs</strong> (integration changes) — <code>hacs/action</code> with <code>category: integration</code>.
+  <code>ignore: brands</code> stays: that check looks for the domain in
+  <code>home-assistant/brands</code>, while since HA 2026.3 the icons ship <em>inside</em> the
+  integration — <code>custom_components/climate_orchestrator/brand/icon.png</code> +
+  <code>icon@2x.png</code>, served via the local brands proxy API and taking priority
+  over the CDN; the SVG source stays in the repo-root <code>brand/</code>.</li>
 </ul>
-<p>Two scheduled workflows complement CI:</p>
+<p>Two scheduled workflows complement CI; each files (or bumps) a <code>ci</code>-labelled
+tracking issue when it fails, because nobody reliably reads scheduled-run
+emails:</p>
 <ul>
 <li>A weekly <strong><code>links.yml</code></strong> runs lychee over the README, the changelog, the
   docs chapters, and the issue/PR templates to catch dead <em>external</em> links
   (internal docs links are gated per-PR by the strict MkDocs build).</li>
-<li>A weekly <strong><code>ha-dev.yml</code></strong> canary re-runs the test suite against Home
-  Assistant's latest <em>pre-release</em> (uv <code>--prerelease=allow</code> upgrade over the
-  locked venv) to catch upstream breaking changes weeks before they reach
-  users — scheduled, so it never gates PRs.</li>
+<li>A weekly <strong><code>ha-dev.yml</code></strong> ("HA compatibility") canary covers both ends of
+  the supported HA range: the test suite <strong>plus mypy</strong> against HA's latest
+  <em>pre-release</em> (uv <code>--prerelease=allow</code> upgrade over the locked venv — type
+  errors often surface upstream breakage before tests do), and the test suite
+  against the <strong>oldest supported HA</strong> (hacs.json's floor, currently 2025.2,
+  via the matching PHACC pin in an unlocked Python 3.13 env) — the claimed
+  floor is only honest while something tests it. Scheduled, so neither gates
+  PRs; a red floor run means either a compat fix or raising the floor.</li>
 </ul>
 <p><strong><code>docs.yml</code> (documentation deploy):</strong> builds the versioned MkDocs site with
 mike and publishes it to GitHub Pages through the Actions deploy path. Only
@@ -1621,7 +1691,7 @@ release.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 4, 2026 20:52:14 UTC">June 4, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 5, 2026 12:06:36 UTC">June 5, 2026</span>
   </span>
 
     
