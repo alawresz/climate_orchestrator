@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.28.6 (2026-06-05)
+
+### Bug Fixes
+
+- Tolerate corrupt restore data (boost deadline type check, MPC drop warning)
+  ([`102f4bd`](https://github.com/alawresz/climate_orchestrator/commit/102f4bd2aad4ab0b2d12edc9bce0f7e444233461))
+
+
 ## v0.28.5 (2026-06-05)
 
 ### Bug Fixes
