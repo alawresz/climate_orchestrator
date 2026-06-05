@@ -218,12 +218,14 @@ def build_snapshot(
     available = frozenset(eid for eid, r in readings.items() if r.available)
     unavailable = frozenset(eid for eid, r in readings.items() if not r.available)
 
+    extras = {
+        s
+        for s in (outdoor_sensor, home_temp_sensor, home_humidity_sensor)
+        if s is not None
+    }
     tracked: set[str] = (
-        set(device_ids) | temp_sensors | humidity_sensors | window_sensors
+        set(device_ids) | temp_sensors | humidity_sensors | window_sensors | extras
     )
-    for extra in (outdoor_sensor, home_temp_sensor, home_humidity_sensor):
-        if extra is not None:
-            tracked.add(extra)
 
     return SmartClimateData(
         home_avg_temperature=home_avg_temperature,

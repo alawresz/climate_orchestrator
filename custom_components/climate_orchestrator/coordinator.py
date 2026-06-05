@@ -363,8 +363,15 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
     @callback
     def _runtime(self, entity_id: str) -> DeviceRuntime:
-        """Return the device's mutable runtime state, created on first touch."""
-        return self._devices.setdefault(entity_id, DeviceRuntime())
+        """Return the device's mutable runtime state, created on first touch.
+
+        Once created, a device's runtime lives until the coordinator unloads
+        (or the device is evicted on reconfiguration) — it carries learned
+        MPC state, override deadlines, and command history.
+        """
+        if (runtime := self._devices.get(entity_id)) is None:
+            runtime = self._devices[entity_id] = DeviceRuntime()
+        return runtime
 
     @callback
     def _background(self, coro: Coroutine[Any, Any, Any], name: str) -> None:
@@ -442,9 +449,10 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                     if k in managed and isinstance(v, int | float) and math.isfinite(v):
                         self._runtime(k).ac_bias_integral = float(v)
             if isinstance(demand := maint.get("last_demand"), dict):
-                valid = {d.value for d in Demand}
+                # StrEnum members compare equal to their string values, so the
+                # raw persisted strings can be checked against the enum itself.
                 for k, v in demand.items():
-                    if k in managed and v in valid:
+                    if k in managed and v in set(Demand):
                         self._runtime(k).demand = Demand(v)
 
     @callback

@@ -141,13 +141,13 @@ class MpcController:
         """
         if len(self.history) < MIN_SAMPLES:
             return None
-        total = 0.0
-        for s in self.history:
-            predicted = s.dt * (
-                self.params.gain * s.valve - self.params.loss * (s.temp - s.outdoor)
-            )
-            total += (predicted - (s.next_temp - s.temp)) ** 2
-        return math.sqrt(total / len(self.history))
+        residuals = [
+            s.dt
+            * (self.params.gain * s.valve - self.params.loss * (s.temp - s.outdoor))
+            - (s.next_temp - s.temp)
+            for s in self.history
+        ]
+        return math.sqrt(sum(r * r for r in residuals) / len(residuals))
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise learned parameters and history for persistence."""

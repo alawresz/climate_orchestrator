@@ -12,9 +12,7 @@ from .model import DeviceCommand, DeviceState, Mode, Writes
 
 def reconcile(current: DeviceState, command: DeviceCommand, *, step: float) -> Writes:
     """Return the minimal writes to bring ``current`` to ``command``."""
-    set_mode = (
-        command.hvac_mode if current.hvac_mode != command.hvac_mode.value else None
-    )
+    set_mode = command.hvac_mode if current.hvac_mode != command.hvac_mode else None
 
     set_temperature: float | None = None
     if (
