@@ -18,7 +18,7 @@ live in `tests/ha/helpers.py` — which is also the **single point of access
 to coordinator internals**: tests that need to manipulate internal state
 (simulated clocks, injected learned models, store round-trips) go through
 its intention-named accessors (`runtime`, `set_maintenance_clock`,
-`window_timers`, `expire_startup_grace`, ...), never `coordinator._*`
+`window_timers`, `rmot`, `forecast_cache`, `expire_startup_grace`, ...), never `coordinator._*`
 directly. This is lint-enforced: ruff's `SLF001` (flake8-self) flags private
 access on other objects everywhere — source and tests alike — with
 `helpers.py` the single exempted file. Production refactors may break that
@@ -125,6 +125,13 @@ surfaces any mutant the suite fails to kill.
   papered over with a contrived test.
 
 ## Survivor ledger
+
+!!! note
+    Mutation testing covers the `control/` package only (the pure control
+    and MPC math, where a flipped sign survives every other net). The
+    stateful modules extracted from the coordinator — `windows.py`,
+    `persistence.py`, `adaptation.py`, `events.py`, `supervision.py` — are
+    exercised by the integration suites but are outside mutmut's scope.
 
 A clean run is **845 mutants, 25 surviving (~97% killed)** — measured on
 Python 3.14 with the locked HA stack; counts shift when `control/` or the

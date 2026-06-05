@@ -370,6 +370,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
     @callback
     def _state_persist_data(self) -> dict[str, Any]:
+        """Slow-state payload; LearnedStateStores calls this and dedupes."""
         return {
             "last": self._last_maintenance,
             "rmot": self._adaptation.rmot,
@@ -381,6 +382,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
     @callback
     def _mpc_persist_data(self) -> dict[str, Any]:
+        """Learned-MPC payload; LearnedStateStores calls this and dedupes."""
         return {
             trv_id: controller.to_dict()
             for trv_id, rt in self._devices.items()

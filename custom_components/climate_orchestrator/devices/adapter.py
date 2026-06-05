@@ -34,7 +34,12 @@ if TYPE_CHECKING:
 
 
 class ClimateAdapter:
-    """Read and command a single Home Assistant climate entity."""
+    """Read and command a single Home Assistant climate entity.
+
+    Stateless: a thin wrapper over state reads and service calls, meant to
+    be instantiated per use (the coordinator creates one per device per
+    cycle) — do not cache instances expecting them to track state.
+    """
 
     def __init__(self, hass: HomeAssistant, entity_id: str) -> None:
         """Bind the adapter to an entity."""

@@ -1,8 +1,9 @@
 # Persistence and restore
 
-Learned and latched state survives restarts; transient counters deliberately do
-not. Persistence is coordinator-owned, schema-versioned, flash-wear-aware, and
-bounded.
+Learned and latched state survives restarts; transient counters deliberately
+do not. Persistence is managed by `LearnedStateStores` (schema-versioned,
+flash-wear-aware, and bounded), with the payloads supplied by the
+coordinator.
 
 ## Stores and what they hold
 

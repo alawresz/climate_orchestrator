@@ -210,7 +210,8 @@ outdoor-aware.
 
 The window-open guard is debounced by a configurable **Window open delay**
 (`number`, minutes; default `0` = stop immediately). When an area's window
-opens, the coordinator records the open timestamp; the guard only suppresses
+opens, the window monitor records the open timestamp; the guard only
+suppresses
 that area's heating/cooling once the window has stayed open for at least the
 delay, so a brief airing doesn't interrupt an in-progress heat-up.
 
