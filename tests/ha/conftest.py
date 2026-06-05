@@ -42,10 +42,10 @@ def auto_enable_disabled_entities() -> Generator[None]:
 
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(
-    enable_custom_integrations: None,
-) -> Generator[None]:
+    enable_custom_integrations: None,  # noqa: ARG001 - fixture wired by name
+) -> None:
     """Enable loading of custom integrations in every test."""
-    yield
+    return
 
 
 @pytest.fixture

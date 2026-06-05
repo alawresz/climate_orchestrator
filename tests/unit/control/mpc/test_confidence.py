@@ -44,4 +44,5 @@ def test_fit_rmse_positive_when_model_misfits() -> None:
             Sample(dt=1.0, temp=21.0, next_temp=24.0, valve=valve, outdoor=5.0)
         )
     rmse = controller.fit_rmse()
-    assert rmse is not None and rmse > 0.0
+    assert rmse is not None
+    assert rmse > 0.0

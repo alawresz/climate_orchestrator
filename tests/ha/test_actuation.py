@@ -218,7 +218,7 @@ async def test_command_failures_log_once_per_outage(
     # lands in caplog's setup phase, not the call phase counted below.)
     failing = True
 
-    async def _device_rejects(call: ServiceCall) -> None:
+    async def _device_rejects(_call: ServiceCall) -> None:
         if failing:
             raise HomeAssistantError
 

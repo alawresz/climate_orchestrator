@@ -78,7 +78,7 @@ async def test_options_flow_edits_devices(
 
 
 async def test_discovery_hints_default_when_unset(
-    hass: HomeAssistant, init_integration: MockConfigEntry
+    init_integration: MockConfigEntry,
 ) -> None:
     """With no override, the coordinator uses the built-in Zigbee2MQTT hints."""
     coordinator: SmartClimateCoordinator = init_integration.runtime_data

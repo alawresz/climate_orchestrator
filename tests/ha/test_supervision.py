@@ -141,7 +141,8 @@ async def test_orchestrator_interaction_clears_overrides(
 
     assert runtime(coordinator, TRV_ENTITY).override_until is None
     ended = [e for e in events if e.data["type"] == EVENT_TYPE_OVERRIDE_ENDED]
-    assert ended and ended[0].data["reason"] == "reasserted"
+    assert ended
+    assert ended[0].data["reason"] == "reasserted"
 
 
 async def test_frost_protection_punches_through_override(
@@ -172,7 +173,8 @@ async def test_frost_protection_punches_through_override(
     await refresh(hass, init_integration)
 
     ended = [e for e in events if e.data["type"] == EVENT_TYPE_OVERRIDE_ENDED]
-    assert ended and ended[0].data["reason"] == "frost_protection"
+    assert ended
+    assert ended[0].data["reason"] == "frost_protection"
     # The human had already set the TRV to heat, so reconcile skips the
     # (redundant) mode write — the forced-heat evidence is the setpoint write.
     assert [c for c in set_temp if c.data[ATTR_ENTITY_ID] == TRV_ENTITY]
@@ -229,7 +231,8 @@ async def test_setpoint_change_also_triggers_override(
     await refresh(hass, init_integration)
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     command = runtime(coordinator, TRV_ENTITY).command
-    assert command is not None and command.target_temp is not None
+    assert command is not None
+    assert command.target_temp is not None
 
     # Device complies (mode + setpoint), then a human turns the dial +2 °C.
     hass.states.async_set(
@@ -309,7 +312,7 @@ async def test_loud_command_failures_do_not_raise_ignored_issue(
 
     # Deterministic outage: the climate services exist but reject every command
     # (a missing entity alone only warns — the call itself would succeed).
-    async def _device_rejects(call: ServiceCall) -> None:
+    async def _device_rejects(_call: ServiceCall) -> None:
         raise HomeAssistantError
 
     hass.services.async_register("climate", "set_hvac_mode", _device_rejects)
@@ -369,7 +372,7 @@ async def test_loud_failures_fire_no_watchdog_events(
 ) -> None:
     """Failing service calls never produce watchdog events."""
 
-    async def _device_rejects(call: ServiceCall) -> None:
+    async def _device_rejects(_call: ServiceCall) -> None:
         raise HomeAssistantError
 
     hass.services.async_register("climate", "set_hvac_mode", _device_rejects)

@@ -142,7 +142,7 @@ SENSORS: tuple[SmartClimateSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         suggested_display_precision=1,
-        value_fn=lambda coord, data: _home_feels_like(coord, data),
+        value_fn=_home_feels_like,
     ),
     SmartClimateSensorDescription(
         key="temperature_slope",
@@ -275,7 +275,7 @@ def _trv_label(trv_id: str) -> str:
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
+    _hass: HomeAssistant,
     entry: SmartClimateConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:

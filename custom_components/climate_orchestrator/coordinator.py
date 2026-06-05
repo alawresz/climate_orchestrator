@@ -146,7 +146,7 @@ class _LearnedStateStore(Store[dict[str, Any]]):
     async def _async_migrate_func(
         self,
         old_major_version: int,
-        old_minor_version: int,
+        _old_minor_version: int,
         old_data: dict[str, Any],
     ) -> dict[str, Any]:
         if old_major_version == _MPC_STORE_VERSION:
@@ -998,7 +998,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                 blocking=True,
                 return_response=True,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 - any forecast failure must not break the cycle
             _LOGGER.debug("climate_orchestrator: forecast fetch failed", exc_info=True)
             return
         # The service response is loosely typed JSON; narrow every step.

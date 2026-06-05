@@ -100,7 +100,6 @@ async def test_device_action_and_frost_binary_sensor(
 
 
 async def test_runtime_and_cycle_counters(
-    hass: HomeAssistant,
     init_integration: MockConfigEntry,
 ) -> None:
     """The rolling counters integrate run-time and count off->on starts."""

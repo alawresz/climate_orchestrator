@@ -107,7 +107,7 @@ async def test_repeated_control_failures_raise_and_clear(
     registry = ir.async_get(hass)
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
 
-    async def _boom(data: object) -> None:
+    async def _boom(_data: object) -> None:
         raise RuntimeError
 
     monkeypatch.setattr(coordinator, "_async_control", _boom)

@@ -142,7 +142,7 @@ class SmartClimateConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(
-        config_entry: SmartClimateConfigEntry,
+        _config_entry: SmartClimateConfigEntry,
     ) -> SmartClimateOptionsFlow:
         """Return the options flow handler."""
         return SmartClimateOptionsFlow()

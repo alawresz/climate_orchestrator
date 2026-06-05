@@ -24,7 +24,7 @@ CALIBRATION_MODE_KEY = "calibration_mode"
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
+    _hass: HomeAssistant,
     entry: SmartClimateConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:

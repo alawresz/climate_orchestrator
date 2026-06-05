@@ -67,7 +67,7 @@ async def async_remove_entry(
 
 
 async def async_migrate_entry(
-    hass: HomeAssistant, entry: SmartClimateConfigEntry
+    _hass: HomeAssistant, entry: SmartClimateConfigEntry
 ) -> bool:
     """Migrate a config entry created by an older (or newer) version.
 

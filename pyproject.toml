@@ -71,10 +71,50 @@ select = [
   "TRY",  # tryceratops (exception hygiene)
   "D",    # pydocstyle
   "SLF",  # flake8-self: no reaching into other objects' privates
+  "A",    # flake8-builtins (no shadowing builtins)
+  "ARG",  # unused arguments (underscore what interfaces force on us)
+  "BLE",  # no blind except (intentional ones carry a noqa + rationale)
+  "C90",  # mccabe complexity ceiling (see max-complexity below)
+  "EM",   # exception messages extracted to variables
+  "ERA",  # no commented-out code
+  "FA",   # future annotations required (load-bearing on py<3.14 — tooling.md)
+  "FLY",  # static joins as f-strings
+  "FURB", # refurb modernisations
+  "ICN",  # import conventions
+  "INP",  # no implicit namespace packages
+  "ISC",  # implicit str concatenation (ISC001 left to the formatter)
+  "N",    # pep8-naming
+  "PIE",  # misc lints
+  "PL",   # pylint subset (noisy size/magic rules ignored below)
+  "PT",   # pytest style
+  "PGH",  # pygrep-hooks (no blanket noqa / type: ignore)
+  "RSE",  # raise statement hygiene
+  "S",    # bandit security checks (S101 asserts allowed in tests)
+  "T20",  # no print
 ]
-# RUF012: HA entity `_attr_*` lists are effectively class-level constants;
-# annotating them ClassVar conflicts with the base classes' instance attrs.
-ignore = ["RUF012"]
+ignore = [
+  # RUF012: HA entity `_attr_*` lists are effectively class-level constants;
+  # annotating them ClassVar conflicts with the base classes' instance attrs.
+  "RUF012",
+  # Handled by the ruff formatter; enabling it just fights the formatter.
+  "ISC001",
+  # Comparing against literal numbers is the *point* in control math and
+  # tests; the values that deserve names already live in const.py.
+  "PLR2004",
+  # Pure control functions legitimately take many inputs (that explicitness
+  # is the design); guard-clause style legitimately returns early and often.
+  "PLR0913",
+  "PLR0911",
+]
+
+[tool.ruff.lint.pylint]
+# Aligned with the mccabe ceiling below: a backstop, not a target.
+max-branches = 15
+
+[tool.ruff.lint.mccabe]
+# A ceiling, not a target: the worst current function sits at 14. This stops
+# future 20-branch monsters without demanding refactors of working code.
+max-complexity = 15
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
@@ -82,7 +122,8 @@ convention = "pep257"
 [tool.ruff.lint.per-file-ignores]
 # Tests are dev-only: docstrings aren't required, and TYPE_CHECKING import
 # guards add churn without runtime benefit.
-"tests/**" = ["D", "TC"]
+# S101: asserts are pytest's assertion mechanism.
+"tests/**" = ["D", "TC", "S101"]
 # The ONE sanctioned home for coordinator-internal access (see
 # docs/project/testing.md): every other file — source and tests alike —
 # gets SLF001 if it reaches into another object's privates.

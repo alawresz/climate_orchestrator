@@ -232,7 +232,8 @@ def test_decide_is_total_for_any_input(
         glob,
     )
     assert decision.demand in set(Demand)
-    assert isinstance(decision.reason, str) and decision.reason
+    assert isinstance(decision.reason, str)
+    assert decision.reason
     # Capability gating must always hold.
     if kind is DeviceKind.HEATER:
         assert decision.demand is not Demand.COOL

@@ -100,7 +100,8 @@ def test_identify_degenerate_samples_stay_finite_and_bounded() -> None:
         for _ in range(10)
     ]
     params = identify_parameters(samples)
-    assert math.isfinite(params.gain) and math.isfinite(params.loss)
+    assert math.isfinite(params.gain)
+    assert math.isfinite(params.loss)
     assert 0.0 <= params.gain <= MAX_GAIN
     assert 0.0 <= params.loss <= MAX_LOSS
 
@@ -121,7 +122,7 @@ def test_identify_rejects_unconverged_fit(monkeypatch) -> None:
     monkeypatch.setattr(
         model,
         "least_squares",
-        lambda *a, **k: SimpleNamespace(success=False, x=np.array([0.5, 0.5])),
+        lambda *_a, **_k: SimpleNamespace(success=False, x=np.array([0.5, 0.5])),
     )
     samples = [
         Sample(dt=1.0, temp=20.0, next_temp=20.1, valve=0.5, outdoor=10.0)
@@ -139,7 +140,7 @@ def test_identify_rejects_partially_non_finite_fit(monkeypatch, x) -> None:
     monkeypatch.setattr(
         model,
         "least_squares",
-        lambda *a, **k: SimpleNamespace(success=True, x=np.array(x)),
+        lambda *_a, **_k: SimpleNamespace(success=True, x=np.array(x)),
     )
     samples = [
         Sample(dt=1.0, temp=20.0, next_temp=20.1, valve=0.5, outdoor=10.0)

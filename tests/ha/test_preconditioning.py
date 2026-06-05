@@ -31,7 +31,7 @@ def _register_forecast_service(
 ) -> None:
     series = _FORECAST if temps is None else temps
 
-    async def _get_forecasts(call: ServiceCall) -> dict:
+    async def _get_forecasts(_call: ServiceCall) -> dict:
         return {
             WEATHER: {"forecast": [{"datetime": "x", "temperature": t} for t in series]}
         }
