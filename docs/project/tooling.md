@@ -167,8 +167,10 @@ Three further automation workflows round things out. A weekly
 **`scorecard.yml`** runs OpenSSF Scorecard over the repo's supply-chain
 practices (pinned actions, token permissions, update tooling), feeding the
 Security → Code scanning panel and the README badge. **`codeql.yml`** runs
-CodeQL's Python SAST on source changes and weekly — modest expected yield
-next to ruff/mypy/zizmor, but it keeps security static analysis continuous.
+CodeQL on every push to main and weekly, analyzing both the Python source and
+the GitHub Actions workflows (the `actions` query pack complements zizmor on
+workflow-injection patterns) — modest expected Python yield next to
+ruff/mypy, but it keeps security static analysis continuous.
 The repo also ships a root **`SECURITY.md`** (private vulnerability
 reporting, supported versions, artifact verification).
 **`dependabot-automerge.yml`** arms auto-merge (squash) on Dependabot's

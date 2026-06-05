@@ -1,0 +1,41 @@
+name: CodeQL
+
+# SAST over the Python source and the GitHub Actions workflows. Python yield
+# next to ruff/mypy is modest; the actions pack covers workflow-injection
+# patterns (complementing zizmor) and keeps the Security → Code scanning
+# panel fed. Runs on every push to main — unfiltered, so workflow and config
+# changes are analyzed too — plus weekly for newly added queries.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * 3" # Wednesdays 07:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write # upload the analysis results
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, python]
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          languages: ${{ matrix.language }}
+      - name: Run analysis
+        uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          category: "/language:${{ matrix.language }}"

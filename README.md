@@ -1,11 +1,12 @@
 # Climate Orchestrator
 
-[![CI](https://github.com/alawresz/climate_orchestrator/actions/workflows/ci.yml/badge.svg)](https://github.com/alawresz/climate_orchestrator/actions/workflows/ci.yml)
-[![Docs](https://github.com/alawresz/climate_orchestrator/actions/workflows/docs.yml/badge.svg)](https://alawresz.github.io/climate_orchestrator/)
 [![Release](https://img.shields.io/github/v/release/alawresz/climate_orchestrator?include_prereleases&sort=semver)](https://github.com/alawresz/climate_orchestrator/releases)
 [![codecov](https://codecov.io/gh/alawresz/climate_orchestrator/graph/badge.svg)](https://codecov.io/gh/alawresz/climate_orchestrator)
-[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![CI](https://github.com/alawresz/climate_orchestrator/actions/workflows/ci.yml/badge.svg)](https://github.com/alawresz/climate_orchestrator/actions/workflows/ci.yml)
+[![Docs](https://github.com/alawresz/climate_orchestrator/actions/workflows/docs.yml/badge.svg)](https://alawresz.github.io/climate_orchestrator/)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13105/badge)](https://www.bestpractices.dev/projects/13105)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/alawresz/climate_orchestrator/badge)](https://scorecard.dev/viewer/?uri=github.com/alawresz/climate_orchestrator)
+[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 One thermostat for the whole house. Instead of controlling each radiator valve
