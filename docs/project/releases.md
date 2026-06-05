@@ -1,10 +1,12 @@
 # Releases
 
 Versioning is automated with **python-semantic-release** (PSR) driven by
-Conventional Commits. The version is the single tag; `[tool.semantic_release]`
-keeps both `pyproject.toml` (`version_toml`) and
-`custom_components/climate_orchestrator/manifest.json` (`version_variables`) in
-lock-step with it.
+Conventional Commits. The git tag is the source of truth; the only stamped
+file is `custom_components/climate_orchestrator/manifest.json`
+(`version_variables`) — what HA and HACS actually read. `pyproject.toml`
+keeps a frozen `0.0.0` placeholder on purpose: `uv.lock` records the (virtual)
+project's version, so stamping pyproject on every release would invalidate
+the lockfile and fail CI's `uv lock --check` until someone re-ran `uv lock`.
 
 ```mermaid
 flowchart LR
@@ -53,7 +55,7 @@ push run) can never trigger a release before the push run's tests finish. It
 checks out whichever branch CI ran on and runs PSR, which:
 
 1. reads the branch config to decide stable vs prerelease,
-2. bumps `pyproject.toml` + `manifest.json`,
+2. bumps `manifest.json`,
 3. updates `CHANGELOG.md` (changelog update mode — appends new entries rather
    than regenerating the file),
 4. runs `build_command` to produce `dist/climate_orchestrator.zip` (the

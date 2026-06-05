@@ -1,6 +1,8 @@
 [project]
 name = "climate-orchestrator"
-version = "0.28.3"
+# Frozen placeholder: the released version lives in manifest.json + the git
+# tag (semantic-release stamps those). Deliberately NOT stamped here.
+version = "0.0.0"
 description = "Climate Orchestrator — whole-home climate orchestration for Home Assistant"
 readme = "README.md"
 # Dev/test environment floor — tracks current Home Assistant's runtime
@@ -160,8 +162,9 @@ also_copy = ["custom_components/"]
 package = false
 
 [tool.semantic_release]
-# Version lives in two places; keep both in lock-step with the release tag.
-version_toml = ["pyproject.toml:project.version"]
+# The only stamped version surface is manifest.json (what HA and HACS read);
+# the git tag is the source of truth. pyproject's version stays a frozen
+# placeholder (see [project]) so releases never invalidate uv.lock.
 version_variables = [
   "custom_components/climate_orchestrator/manifest.json:version",
 ]
