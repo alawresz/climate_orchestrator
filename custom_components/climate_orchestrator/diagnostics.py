@@ -60,5 +60,5 @@ async def async_get_config_entry_diagnostics(
             for eid in coordinator.device_ids
         },
         "mpc": coordinator.mpc_diagnostics(),
-        "maintenance_last": coordinator._last_maintenance,
+        "maintenance_last": coordinator.last_maintenance,
     }

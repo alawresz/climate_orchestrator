@@ -537,6 +537,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         return [*self.trv_ids, *self.ac_ids]
 
     @property
+    def last_maintenance(self) -> float | None:
+        """Wall-clock epoch of the last valve-maintenance run (diagnostics)."""
+        return self._last_maintenance
+
+    @property
     def enabled_presets(self) -> list[str]:
         """Named presets the user chose to expose (default: all)."""
         return enabled_presets(self._options)
