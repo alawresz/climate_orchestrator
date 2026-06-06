@@ -17,20 +17,16 @@ from homeassistant.components.climate import (
 from homeassistant.components.climate import (
     DOMAIN as CLIMATE_DOMAIN,
 )
-from homeassistant.const import (
-    ATTR_ENTITY_ID,
-    ATTR_TEMPERATURE,
-    STATE_UNAVAILABLE,
-    STATE_UNKNOWN,
-)
+from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE
 
-from ..const import MAX_TEMP, MIN_TEMP, TARGET_TEMP_STEP
-from ..util import as_float
 from .model import AdapterCapabilities, DeviceCommand, DeviceState
+from .profiles import profile_for_entity
 from .reconcile import reconcile
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
+
+    from .profiles import DeviceProfile
 
 
 class ClimateAdapter:
@@ -39,40 +35,35 @@ class ClimateAdapter:
     Stateless: a thin wrapper over state reads and service calls, meant to
     be instantiated per use (the coordinator creates one per device per
     cycle) — do not cache instances expecting them to track state.
+
+    All device-specific behaviour (which attributes to read, capability
+    quirks) lives in the resolved ``DeviceProfile``, not here.
     """
 
-    def __init__(self, hass: HomeAssistant, entity_id: str) -> None:
-        """Bind the adapter to an entity."""
+    def __init__(
+        self, hass: HomeAssistant, entity_id: str, profile: DeviceProfile | None = None
+    ) -> None:
+        """Bind the adapter to an entity (and its hardware profile)."""
         self.hass = hass
         self.entity_id = entity_id
+        self.profile = (
+            profile if profile is not None else profile_for_entity(hass, entity_id)
+        )
 
     def read(self) -> DeviceState:
         """Snapshot the device's current state."""
         state = self.hass.states.get(self.entity_id)
-        if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+        if state is None:
             return DeviceState(
                 available=False, hvac_mode=None, current_temp=None, target_temp=None
             )
-        return DeviceState(
-            available=True,
-            hvac_mode=state.state,
-            current_temp=as_float(state.attributes.get("current_temperature")),
-            target_temp=as_float(state.attributes.get("temperature")),
-        )
+        return self.profile.read(state.state, state.attributes)
 
     def capabilities(self) -> AdapterCapabilities:
         """Detect what the device supports from its reported attributes."""
         state = self.hass.states.get(self.entity_id)
         attrs = state.attributes if state is not None else {}
-        modes = attrs.get("hvac_modes") or []
-        return AdapterCapabilities(
-            can_heat="heat" in modes,
-            can_cool="cool" in modes,
-            can_dry="dry" in modes,
-            min_temp=attrs.get("min_temp", MIN_TEMP),
-            max_temp=attrs.get("max_temp", MAX_TEMP),
-            target_step=attrs.get("target_temp_step", TARGET_TEMP_STEP),
-        )
+        return self.profile.capabilities(attrs)
 
     async def apply(self, command: DeviceCommand) -> None:
         """Issue the minimal service calls to reach ``command``."""

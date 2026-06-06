@@ -33,6 +33,15 @@ Zigbee2MQTT/SONOFF naming but are **user-configurable** in the options flow
 lower-cased tuple by the coordinator), so another brand's naming can be
 supported without code changes. `target` mode (the default) needs none of this.
 
+**Device profiles.** Beyond user-configurable hints, per-model quirks (a
+non-standard temperature attribute, a misreported capability, vendor-specific
+number names) live in a `DeviceProfile` (`devices/profiles.py`), resolved per
+entity from the device registry by `(integration, manufacturer, model)`. The
+`ClimateAdapter` reads through the resolved profile; the generic profile is the
+standard contract above. To add hardware support, see
+[Adding hardware support](../project/adding-hardware.md) and
+[ADR-0001](../decisions/0001-device-profiles.md).
+
 ## TRV controller (mpc, offset, target)
 
 The `calibration_mode` select chooses the strategy: `target` (mode + setpoint,

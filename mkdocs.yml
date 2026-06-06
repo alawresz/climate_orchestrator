@@ -125,6 +125,13 @@ nav:
       - MPC deep dive: internals/mpc.md
       - Device control: internals/device-control.md
       - Persistence & lifecycle: internals/persistence.md
+  - Project:
+      - Testing & quality: project/testing.md
+      - Tooling & CI: project/tooling.md
+      - Releases: project/releases.md
+      - Changelog: project/changelog.md
+      - Contributing: project/contributing.md
+      - Adding hardware support: project/adding-hardware.md
   - Decisions:
       - Overview: decisions/index.md
       - "ADR-0001: Device profiles": decisions/0001-device-profiles.md
@@ -134,9 +141,3 @@ nav:
       - "ADR-0005: Store schema versioning": decisions/0005-store-schema-versioning.md
       - "ADR-0006: Version & packaging gates": decisions/0006-version-and-packaging-gates.md
       - "ADR-0007: GitHub App release": decisions/0007-github-app-release.md
-  - Project:
-      - Testing & quality: project/testing.md
-      - Tooling & CI: project/tooling.md
-      - Releases: project/releases.md
-      - Changelog: project/changelog.md
-      - Contributing: project/contributing.md

@@ -80,6 +80,7 @@ from .control.throttle import throttle_setpoint
 from .devices.adapter import ClimateAdapter
 from .devices.command import build_command
 from .devices.model import DeviceCommand, Mode
+from .devices.profiles import profile_for_entity
 from .devices.trv import (
     LOCAL_CALIBRATION_HINTS,
     VALVE_OPENING_HINTS,
@@ -472,6 +473,16 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         """Name hints used to discover a TRV's local-calibration number entity."""
         return self._hint_tuple(CONF_CALIBRATION_HINTS, LOCAL_CALIBRATION_HINTS)
 
+    def _valve_hints_for(self, entity_id: str) -> tuple[str, ...]:
+        """Valve-number hints for a device: its profile's, else the configured."""
+        profile = profile_for_entity(self.hass, entity_id)
+        return profile.resolve_valve_hints(self.valve_hints)
+
+    def _calibration_hints_for(self, entity_id: str) -> tuple[str, ...]:
+        """Calibration-number hints for a device: its profile's, else configured."""
+        profile = profile_for_entity(self.hass, entity_id)
+        return profile.resolve_calibration_hints(self.calibration_hints)
+
     async def _async_update_data(self) -> SmartClimateData:
         """Resolve sensors and aggregates, keep listeners in sync, and actuate."""
         max_age_min = clamped_number_value(
@@ -647,7 +658,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         """Drive an MPC TRV's valve fully shut while it isn't heating."""
         if ctx.settings.calibration_mode != CALIBRATION_MPC:
             return []
-        number = find_related_number(self.hass, entity_id, self.valve_hints)
+        number = find_related_number(
+            self.hass, entity_id, self._valve_hints_for(entity_id)
+        )
         if number is None:
             return []
         self._runtime(entity_id).valve = 0.0
@@ -657,7 +670,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self, entity_id: str, area_temp: float | None, ctx: CycleContext
     ) -> list[Coroutine[Any, Any, None]]:
         """Observe the room, optimise the valve opening, and write it."""
-        number = find_related_number(self.hass, entity_id, self.valve_hints)
+        number = find_related_number(
+            self.hass, entity_id, self._valve_hints_for(entity_id)
+        )
         calibration_issue(self.hass, entity_id, "mpc", missing=number is None)
         if number is None or area_temp is None:
             return []
@@ -704,7 +719,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         self, entity_id: str, area_temp: float | None, adapter: ClimateAdapter
     ) -> list[Coroutine[Any, Any, None]]:
         """Write the local-calibration offset so the TRV sees the area temp."""
-        number = find_related_number(self.hass, entity_id, self.calibration_hints)
+        number = find_related_number(
+            self.hass, entity_id, self._calibration_hints_for(entity_id)
+        )
         calibration_issue(self.hass, entity_id, "offset", missing=number is None)
         offset = local_offset(area_temp, adapter.read().current_temp)
         if number is None or offset is None:
@@ -1258,7 +1275,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         valves = [
             number
             for trv_id in (trv_ids or self.trv_ids)
-            if (number := find_related_number(self.hass, trv_id, VALVE_OPENING_HINTS))
+            if (
+                number := find_related_number(
+                    self.hass, trv_id, self._valve_hints_for(trv_id)
+                )
+            )
         ]
         if not valves:
             return False
