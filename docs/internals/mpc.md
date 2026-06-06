@@ -36,7 +36,7 @@ flowchart LR
 Room dynamics are modelled as linear first-order (single RC node):
 
 ```
-dT/dt = gain·u − loss·(T − T_out_or_amb) + solar
+dT/dt = gain·u − loss·(T − outdoor)
 ```
 
 with `u` ∈ [0, 1] the valve fraction. Discretised
@@ -45,6 +45,9 @@ with `u` ∈ [0, 1] the valve fraction. Discretised
 ```
 T[n+1] = T[n] + dt · (gain·valve − loss·(T[n] − outdoor))
 ```
+
+The model has no solar or supply-temperature term: `gain` is a single learned
+constant (see [the constant-supply-temperature assumption](#assumption-constant-supply-temperature) below).
 
 - `gain` — K per minute at full valve (how fast a fully-open valve heats the
   room).

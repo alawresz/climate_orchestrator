@@ -4,23 +4,24 @@ The control engine decides *whether* each device should heat or cool; this page
 covers *how* that intent becomes commands, which differs for radiator valves
 and air conditioners.
 
-## Adapters
+## The adapter
 
-A common `DeviceAdapter` interface decouples control from integration
-specifics:
+A single `ClimateAdapter` (`devices/adapter.py`) decouples control from
+integration specifics — it drives *any* HA `climate` entity through the standard
+services and carries no per-vendor logic itself:
 
 ```python
-class DeviceAdapter(Protocol):
-    capabilities: AdapterCapabilities      # supports_valve, supports_local_offset, setpoint_only, hvac_modes...
-    async def read(self) -> DeviceState: ...
+class ClimateAdapter:
+    def __init__(self, hass, entity_id, profile: DeviceProfile | None = None): ...
+    def read(self) -> DeviceState: ...
+    def capabilities(self) -> AdapterCapabilities: ...
     async def apply(self, command: DeviceCommand) -> None: ...
 ```
 
-Concrete adapters: `Z2MTrvAdapter` (SONOFF TRVZB) and `MideaAcAdapter`, plus a
-`GenericClimateAdapter` fallback (any HA `climate` entity). Adapter selection
-is capability-based, not vendor-locked.
+There are no per-vendor adapter subclasses; hardware variation is expressed as
+*data* in a `DeviceProfile` the adapter reads through (see below).
 
-**Hardware portability.** In the implementation, a single `ClimateAdapter`
+**Hardware portability.** A single `ClimateAdapter`
 (`devices/adapter.py`) drives *any* HA `climate` entity (TRV or AC):
 `can_heat/can_cool/can_dry`, `min_temp`/`max_temp`/`target_step` are all read
 from the device's own reported attributes, so adding a different AC or a

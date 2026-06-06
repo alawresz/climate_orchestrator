@@ -13,9 +13,10 @@ downgrade-safe loads); the coordinator supplies the payloads and maps
 restored data back onto runtime state. The stores hold:
 
 - learned MPC parameters/observer state per device,
-- preset values,
-- latched demand/hysteresis state, and
-- the self-tuning AC bias.
+- the latched per-device demand,
+- the self-tuning AC bias per device,
+- the running-mean outdoor temperature (rmot), and
+- the last valve-maintenance timestamp.
 
 All of it is restored on startup with safe priors. Beyond the store, every
 tunable persists via `RestoreNumber`/`RestoreEntity` and re-runs control on
@@ -46,7 +47,7 @@ positively recognise is discarded rather than risk a mis-read.
   (`_async_migrate_func` returns `{}` with a warning).
 - **A newer major** — the downgrade case — is discarded too. On HA ≥ 2026.3
   `Store` raises `UnsupportedStorageVersionError` before any hook runs (caught
-  in `_load_safely`); older HA hands the payload to the migrate hook instead,
+  in `LearnedStateStores._load`); older HA hands the payload to the migrate hook instead,
   which discards it like any unknown major. The exception import is guarded
   accordingly.
 
