@@ -94,6 +94,36 @@ async def test_setup_prunes_retired_entities(
     assert registry.async_get(kept) is not None
 
 
+async def test_setup_prunes_removed_device_entities(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Per-device diagnostics for a device no longer selected are pruned.
+
+    Removing a device from the options leaves its action/runtime/valve/etc.
+    sensors as unavailable orphans otherwise; a reload should drop them while
+    keeping the still-managed devices' entities.
+    """
+    registry = er.async_get(hass)
+    cid = init_integration.entry_id
+    # An orphan from a device that is not in the (TRV + AC) selection.
+    orphan = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{cid}_climate.removed_trv_device_action",
+        config_entry=init_integration,
+    ).entity_id
+    kept = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{cid}_{TRV_ENTITY}_device_action"
+    )
+    assert kept is not None
+
+    await hass.config_entries.async_reload(cid)
+    await hass.async_block_till_done()
+
+    assert registry.async_get(orphan) is None  # orphan pruned
+    assert registry.async_get(kept) is not None  # managed device kept
+
+
 async def test_unload_entry(
     hass: HomeAssistant, init_integration: MockConfigEntry
 ) -> None:

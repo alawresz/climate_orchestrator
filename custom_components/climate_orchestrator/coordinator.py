@@ -102,7 +102,7 @@ from .persistence import LearnedStateStores
 from .repairs import (
     calibration_issue,
     capability_issues,
-    command_ignored_issue,
+    clear_all_issues,
     environment_issues,
     mpc_poor_fit_issue,
     toggle_issue,
@@ -607,11 +607,16 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
     @callback
     def mpc_diagnostics(self) -> dict[str, dict[str, float | int]]:
-        """Learned MPC parameters per TRV (gain, loss, sample count)."""
+        """Learned MPC parameters per TRV (gain, loss, sample count).
+
+        ``params`` is pinned per controller (an atomic read of the frozen
+        pair) so a re-identification on the executor thread can't hand back a
+        gain from one fit with a loss from the next during a diagnostics dump.
+        """
         return {
             trv_id: {
-                "gain": controller.params.gain,
-                "loss": controller.params.loss,
+                "gain": (params := controller.params).gain,
+                "loss": params.loss,
                 "samples": len(controller.history),
             }
             for trv_id, rt in self._devices.items()
@@ -1412,12 +1417,10 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             self._unsub_state()
             self._unsub_state = None
         self._windows.shutdown()
-        # Per-device repairs are keyed by entity id; without this they outlive
-        # an entry unload/removal as orphaned notices for devices that are gone.
-        for entity_id in self.device_ids:
-            mpc_poor_fit_issue(self.hass, entity_id, active=False)
-            calibration_issue(self.hass, entity_id, "mpc", missing=False)
-            command_ignored_issue(self.hass, entity_id, active=False)
+        # Repairs are keyed by DOMAIN, not the entry, so they'd outlive an
+        # unload/removal as orphaned notices — clear them all (per-device and
+        # whole-entry) on the way out.
+        clear_all_issues(self.hass, self.device_ids)
         if any(rt.mpc is not None for rt in self._devices.values()):
             await self._stores.save_mpc_now()
         # The rate limiter may be holding back slow-moving state — flush it

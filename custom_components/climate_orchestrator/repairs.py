@@ -14,10 +14,44 @@ from homeassistant.helpers import issue_registry as ir
 from .const import DOMAIN
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from homeassistant.core import HomeAssistant
 
     from .models import Band, SmartClimateData
     from .settings import RuntimeSettings
+
+
+# Whole-entry repair issue ids (no per-device placeholder) raised by
+# ``environment_issues`` / ``capability_issues`` / the coordinator. Kept here
+# so entry teardown can clear them all in one place — see ``clear_all_issues``.
+_GLOBAL_ISSUE_IDS = (
+    "inverted_band",
+    "outdoor_sensor_missing",
+    "weather_forecast_missing",
+    "weather_forecast_unavailable",
+    "heating_assist_unavailable",
+    "dehumidify_unavailable",
+    "ac_ignore_window_inert",
+    "no_temperature_source",
+    "stale_sensor",
+    "control_loop_failing",
+)
+
+
+def clear_all_issues(hass: HomeAssistant, entity_ids: Iterable[str]) -> None:
+    """Clear every repair this integration can raise (entry unload/removal).
+
+    Issues are keyed by ``DOMAIN`` + id, not by the config entry, so without
+    this they outlive the entry as orphaned notices for devices/conditions
+    that are gone. Edge-safe: deleting an absent issue is a no-op.
+    """
+    for entity_id in entity_ids:
+        mpc_poor_fit_issue(hass, entity_id, active=False)
+        calibration_issue(hass, entity_id, "mpc", missing=False)
+        command_ignored_issue(hass, entity_id, active=False)
+    for issue_id in _GLOBAL_ISSUE_IDS:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
 
 
 def toggle_issue(hass: HomeAssistant, issue_id: str, active: bool, key: str) -> None:

@@ -319,6 +319,27 @@ async def test_per_device_repairs_clear_on_unload(
     assert registry.async_get_issue(DOMAIN, issue_id) is None
 
 
+async def test_global_repairs_also_clear_on_unload(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """Whole-entry repairs (not just per-device ones) clear on unload."""
+    registry = ir.async_get(hass)
+    # A raised whole-entry repair (id has no per-device placeholder).
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        "inverted_band",
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="inverted_band",
+    )
+    assert registry.async_get_issue(DOMAIN, "inverted_band") is not None
+
+    assert await hass.config_entries.async_unload(init_integration.entry_id)
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, "inverted_band") is None
+
+
 async def test_ac_ignore_window_with_an_ac_is_not_flagged(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,

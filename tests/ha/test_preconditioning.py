@@ -335,3 +335,53 @@ async def test_persistent_forecast_failure_raises_and_clears(
     await hass.async_block_till_done()
     assert registry.async_get_issue(DOMAIN, issue) is None
     assert forecast_cache(coordinator) == _FORECAST
+
+
+async def test_forecast_failure_clears_when_preconditioning_disabled(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Turning the feature off resets the failure clock (no stale repair).
+
+    Otherwise an aged failure streak would re-fire the repair the instant the
+    feature is re-enabled, even before the next fetch is attempted.
+    """
+    outage = HomeAssistantError("weather provider outage")
+
+    async def _failing(_call: ServiceCall) -> dict[str, Any]:
+        raise outage
+
+    hass.services.async_register(
+        "weather", "get_forecasts", _failing, supports_response=SupportsResponse.ONLY
+    )
+    entry = await _setup_preconditioning_entry(
+        hass, living_area, register_entity_in_area, entity_id_for, "sc_precond_off"
+    )
+    coordinator: SmartClimateCoordinator = entry.runtime_data
+    registry = ir.async_get(hass)
+    issue = "weather_forecast_unavailable"
+    switch = entity_id_for("switch", f"{entry.entry_id}_forecast_preconditioning")
+
+    # Sustained failure raises the repair.
+    age_forecast_failure(coordinator)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, issue) is not None
+
+    # Disabling the feature clears the failure clock -> the repair clears, and a
+    # re-enable does not immediately re-fire it (the streak reset, not aged).
+    await hass.services.async_call(
+        "switch", "turn_off", {ATTR_ENTITY_ID: switch}, blocking=True
+    )
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, issue) is None
+
+    await hass.services.async_call(
+        "switch", "turn_on", {ATTR_ENTITY_ID: switch}, blocking=True
+    )
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, issue) is None

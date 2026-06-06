@@ -12,9 +12,16 @@ from pathlib import Path
 import re
 
 import custom_components.climate_orchestrator as integration_pkg
+from custom_components.climate_orchestrator.repairs import _GLOBAL_ISSUE_IDS
 
 _PKG_DIR = Path(integration_pkg.__file__).parent
 _STRINGS = _PKG_DIR / "strings.json"
+
+# Issue ids carrying a per-device entity suffix (cleared per entity_id, so not
+# in _GLOBAL_ISSUE_IDS). These are the static prefixes of those issue ids.
+_PER_DEVICE_ISSUE_KEYS = frozenset(
+    {"missing_calibration_number", "device_ignoring_commands", "mpc_model_poor_fit"}
+)
 
 
 def _repair_keys_used() -> set[str]:
@@ -46,3 +53,17 @@ def test_every_repair_key_is_defined_in_strings() -> None:
     assert used, "scan found no repair keys — the regex has drifted from the code"
     missing = used - defined
     assert not missing, f"repair keys with no strings.json entry: {sorted(missing)}"
+
+
+def test_every_issue_is_either_global_or_per_device() -> None:
+    """Every defined issue is cleared on teardown via one of the two lists.
+
+    Guards ``clear_all_issues``: a new whole-entry repair added to strings.json
+    but forgotten in ``_GLOBAL_ISSUE_IDS`` would otherwise orphan on unload.
+    """
+    defined = set(json.loads(_STRINGS.read_text(encoding="utf-8"))["issues"])
+    accounted = set(_GLOBAL_ISSUE_IDS) | _PER_DEVICE_ISSUE_KEYS
+    assert not defined - accounted, (
+        "issues neither in _GLOBAL_ISSUE_IDS nor per-device (won't clear on "
+        f"unload): {sorted(defined - accounted)}"
+    )
