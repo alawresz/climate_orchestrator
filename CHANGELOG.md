@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v0.29.0 (2026-06-06)
+
+### Chores
+
+- **coverage**: Raise the gate to 97% and mark the import fallback
+  ([`32a1369`](https://github.com/alawresz/climate_orchestrator/commit/32a13691a5968ab0ff9a77e89a34d46c4386e2f4))
+
+### Features
+
+- Flag AC-dependent settings that can't act on the configured hardware
+  ([`eb3b7c7`](https://github.com/alawresz/climate_orchestrator/commit/eb3b7c7fd275faa5213e41f6f78861101f01b3b9))
+
+### Testing
+
+- Cover the window recheck timer, forecast defenses, and guard paths
+  ([`12c288b`](https://github.com/alawresz/climate_orchestrator/commit/12c288bcaf046962376e2cf6ae904ceeb44081d0))
+
+
 ## v0.28.7 (2026-06-05)
 
 ### Bug Fixes
