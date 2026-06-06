@@ -102,6 +102,7 @@ from .persistence import LearnedStateStores
 from .repairs import (
     calibration_issue,
     capability_issues,
+    command_ignored_issue,
     environment_issues,
     mpc_poor_fit_issue,
     toggle_issue,
@@ -734,13 +735,24 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         runtime = self._runtime(entity_id)
         error = controller.relative_fit_error()
         if error is None or error < MPC_POOR_FIT_RATIO:
-            runtime.poor_fit_since = None
-            mpc_poor_fit_issue(self.hass, entity_id, active=False)
+            self._clear_poor_fit(entity_id)
             return
         if runtime.poor_fit_since is None:
             runtime.poor_fit_since = time.monotonic()
         sustained = time.monotonic() - runtime.poor_fit_since >= MPC_POOR_FIT_SECONDS
         mpc_poor_fit_issue(self.hass, entity_id, active=sustained)
+
+    @callback
+    def _clear_poor_fit(self, entity_id: str) -> None:
+        """Reset the MPC poor-fit streak and clear its repair for a device.
+
+        Called both when the fit recovers and when a TRV leaves MPC mode — the
+        model assessment no longer applies, so the streak must not linger (a
+        stale ``poor_fit_since`` would otherwise re-fire instantly on a later
+        switch back to MPC), and any raised repair must clear.
+        """
+        self._runtime(entity_id).poor_fit_since = None
+        mpc_poor_fit_issue(self.hass, entity_id, active=False)
 
     def _offset_writes(
         self, entity_id: str, area_temp: float | None, adapter: ClimateAdapter
@@ -1092,16 +1104,19 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         writes: list[tuple[str, Coroutine[Any, Any, None]]] = [
             (entity_id, adapter.apply(command))
         ]
-        if (
-            kind is DeviceKind.HEATER
-            and ctx.settings.calibration_mode != CALIBRATION_TARGET
-        ):
-            writes += [
-                (entity_id, coro)
-                for coro in self._calibration_writes(
-                    entity_id, decision, reading, ctx, adapter
-                )
-            ]
+        if kind is DeviceKind.HEATER:
+            if ctx.settings.calibration_mode != CALIBRATION_TARGET:
+                writes += [
+                    (entity_id, coro)
+                    for coro in self._calibration_writes(
+                        entity_id, decision, reading, ctx, adapter
+                    )
+                ]
+            if ctx.settings.calibration_mode != CALIBRATION_MPC:
+                # Not driving the model this cycle — its poor-fit assessment no
+                # longer applies, so drop any streak/repair (it's re-evaluated
+                # afresh whenever MPC mode resumes).
+                self._clear_poor_fit(entity_id)
         return decision, writes
 
     @callback
@@ -1377,6 +1392,12 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             self._unsub_state()
             self._unsub_state = None
         self._windows.shutdown()
+        # Per-device repairs are keyed by entity id; without this they outlive
+        # an entry unload/removal as orphaned notices for devices that are gone.
+        for entity_id in self.device_ids:
+            mpc_poor_fit_issue(self.hass, entity_id, active=False)
+            calibration_issue(self.hass, entity_id, "mpc", missing=False)
+            command_ignored_issue(self.hass, entity_id, active=False)
         if any(rt.mpc is not None for rt in self._devices.values()):
             await self._stores.save_mpc_now()
         # The rate limiter may be holding back slow-moving state — flush it

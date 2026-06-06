@@ -27,7 +27,13 @@ from custom_components.climate_orchestrator.control.mpc.model import (
 )
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, AREA_HUMIDITY_SENSOR, AREA_TEMP_SENSOR, TRV_ENTITY
-from tests.ha.helpers import evaluate_mpc_fit, refresh, runtime
+from tests.ha.helpers import (
+    evaluate_mpc_fit,
+    refresh,
+    runtime,
+    select_calibration_mode,
+    setup_trv_with_number,
+)
 
 # An AC advertising both heat and dry modes (reverse-cycle unit); the
 # init_integration fixture's AC reports no modes, so it can neither.
@@ -260,6 +266,57 @@ async def test_persistent_poor_mpc_fit_raises_and_clears(
     evaluate_mpc_fit(coordinator, TRV_ENTITY, _well_fitting_controller())
     assert registry.async_get_issue(DOMAIN, issue_id) is None
     assert runtime(coordinator, TRV_ENTITY).poor_fit_since is None
+
+
+async def test_poor_fit_repair_clears_when_leaving_mpc_mode(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    living_area: str,
+) -> None:
+    """Switching a TRV out of MPC mode drops an active poor-fit repair.
+
+    Otherwise the notice — whose own advice is "use offset mode" — would
+    orphan, and the stale streak would re-fire instantly on a later switch
+    back to MPC.
+    """
+    registry = ir.async_get(hass)
+    coordinator = await setup_trv_with_number(
+        hass, config_entry, living_area, number_value="50"
+    )
+    cid = config_entry.entry_id
+    issue_id = f"mpc_model_poor_fit_{TRV_ENTITY}"
+
+    # Force the repair active with an already-aged streak.
+    runtime(coordinator, TRV_ENTITY).poor_fit_since = (
+        time.monotonic() - MPC_POOR_FIT_SECONDS - 10.0
+    )
+    evaluate_mpc_fit(coordinator, TRV_ENTITY, _poorly_fitting_controller())
+    assert registry.async_get_issue(DOMAIN, issue_id) is not None
+
+    # Leaving MPC mode -> the next control cycle clears the repair and streak.
+    await select_calibration_mode(hass, cid, "offset")
+    await refresh(hass, config_entry)
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
+    assert runtime(coordinator, TRV_ENTITY).poor_fit_since is None
+
+
+async def test_per_device_repairs_clear_on_unload(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """A raised per-device repair doesn't outlive the entry as an orphan."""
+    registry = ir.async_get(hass)
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    issue_id = f"mpc_model_poor_fit_{TRV_ENTITY}"
+
+    runtime(coordinator, TRV_ENTITY).poor_fit_since = (
+        time.monotonic() - MPC_POOR_FIT_SECONDS - 10.0
+    )
+    evaluate_mpc_fit(coordinator, TRV_ENTITY, _poorly_fitting_controller())
+    assert registry.async_get_issue(DOMAIN, issue_id) is not None
+
+    assert await hass.config_entries.async_unload(init_integration.entry_id)
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
 
 
 async def test_ac_ignore_window_with_an_ac_is_not_flagged(
