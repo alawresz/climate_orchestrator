@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.31.1 (2026-06-06)
+
+### Bug Fixes
+
+- Make MPC diagnostic reads safe against the executor thread
+  ([`eb57905`](https://github.com/alawresz/climate_orchestrator/commit/eb579058c9a3b0dc44927d9aa6b6bcc41c3669f1))
+
+
 ## v0.31.0 (2026-06-06)
 
 ### Chores
