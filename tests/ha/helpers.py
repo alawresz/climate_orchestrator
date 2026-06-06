@@ -190,6 +190,13 @@ def set_maintenance_running(
     coordinator._maintenance_running = value
 
 
+def evaluate_mpc_fit(
+    coordinator: SmartClimateCoordinator, entity_id: str, controller: Any
+) -> None:
+    """Run the poor-fit repair evaluation for a device's MPC controller."""
+    coordinator._evaluate_mpc_fit(entity_id, controller)
+
+
 def rmot(coordinator: SmartClimateCoordinator) -> float | None:
     """The running-mean outdoor temperature driving adaptive comfort."""
     return coordinator.running_mean_outdoor

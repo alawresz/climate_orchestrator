@@ -62,3 +62,12 @@ opaque.
   numerical hardening; SciPy runs in an executor to keep the event loop free.
 - **Discovery** of the per-mode `number` entities is by name hint, now folded
   into device profiles ([ADR-0001](0001-device-profiles.md)).
+- **Known limitation / to revisit:** the model learns a single `gain`, so it
+  assumes a constant radiator output and is mis-specified for
+  weather-compensated hydronic systems (district heating, outdoor-reset
+  boilers), where the same valve opening emits more heat in colder weather.
+  Comfort still holds (closed-loop, rolling re-fit), but the fit degrades; a
+  [poor-fit repair](../reference/troubleshooting.md#repairs) flags it and
+  `offset` mode is the recommended fallback. The proper fix is an optional
+  supply-temperature input changing the heat term to `k·valve·(supply − room)`,
+  deferred until there's demand and a sensor to drive it.

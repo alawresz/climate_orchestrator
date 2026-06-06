@@ -58,6 +58,8 @@ from .const import (
     DEFAULT_PRESET,
     DEFAULT_PRESETS,
     DOMAIN,
+    MPC_POOR_FIT_RATIO,
+    MPC_POOR_FIT_SECONDS,
     RUNTIME_WINDOW_SECONDS,
     STARTUP_GRACE_SECONDS,
     UPDATE_INTERVAL_SECONDS,
@@ -101,6 +103,7 @@ from .repairs import (
     calibration_issue,
     capability_issues,
     environment_issues,
+    mpc_poor_fit_issue,
     toggle_issue,
 )
 from .sensing.registry import build_snapshot
@@ -172,6 +175,9 @@ class DeviceRuntime:
 
     override_until: float | None = None
     """Monotonic deadline of a manual-override takeover (None = not active)."""
+
+    poor_fit_since: float | None = None
+    """Monotonic time the MPC model's fit went (and stayed) poor; debounce."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -713,7 +719,28 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
 
         pct = await self.hass.async_add_executor_job(_observe_and_optimize)
         runtime.valve = pct / 100.0
+        self._evaluate_mpc_fit(entity_id, controller)
         await self._write_number_if_changed(number, pct)
+
+    @callback
+    def _evaluate_mpc_fit(self, entity_id: str, controller: MpcController) -> None:
+        """Raise/clear the poor-fit repair, debounced over ``MPC_POOR_FIT_SECONDS``.
+
+        A model that can't represent the room — a weather-compensated radiator
+        being the usual culprit — fits poorly *persistently*; a cold snap or a
+        one-off disturbance recovers. Only a sustained high relative error
+        raises the notice.
+        """
+        runtime = self._runtime(entity_id)
+        error = controller.relative_fit_error()
+        if error is None or error < MPC_POOR_FIT_RATIO:
+            runtime.poor_fit_since = None
+            mpc_poor_fit_issue(self.hass, entity_id, active=False)
+            return
+        if runtime.poor_fit_since is None:
+            runtime.poor_fit_since = time.monotonic()
+        sustained = time.monotonic() - runtime.poor_fit_since >= MPC_POOR_FIT_SECONDS
+        mpc_poor_fit_issue(self.hass, entity_id, active=sustained)
 
     def _offset_writes(
         self, entity_id: str, area_temp: float | None, adapter: ClimateAdapter

@@ -51,6 +51,30 @@ T[n+1] = T[n] + dt · (gain·valve − loss·(T[n] − outdoor))
 - `loss` — 1/minute coupling to the outdoor delta (how fast the room leaks
   heat).
 
+### Assumption: constant supply temperature
+
+`gain` is a single learned constant, so the model assumes a fixed heat output
+at a given valve opening. That holds for a radiator fed at a steady water
+temperature (a fixed-flow boiler, electric). It does **not** hold for a
+**weather-compensated** hydronic system — district heating, or a condensing
+boiler on an outdoor-reset curve — where the supply temperature rises as it
+gets colder, so the same opening emits more heat in harsh weather.
+
+The model captures the *loss* side of harsh weather (`loss·(room − outdoor)`
+grows with the gradient) but not the *output* side. Because the fit runs over a
+rolling window it tracks a slowly-drifting supply temperature, and because
+control is closed-loop the room still reaches target — but the model is
+mis-specified: the fitter partly absorbs the weather-dependent emission into a
+distorted `loss`, the residual error (`model_error`) runs higher,
+preconditioning is less reliable, and a fast supply-temperature swing causes
+transient over/undershoot until the fit catches up. The
+[poor-fit repair](../reference/troubleshooting.md#repairs) surfaces a TRV whose
+model can't fit, and on such systems `offset` mode (which defers modulation to
+the valve's own loop) is usually the better choice. The proper fix —
+modelling emission as `k·valve·(supply − room)` given a supply-temperature
+sensor — is recorded as future work in
+[ADR-0004](../decisions/0004-trv-calibration-mpc.md).
+
 ## System identification
 
 System identification replaces ad-hoc EMA inference with

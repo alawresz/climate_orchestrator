@@ -38,6 +38,10 @@ DEFAULT_MAX_HISTORY = 200
 # re-equilibrated several times over — and a huge dt skews the fit and blows
 # up the Kalman projection. Such gaps re-anchor instead of being learned from.
 MAX_SAMPLE_DT_MIN = 30.0
+# Below this RMS of observed per-step temperature change (K), the room is
+# barely moving (noise-dominated) and fit quality can't be judged — relative
+# error is reported as unknown rather than spuriously high.
+_MIN_FIT_SIGNAL = 0.05
 
 
 class MpcController:
@@ -148,6 +152,30 @@ class MpcController:
             for s in self.history
         ]
         return math.sqrt(sum(r * r for r in residuals) / len(residuals))
+
+    def relative_fit_error(self) -> float | None:
+        """Fit residual as a fraction of the room's actual movement, or ``None``.
+
+        ``fit_rmse`` is an absolute figure whose scale depends on ``dt`` and how
+        much the room moves, so it can't carry a fixed "this fit is bad"
+        threshold. This normalises it by the RMS of the observed per-step
+        changes: ``0`` is a perfect fit, ``~1`` means the model explains no more
+        than predicting "no change," ``>1`` is worse than nothing. ``None``
+        until there are enough samples, or when the room is too static to judge
+        (see ``_MIN_FIT_SIGNAL``) — a model that can't be evaluated isn't bad.
+
+        A persistently high value is the tell that the model is mis-specified
+        for the hardware — e.g. a weather-compensated radiator whose output
+        varies with the supply temperature the constant ``gain`` can't capture.
+        """
+        if len(self.history) < MIN_SAMPLES:
+            return None
+        observed = [s.next_temp - s.temp for s in self.history]
+        rms_observed = math.sqrt(sum(o * o for o in observed) / len(observed))
+        if rms_observed < _MIN_FIT_SIGNAL:
+            return None
+        rmse = self.fit_rmse()
+        return None if rmse is None else rmse / rms_observed
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise learned parameters and history for persistence."""

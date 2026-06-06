@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import time
 
 from homeassistant.const import ATTR_ENTITY_ID, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
@@ -17,10 +18,16 @@ from custom_components.climate_orchestrator.const import (
     CONTROL_FAILURE_ISSUE_THRESHOLD,
     DEFAULT_TITLE,
     DOMAIN,
+    MPC_POOR_FIT_SECONDS,
+)
+from custom_components.climate_orchestrator.control.mpc.controller import MpcController
+from custom_components.climate_orchestrator.control.mpc.model import (
+    Sample,
+    ThermalParams,
 )
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, AREA_HUMIDITY_SENSOR, AREA_TEMP_SENSOR, TRV_ENTITY
-from tests.ha.helpers import refresh
+from tests.ha.helpers import evaluate_mpc_fit, refresh, runtime
 
 # An AC advertising both heat and dry modes (reverse-cycle unit); the
 # init_integration fixture's AC reports no modes, so it can neither.
@@ -186,6 +193,73 @@ async def test_ac_ignore_window_without_an_ac_raises_and_clears(
     await _turn_off(hass, entity_id_for, cid, "ac_ignore_window")
     await refresh(hass, entry)
     assert registry.async_get_issue(DOMAIN, "ac_ignore_window_inert") is None
+
+
+def _poorly_fitting_controller() -> MpcController:
+    """A controller whose history the model structurally can't reproduce.
+
+    Constant regressors with an alternating ±1 K change — exactly the
+    signature of a weather-compensated radiator whose output the constant
+    ``gain`` can't track. ``relative_fit_error`` sits at/above the threshold.
+    """
+    controller = MpcController(ThermalParams(gain=0.0, loss=0.0))
+    for i in range(8):
+        controller.history.append(
+            Sample(
+                dt=1.0,
+                temp=21.0,
+                next_temp=22.0 if i % 2 == 0 else 20.0,
+                valve=0.5,
+                outdoor=11.0,
+            )
+        )
+    return controller
+
+
+def _well_fitting_controller() -> MpcController:
+    """A controller whose history its params reproduce exactly."""
+    params = ThermalParams(gain=0.1, loss=0.01)
+    controller = MpcController(params)
+    for valve in (0.0, 0.5, 1.0, 0.2, 0.8, 0.6):
+        temp, outdoor = 21.0, 5.0
+        delta = params.gain * valve - params.loss * (temp - outdoor)
+        controller.history.append(
+            Sample(
+                dt=1.0, temp=temp, next_temp=temp + delta, valve=valve, outdoor=outdoor
+            )
+        )
+    return controller
+
+
+async def test_persistent_poor_mpc_fit_raises_and_clears(
+    hass: HomeAssistant, init_integration: MockConfigEntry
+) -> None:
+    """A model that can't fit for over a day raises a repair; a good fit clears it.
+
+    The debounce is exercised by pre-ageing ``poor_fit_since``; a fresh poor
+    fit does *not* raise immediately.
+    """
+    registry = ir.async_get(hass)
+    coordinator: SmartClimateCoordinator = init_integration.runtime_data
+    issue_id = f"mpc_model_poor_fit_{TRV_ENTITY}"
+    bad = _poorly_fitting_controller()
+
+    # Poor, but only just now -> debounced, no issue yet.
+    evaluate_mpc_fit(coordinator, TRV_ENTITY, bad)
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
+    assert runtime(coordinator, TRV_ENTITY).poor_fit_since is not None
+
+    # Pretend it has been poor for longer than the debounce window -> raised.
+    runtime(coordinator, TRV_ENTITY).poor_fit_since = (
+        time.monotonic() - MPC_POOR_FIT_SECONDS - 10.0
+    )
+    evaluate_mpc_fit(coordinator, TRV_ENTITY, bad)
+    assert registry.async_get_issue(DOMAIN, issue_id) is not None
+
+    # The model fits again -> the streak resets and the notice clears.
+    evaluate_mpc_fit(coordinator, TRV_ENTITY, _well_fitting_controller())
+    assert registry.async_get_issue(DOMAIN, issue_id) is None
+    assert runtime(coordinator, TRV_ENTITY).poor_fit_since is None
 
 
 async def test_ac_ignore_window_with_an_ac_is_not_flagged(

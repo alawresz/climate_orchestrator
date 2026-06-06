@@ -71,6 +71,23 @@ def command_ignored_issue(hass: HomeAssistant, entity_id: str, *, active: bool) 
         ir.async_delete_issue(hass, DOMAIN, issue_id)
 
 
+def mpc_poor_fit_issue(hass: HomeAssistant, entity_id: str, *, active: bool) -> None:
+    """Raise/clear the per-TRV "MPC model fits poorly" repair issue."""
+    issue_id = f"mpc_model_poor_fit_{entity_id}"
+    if active:
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="mpc_model_poor_fit",
+            translation_placeholders={"entity_id": entity_id},
+        )
+    else:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+
+
 def capability_issues(
     hass: HomeAssistant,
     settings: RuntimeSettings,

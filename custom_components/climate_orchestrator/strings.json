@@ -258,6 +258,10 @@
     "ac_ignore_window_inert": {
       "title": "Climate Orchestrator: window exemption has no AC",
       "description": "**AC ignores open windows** is enabled, but no air conditioner is configured, so the exemption has nothing to apply to. Select an air conditioner in the integration's Configure dialog, or turn the setting off."
+    },
+    "mpc_model_poor_fit": {
+      "title": "Climate Orchestrator: MPC model can't fit this radiator",
+      "description": "The MPC thermal model for `{entity_id}` has fit its room poorly for over a day — its learned `gain`/`loss` no longer explain how the room actually responds. The usual cause is a **weather-compensated** heating system (district heating, or a boiler on an outdoor-reset curve): the supply-water temperature rises in cold weather, so the same valve opening emits more heat than the model's single constant `gain` can represent. Control still keeps the room comfortable via feedback, but preconditioning is less reliable and you may see mild over/undershoot when the weather shifts. On such systems, switching this TRV's calibration mode to **offset** (which lets the valve's own loop modulate against the live water temperature) is usually the better choice. This notice clears itself once the model fits again."
     }
   },
   "services": {

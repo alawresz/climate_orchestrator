@@ -35,6 +35,10 @@ A notice is raised (and auto-cleared) for silent misconfigurations:
   timeout);
 - an inverted comfort band (cool setpoint below the heat setpoint, leaving no
   neutral zone);
+- a TRV in `mpc` mode whose thermal model has fit its room poorly for over a
+  day — usually a weather-compensated radiator (district heating, outdoor-reset
+  boiler) whose output the model's constant `gain` can't track; the notice
+  suggests `offset` mode and clears once the model fits again;
 - no usable temperature source for any managed device.
 
 The capability checks above only consider *available* air conditioners — an AC

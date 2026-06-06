@@ -79,6 +79,15 @@ PRECONDITION_MAX_STEPS: Final = 600
 # a real fault, short enough to surface before rooms drift noticeably.
 CONTROL_FAILURE_ISSUE_THRESHOLD: Final = 3
 
+# MPC poor-fit repair: when a TRV's normalised model fit error
+# (``relative_fit_error``) stays at or above this fraction continuously for
+# this long, the model can't represent the room (e.g. a weather-compensated
+# radiator whose output the constant ``gain`` can't track) — surface a repair
+# suggesting offset mode. The ratio is generous and the window long so a cold
+# snap or a one-off disturbance doesn't trip it; only a chronic mis-fit does.
+MPC_POOR_FIT_RATIO: Final = 0.8
+MPC_POOR_FIT_SECONDS: Final = 86400.0
+
 # Command-ignored watchdog: a device whose service calls *succeed* but whose
 # state never reflects the commanded HVAC mode for this long is silently
 # ignoring us (child lock engaged, weak radio link, dying battery, a stuck
