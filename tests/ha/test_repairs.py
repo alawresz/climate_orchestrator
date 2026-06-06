@@ -13,12 +13,192 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from custom_components.climate_orchestrator.const import (
+    CONF_TRVS,
     CONTROL_FAILURE_ISSUE_THRESHOLD,
+    DEFAULT_TITLE,
     DOMAIN,
 )
 from custom_components.climate_orchestrator.coordinator import SmartClimateCoordinator
 from tests.conftest import AC_ENTITY, AREA_HUMIDITY_SENSOR, AREA_TEMP_SENSOR, TRV_ENTITY
 from tests.ha.helpers import refresh
+
+# An AC advertising both heat and dry modes (reverse-cycle unit); the
+# init_integration fixture's AC reports no modes, so it can neither.
+_AC_HEAT_DRY = {"hvac_modes": ["off", "cool", "heat", "dry"]}
+
+
+async def _setup_trv_only(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+) -> MockConfigEntry:
+    """A radiator-only home (no AC configured) with a usable temperature."""
+    register_entity_in_area(TRV_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "heat", {"hvac_modes": ["off", "heat"]})
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=DEFAULT_TITLE,
+        data={CONF_TRVS: [TRV_ENTITY]},
+        entry_id="sc_trv_only_repairs",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
+
+
+async def _turn_on(
+    hass: HomeAssistant, entity_id_for: Callable[[str, str], str], cid: str, key: str
+) -> None:
+    await hass.services.async_call(
+        "switch",
+        "turn_on",
+        {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_{key}")},
+        blocking=True,
+    )
+
+
+async def _turn_off(
+    hass: HomeAssistant, entity_id_for: Callable[[str, str], str], cid: str, key: str
+) -> None:
+    await hass.services.async_call(
+        "switch",
+        "turn_off",
+        {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_{key}")},
+        blocking=True,
+    )
+
+
+async def test_heating_assist_without_heat_capable_ac_raises_and_clears(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Assist on while the AC has no heat mode raises; gaining one clears it.
+
+    The engine produces a HEAT demand for the AC, but ``build_command`` drops
+    it (no ``heat`` capability) — assist silently does nothing.
+    """
+    registry = ir.async_get(hass)
+    cid = init_integration.entry_id
+    # Assist is off by default -> no issue even though the AC can't heat.
+    assert registry.async_get_issue(DOMAIN, "heating_assist_unavailable") is None
+
+    await _turn_on(hass, entity_id_for, cid, "ac_heating_assist")
+    await refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, "heating_assist_unavailable") is not None
+
+    # The AC starts advertising a heat mode -> assist can act, issue clears.
+    hass.states.async_set(AC_ENTITY, "off", _AC_HEAT_DRY)
+    await refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, "heating_assist_unavailable") is None
+
+
+async def test_heating_assist_without_any_ac_raises(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """Assist on in a radiator-only home (no AC at all) is flagged too."""
+    registry = ir.async_get(hass)
+    entry = await _setup_trv_only(hass, living_area, register_entity_in_area)
+    cid = entry.entry_id
+    assert registry.async_get_issue(DOMAIN, "heating_assist_unavailable") is None
+
+    await _turn_on(hass, entity_id_for, cid, "ac_heating_assist")
+    await refresh(hass, entry)
+    assert registry.async_get_issue(DOMAIN, "heating_assist_unavailable") is not None
+
+    await _turn_off(hass, entity_id_for, cid, "ac_heating_assist")
+    await refresh(hass, entry)
+    assert registry.async_get_issue(DOMAIN, "heating_assist_unavailable") is None
+
+
+async def test_offline_ac_does_not_falsely_flag_heating_assist(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """An AC that's merely offline has unknown modes, so assist isn't flagged.
+
+    Its capabilities can't be read while unavailable; flagging then would be a
+    false alarm every time the unit drops off the network.
+    """
+    registry = ir.async_get(hass)
+    cid = init_integration.entry_id
+    # A heat-capable AC that then goes offline.
+    hass.states.async_set(AC_ENTITY, "off", _AC_HEAT_DRY)
+    await _turn_on(hass, entity_id_for, cid, "ac_heating_assist")
+    await refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, "heating_assist_unavailable") is None
+
+    hass.states.async_set(AC_ENTITY, "unavailable")
+    await refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, "heating_assist_unavailable") is None
+
+
+async def test_dew_point_guard_without_dry_capable_ac_raises_and_clears(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+) -> None:
+    """Dew-point guard (on by default) with a non-dry AC is flagged; dry clears.
+
+    The fixture AC reports no modes, so the guard can't dehumidify through it.
+    """
+    registry = ir.async_get(hass)
+    await refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, "dehumidify_unavailable") is not None
+
+    hass.states.async_set(AC_ENTITY, "off", _AC_HEAT_DRY)
+    await refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, "dehumidify_unavailable") is None
+
+
+async def test_dew_point_guard_is_not_flagged_in_a_radiator_only_home(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+) -> None:
+    """No AC configured means the guard has nothing to nag about (default on)."""
+    registry = ir.async_get(hass)
+    entry = await _setup_trv_only(hass, living_area, register_entity_in_area)
+    await refresh(hass, entry)
+    assert registry.async_get_issue(DOMAIN, "dehumidify_unavailable") is None
+
+
+async def test_ac_ignore_window_without_an_ac_raises_and_clears(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """The own-room window exemption with no AC configured is inert -> flagged."""
+    registry = ir.async_get(hass)
+    entry = await _setup_trv_only(hass, living_area, register_entity_in_area)
+    cid = entry.entry_id
+    assert registry.async_get_issue(DOMAIN, "ac_ignore_window_inert") is None
+
+    await _turn_on(hass, entity_id_for, cid, "ac_ignore_window")
+    await refresh(hass, entry)
+    assert registry.async_get_issue(DOMAIN, "ac_ignore_window_inert") is not None
+
+    await _turn_off(hass, entity_id_for, cid, "ac_ignore_window")
+    await refresh(hass, entry)
+    assert registry.async_get_issue(DOMAIN, "ac_ignore_window_inert") is None
+
+
+async def test_ac_ignore_window_with_an_ac_is_not_flagged(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """With an AC configured the exemption has a target, so no repair."""
+    registry = ir.async_get(hass)
+    cid = init_integration.entry_id
+    await _turn_on(hass, entity_id_for, cid, "ac_ignore_window")
+    await refresh(hass, init_integration)
+    assert registry.async_get_issue(DOMAIN, "ac_ignore_window_inert") is None
 
 
 async def test_adaptive_comfort_without_outdoor_sensor_raises_and_clears(

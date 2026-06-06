@@ -23,11 +23,23 @@ A notice is raised (and auto-cleared) for silent misconfigurations:
   `local_temperature_calibration` number can't be found (falls back to `target`);
 - **Adaptive cooling comfort** enabled with no outdoor sensor;
 - **Forecast preconditioning** enabled with no weather entity;
+- **AC heating assist** enabled while no available air conditioner can heat —
+  either none is selected, or the selected unit offers no `heat` mode, so the
+  assist demand is computed and then discarded;
+- **Dew point guard** enabled with an air conditioner configured but none that
+  offers a `dry` mode (a radiator-only home never sees this — there's nothing
+  to dehumidify through);
+- **AC ignores open windows** enabled with no air conditioner configured, so the
+  exemption has nothing to apply to;
 - an area sensor that has gone stale (stopped reporting past the staleness
   timeout);
 - an inverted comfort band (cool setpoint below the heat setpoint, leaving no
   neutral zone);
 - no usable temperature source for any managed device.
+
+The capability checks above only consider *available* air conditioners — an AC
+that's merely offline has unknown modes, so it isn't mistaken for one that
+can't heat or dry.
 
 The last two (stale sensor, no temperature source) are transient right after a
 Home Assistant restart, so while the **Status** sensor reads `initializing`

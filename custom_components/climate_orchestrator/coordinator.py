@@ -96,7 +96,12 @@ from .models import (
     Status,
 )
 from .persistence import LearnedStateStores
-from .repairs import calibration_issue, environment_issues, toggle_issue
+from .repairs import (
+    calibration_issue,
+    capability_issues,
+    environment_issues,
+    toggle_issue,
+)
 from .sensing.registry import build_snapshot
 from .settings import (
     RuntimeSettings,
@@ -1055,6 +1060,32 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             ]
         return decision, writes
 
+    @callback
+    def _raise_capability_issues(
+        self, settings: RuntimeSettings, data: SmartClimateData
+    ) -> None:
+        """Flag AC-dependent settings that can't act on the configured hardware.
+
+        Capabilities come from each AC's reported ``hvac_modes``, so only
+        *available* ACs are inspected (an offline one's modes are unknown).
+        """
+        ac_ids = self.ac_ids
+        available = [
+            eid
+            for eid in ac_ids
+            if (reading := data.readings.get(eid)) is not None and reading.available
+        ]
+        caps = [ClimateAdapter(self.hass, eid).capabilities() for eid in available]
+        capability_issues(
+            self.hass,
+            settings,
+            acs_configured=bool(ac_ids),
+            any_available_ac=bool(available),
+            any_ac_can_heat=any(c.can_heat for c in caps),
+            any_ac_can_dry=any(c.can_dry for c in caps),
+            settled=not data.initializing,
+        )
+
     async def _async_control(self, data: SmartClimateData) -> None:
         """Decide per device, apply commands, and run TRV calibration."""
         settings = self._cycle_settings = resolve_settings(
@@ -1074,6 +1105,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             weather_entity=self.weather_entity,
             has_devices=bool(self.device_ids),
         )
+        self._raise_capability_issues(settings, data)
         global_input = _build_global_input(
             settings, band, data, outdoor, master_off=hvac_mode == HVACMode.OFF
         )

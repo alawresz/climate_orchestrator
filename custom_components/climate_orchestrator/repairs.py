@@ -71,6 +71,55 @@ def command_ignored_issue(hass: HomeAssistant, entity_id: str, *, active: bool) 
         ir.async_delete_issue(hass, DOMAIN, issue_id)
 
 
+def capability_issues(
+    hass: HomeAssistant,
+    settings: RuntimeSettings,
+    *,
+    acs_configured: bool,
+    any_available_ac: bool,
+    any_ac_can_heat: bool,
+    any_ac_can_dry: bool,
+    settled: bool,
+) -> None:
+    """Surface settings that silently do nothing for want of a capable AC.
+
+    The engine yields the demand, but ``build_command`` drops it when the
+    device can't honour it — so these mismatches fail completely silently
+    today. Each is gated to avoid false alarms: ``settled`` keeps a restart's
+    not-yet-joined devices from tripping the alert, and capability checks only
+    consider *available* ACs (an offline one's modes are unknown, not absent).
+    """
+    # Heating assist is opt-in, so even "no AC selected at all" is a clear
+    # mistake. Otherwise: at least one AC is available and none advertise a
+    # heat mode (the demand is produced, then thrown away).
+    assist_inert = (
+        settled
+        and settings.ac_heating_assist
+        and (not acs_configured or (any_available_ac and not any_ac_can_heat))
+    )
+    toggle_issue(
+        hass, "heating_assist_unavailable", assist_inert, "heating_assist_unavailable"
+    )
+    # Dew-point guard is on by default, so don't nag radiator-only homes: only
+    # flag when an AC *is* configured (and available) yet none can dehumidify.
+    dry_inert = (
+        settled
+        and settings.dew_point_guard
+        and acs_configured
+        and any_available_ac
+        and not any_ac_can_dry
+    )
+    toggle_issue(hass, "dehumidify_unavailable", dry_inert, "dehumidify_unavailable")
+    # The own-room window exemption is opt-in and inert without any AC. This is
+    # a pure config check (no capability needed), so no settling gate.
+    toggle_issue(
+        hass,
+        "ac_ignore_window_inert",
+        settings.ac_ignore_window and not acs_configured,
+        "ac_ignore_window_inert",
+    )
+
+
 def environment_issues(
     hass: HomeAssistant,
     settings: RuntimeSettings,

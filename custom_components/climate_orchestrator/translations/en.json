@@ -246,6 +246,18 @@
     "weather_forecast_missing": {
       "title": "Climate Orchestrator: weather entity needed",
       "description": "Forecast preconditioning is enabled, but no weather entity is configured, so there's no forecast to plan against and the feature does nothing. Add a weather entity in the integration's Configure dialog, or turn Forecast preconditioning off."
+    },
+    "heating_assist_unavailable": {
+      "title": "Climate Orchestrator: heating assist can't heat",
+      "description": "**AC heating assist** is enabled, but no available air conditioner can heat — either none is selected, or the selected one(s) don't offer a `heat` HVAC mode. The orchestrator decides the AC should help heat, then has no way to command it, so nothing happens. Select an air conditioner that supports heating (a reverse-cycle / heat-pump unit) in the integration's Configure dialog, or turn AC heating assist off."
+    },
+    "dehumidify_unavailable": {
+      "title": "Climate Orchestrator: dehumidify guard can't dry",
+      "description": "**Dew point guard** is enabled and an air conditioner is configured, but none of the available units offer a `dry` HVAC mode, so muggy air can't trigger dehumidification. Use an air conditioner that supports a dry mode, or turn Dew point guard off."
+    },
+    "ac_ignore_window_inert": {
+      "title": "Climate Orchestrator: window exemption has no AC",
+      "description": "**AC ignores open windows** is enabled, but no air conditioner is configured, so the exemption has nothing to apply to. Select an air conditioner in the integration's Configure dialog, or turn the setting off."
     }
   },
   "services": {
