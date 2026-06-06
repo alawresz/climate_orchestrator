@@ -1,7 +1,7 @@
 # ADR-0005: Store schema versioning with downgrade-safe discard
 
 **Status:** Accepted
-**Date:** 2025-06 (retrospective)
+**Date:** 2026-06 (retrospective)
 
 ## Context
 

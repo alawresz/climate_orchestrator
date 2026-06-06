@@ -1,7 +1,7 @@
 # ADR-0002: A pure, Home Assistant-free control core
 
 **Status:** Accepted
-**Date:** 2025-06 (retrospective)
+**Date:** 2026-06 (retrospective)
 
 ## Context
 

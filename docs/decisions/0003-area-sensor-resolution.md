@@ -1,7 +1,7 @@
 # ADR-0003: Resolve room sensors from the Home Assistant area registry
 
 **Status:** Accepted
-**Date:** 2025-06 (retrospective)
+**Date:** 2026-06 (retrospective)
 
 ## Context
 

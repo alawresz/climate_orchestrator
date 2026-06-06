@@ -1,7 +1,7 @@
 # ADR-0007: Release pushes use a dedicated GitHub App token
 
 **Status:** Accepted
-**Date:** 2025-06 (retrospective)
+**Date:** 2026-06 (retrospective)
 
 ## Context
 

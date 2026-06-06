@@ -1,7 +1,7 @@
 # ADR-0006: Version and packaging gates
 
 **Status:** Accepted
-**Date:** 2025-06 (retrospective)
+**Date:** 2026-06 (retrospective)
 
 ## Context
 

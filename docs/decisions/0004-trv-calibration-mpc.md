@@ -1,7 +1,7 @@
 # ADR-0004: TRV calibration strategies, and model-predictive valve control
 
 **Status:** Accepted
-**Date:** 2025-06 (retrospective)
+**Date:** 2026-06 (retrospective)
 
 ## Context
 
