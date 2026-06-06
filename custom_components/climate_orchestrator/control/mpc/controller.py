@@ -136,17 +136,25 @@ class MpcController:
         # opening outside [0, 100] is never a valid command.
         return round(clamp(valve * 100.0, 0.0, 100.0), 1)
 
-    def _residual(self, sample: Sample) -> float:
+    @staticmethod
+    def _residual(sample: Sample, params: ThermalParams) -> float:
         """Per-step model residual (K): predicted change minus observed change.
 
         The one place the discretised model is evaluated for scoring, so the
-        formula can't drift between ``fit_rmse`` and its callers.
+        formula can't drift between ``fit_rmse`` and its callers. Takes
+        ``params`` explicitly so a whole scoring pass uses one consistent
+        ``(gain, loss)`` even if the fit is re-identified mid-read.
         """
         predicted = sample.dt * (
-            self.params.gain * sample.valve
-            - self.params.loss * (sample.temp - sample.outdoor)
+            params.gain * sample.valve - params.loss * (sample.temp - sample.outdoor)
         )
         return predicted - (sample.next_temp - sample.temp)
+
+    def _rmse_over(self, history: Sequence[Sample]) -> float:
+        """RMS residual over a fixed sample list under the current params."""
+        params = self.params  # pin once: an atomic read of the frozen pair
+        residuals = [self._residual(s, params) for s in history]
+        return math.sqrt(sum(r * r for r in residuals) / len(residuals))
 
     def fit_rmse(self) -> float | None:
         """Root-mean-square residual (K/step) of the current fit over history.
@@ -155,10 +163,14 @@ class MpcController:
         temperature changes; lower is a better-trusted model. ``None`` until
         there are enough samples to have fitted at all.
         """
-        if len(self.history) < MIN_SAMPLES:
+        # Snapshot the deque: the MPC math runs in an executor thread and may be
+        # appending while a loop-side diagnostic read iterates here. Copying
+        # first avoids "deque mutated during iteration"; ``list(deque)`` is
+        # atomic under the GIL.
+        history = list(self.history)
+        if len(history) < MIN_SAMPLES:
             return None
-        residuals = [self._residual(s) for s in self.history]
-        return math.sqrt(sum(r * r for r in residuals) / len(residuals))
+        return self._rmse_over(history)
 
     def relative_fit_error(self) -> float | None:
         """Fit residual as a fraction of the room's actual movement, or ``None``.
@@ -175,14 +187,14 @@ class MpcController:
         for the hardware — e.g. a weather-compensated radiator whose output
         varies with the supply temperature the constant ``gain`` can't capture.
         """
-        if len(self.history) < MIN_SAMPLES:
+        history = list(self.history)  # one snapshot for both ratio terms (see fit_rmse)
+        if len(history) < MIN_SAMPLES:
             return None
-        observed = [s.next_temp - s.temp for s in self.history]
+        observed = [s.next_temp - s.temp for s in history]
         rms_observed = math.sqrt(sum(o * o for o in observed) / len(observed))
         if rms_observed < _MIN_FIT_SIGNAL:
             return None
-        rmse = self.fit_rmse()
-        return None if rmse is None else rmse / rms_observed
+        return self._rmse_over(history) / rms_observed
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise learned parameters and history for persistence."""

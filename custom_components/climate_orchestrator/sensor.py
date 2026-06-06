@@ -367,9 +367,13 @@ class SmartClimateMpcSensor(SmartClimateBaseEntity, SensorEntity):
         controller = self.coordinator.mpc_state(self._trv_id)
         if controller is None:
             return None
+        # Pin params once: the MPC math may re-identify the fit from an executor
+        # thread between attribute reads, which would otherwise mix gain from
+        # one fit with loss from the next. (fit_rmse already reads a snapshot.)
+        params = controller.params
         return {
-            "heating_gain": controller.params.gain,  # K/min at 100 % valve
-            "heat_loss": controller.params.loss,  # 1/min toward outdoors
+            "heating_gain": params.gain,  # K/min at 100 % valve
+            "heat_loss": params.loss,  # 1/min toward outdoors
             "model_error": controller.fit_rmse(),  # °C RMSE; None until ready
             "samples": len(controller.history),
         }
