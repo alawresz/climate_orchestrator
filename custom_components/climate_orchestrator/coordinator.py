@@ -58,6 +58,7 @@ from .const import (
     DEFAULT_PRESET,
     DEFAULT_PRESETS,
     DOMAIN,
+    FORECAST_FAILURE_SECONDS,
     MPC_POOR_FIT_RATIO,
     MPC_POOR_FIT_SECONDS,
     RUNTIME_WINDOW_SECONDS,
@@ -1178,6 +1179,9 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             base_band,
             outdoor_sensor=self.outdoor_sensor,
             weather_entity=self.weather_entity,
+            forecast_failing=self._adaptation.is_forecast_failing(
+                threshold=FORECAST_FAILURE_SECONDS
+            ),
             has_devices=bool(self.device_ids),
         )
         self._raise_capability_issues(settings, data)

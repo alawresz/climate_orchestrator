@@ -8,6 +8,7 @@ from typing import Any
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import issue_registry as ir
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -21,6 +22,7 @@ from custom_components.climate_orchestrator.coordinator import SmartClimateCoord
 from custom_components.climate_orchestrator.settings import resolve_settings
 from tests.conftest import TRV_ENTITY
 from tests.ha.helpers import (
+    age_forecast_failure,
     expire_forecast,
     forecast_cache,
     precondition_series,
@@ -288,3 +290,48 @@ async def test_forecast_fetch_failure_is_swallowed(
     assert precondition_series(coordinator, 1.0, settings) is None
     # The cycle survived: the coordinator still produced a snapshot.
     assert coordinator.last_update_success
+
+
+async def test_persistent_forecast_failure_raises_and_clears(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+    entity_id_for: Callable[[str, str], str],
+) -> None:
+    """A weather entity whose forecast keeps failing surfaces a repair.
+
+    A single failure is debounced; only a sustained one raises, and a
+    recovered fetch clears it.
+    """
+    outage = HomeAssistantError("weather provider outage")
+
+    async def _failing(_call: ServiceCall) -> dict[str, Any]:
+        raise outage
+
+    hass.services.async_register(
+        "weather", "get_forecasts", _failing, supports_response=SupportsResponse.ONLY
+    )
+    entry = await _setup_preconditioning_entry(
+        hass, living_area, register_entity_in_area, entity_id_for, "sc_precond_repair"
+    )
+    coordinator: SmartClimateCoordinator = entry.runtime_data
+    registry = ir.async_get(hass)
+    issue = "weather_forecast_unavailable"
+
+    # Failing, but the streak only just started -> debounced, no repair.
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, issue) is None
+
+    # Sustained past the threshold -> the next cycle raises the repair.
+    age_forecast_failure(coordinator)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, issue) is not None
+
+    # The weather entity recovers -> a successful fetch clears the notice.
+    _register_forecast_service(hass)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, issue) is None
+    assert forecast_cache(coordinator) == _FORECAST

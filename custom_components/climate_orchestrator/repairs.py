@@ -145,6 +145,7 @@ def environment_issues(
     *,
     outdoor_sensor: str | None,
     weather_entity: str | None,
+    forecast_failing: bool,
     has_devices: bool,
 ) -> None:
     """Surface misconfigurations that would otherwise fail silently."""
@@ -171,6 +172,15 @@ def environment_issues(
         "weather_forecast_missing",
         settings.forecast_preconditioning and weather_entity is None,
         "weather_forecast_missing",
+    )
+    # ...and the configured entity must actually return a usable forecast. A
+    # sustained fetch failure (computed by the coordinator) means the feature is
+    # silently inert despite being set up correctly.
+    toggle_issue(
+        hass,
+        "weather_forecast_unavailable",
+        forecast_failing,
+        "weather_forecast_unavailable",
     )
     # These two are transient right after a restart (sensors haven't
     # reported in yet), so hold them back while still initializing — only

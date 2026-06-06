@@ -88,6 +88,13 @@ CONTROL_FAILURE_ISSUE_THRESHOLD: Final = 3
 MPC_POOR_FIT_RATIO: Final = 0.8
 MPC_POOR_FIT_SECONDS: Final = 86400.0
 
+# Forecast-unavailable repair: preconditioning is enabled with a weather entity,
+# but the hourly fetch has failed (or returned junk) continuously for this long.
+# Three hours = the staleness cap, so by now the cached forecast is ignored too
+# and the feature is genuinely inert. Long enough that a transient outage or a
+# single bad poll (fetches retry every 15 min) never trips it.
+FORECAST_FAILURE_SECONDS: Final = 3.0 * 3600.0
+
 # Transitions needed before the MPC model is fitted (vs the cold-start prior).
 # Lives here — not in control.mpc.model — so the sensor platform can read it
 # without importing scipy/numpy (see ADR-0006 / lazy-import discipline).

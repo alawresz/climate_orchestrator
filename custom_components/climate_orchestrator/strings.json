@@ -247,6 +247,10 @@
       "title": "Climate Orchestrator: weather entity needed",
       "description": "Forecast preconditioning is enabled, but no weather entity is configured, so there's no forecast to plan against and the feature does nothing. Add a weather entity in the integration's Configure dialog, or turn Forecast preconditioning off."
     },
+    "weather_forecast_unavailable": {
+      "title": "Climate Orchestrator: weather forecast unavailable",
+      "description": "Forecast preconditioning is enabled and a weather entity is configured, but its hourly forecast has been unavailable for hours — the `weather.get_forecasts` call keeps failing or returns no usable data. Preconditioning is silently inert as a result (control still works; it just can't pre-heat ahead of a cold spell). Check that the weather entity supports an hourly forecast and is working, or turn Forecast preconditioning off. This notice clears once a forecast is fetched again."
+    },
     "heating_assist_unavailable": {
       "title": "Climate Orchestrator: heating assist can't heat",
       "description": "**AC heating assist** is enabled, but no available air conditioner can heat — either none is selected, or the selected one(s) don't offer a `heat` HVAC mode. The orchestrator decides the AC should help heat, then has no way to command it, so nothing happens. Select an air conditioner that supports heating (a reverse-cycle / heat-pump unit) in the integration's Configure dialog, or turn AC heating assist off."

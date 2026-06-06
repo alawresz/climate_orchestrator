@@ -13,6 +13,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.climate_orchestrator.const import (
     DOMAIN,
+    FORECAST_FAILURE_SECONDS,
     STARTUP_GRACE_SECONDS,
 )
 from custom_components.climate_orchestrator.coordinator import (
@@ -233,6 +234,13 @@ def forecast_cache(coordinator: SmartClimateCoordinator) -> list[float]:
 def expire_forecast(coordinator: SmartClimateCoordinator) -> None:
     """Age the cached forecast past the staleness cap (dead weather entity)."""
     coordinator._adaptation._forecast_fetched_at = time.monotonic() - 4.0 * 3600.0
+
+
+def age_forecast_failure(coordinator: SmartClimateCoordinator) -> None:
+    """Push the forecast-fetch-failure clock past the repair threshold."""
+    coordinator._adaptation._fetch_failing_since = (
+        time.monotonic() - FORECAST_FAILURE_SECONDS - 10.0
+    )
 
 
 def precondition_series(

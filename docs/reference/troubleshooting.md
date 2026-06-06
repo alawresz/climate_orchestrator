@@ -23,6 +23,9 @@ A notice is raised (and auto-cleared) for silent misconfigurations:
   `local_temperature_calibration` number can't be found (falls back to `target`);
 - **Adaptive cooling comfort** enabled with no outdoor sensor;
 - **Forecast preconditioning** enabled with no weather entity;
+- **Forecast preconditioning** enabled with a weather entity whose hourly
+  forecast has been unavailable for hours (the fetch keeps failing or returns
+  nothing) — the feature is silently inert until it recovers;
 - **AC heating assist** enabled while no available air conditioner can heat —
   either none is selected, or the selected unit offers no `heat` mode, so the
   assist demand is computed and then discarded;

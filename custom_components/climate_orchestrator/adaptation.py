@@ -52,6 +52,8 @@ class WeatherAdaptation:
         self._adaptive_band: Band | None = None
         self._forecast_hourly: list[float] = []
         self._forecast_fetched_at = 0.0
+        # Monotonic time the forecast fetch started failing (None = healthy).
+        self._fetch_failing_since: float | None = None
 
     @property
     def rmot(self) -> float | None:
@@ -111,10 +113,13 @@ class WeatherAdaptation:
 
         Only when preconditioning is enabled and a weather entity is
         configured; rate-limited to ``PRECONDITION_FORECAST_REFRESH_SECONDS``.
-        Failures are swallowed (the feature simply no-ops without a forecast).
+        Failures are swallowed (the feature simply no-ops without a forecast),
+        but a *persistent* failure is tracked so a repair can surface it — see
+        :meth:`is_forecast_failing`.
         """
         if not settings.forecast_preconditioning or weather_entity is None:
             self._forecast_hourly = []
+            self._fetch_failing_since = None
             return
         now = time.monotonic()
         if (
@@ -122,6 +127,21 @@ class WeatherAdaptation:
             and now - self._forecast_fetched_at < PRECONDITION_FORECAST_REFRESH_SECONDS
         ):
             return
+        temps = await self._fetch_hourly(weather_entity)
+        if temps:
+            self._forecast_hourly = temps[:_FORECAST_MAX_HOURS]
+            self._forecast_fetched_at = now
+            self._fetch_failing_since = None
+        elif self._fetch_failing_since is None:
+            # First failed/empty fetch since the last success: start the clock.
+            self._fetch_failing_since = now
+
+    async def _fetch_hourly(self, weather_entity: str) -> list[float] | None:
+        """Pull the hourly outdoor-temperature series, or ``None`` if unusable.
+
+        ``None`` covers both a raising service and a malformed/empty response —
+        both mean "no usable forecast" to the cache and the failure tracker.
+        """
         try:
             response = await self._hass.services.async_call(
                 "weather",
@@ -132,16 +152,16 @@ class WeatherAdaptation:
             )
         except Exception:  # noqa: BLE001 - any forecast failure must not break the cycle
             _LOGGER.debug("climate_orchestrator: forecast fetch failed", exc_info=True)
-            return
+            return None
         # The service response is loosely typed JSON; narrow every step.
         if not isinstance(response, dict):
-            return
+            return None
         device_block = response.get(weather_entity)
         if not isinstance(device_block, dict):
-            return
+            return None
         entries = device_block.get("forecast")
         if not isinstance(entries, list):
-            return
+            return None
         temps: list[float] = []
         for entry in entries:
             if isinstance(entry, dict):
@@ -152,9 +172,17 @@ class WeatherAdaptation:
                     and math.isfinite(temp)
                 ):
                     temps.append(float(temp))
-        if temps:
-            self._forecast_hourly = temps[:_FORECAST_MAX_HOURS]
-            self._forecast_fetched_at = now
+        return temps or None
+
+    def is_forecast_failing(self, *, threshold: float) -> bool:
+        """Whether forecast fetches have failed continuously for ``threshold`` s.
+
+        Only ever true while preconditioning is enabled with a weather entity
+        configured — the disabled/no-entity path clears the failure clock — so
+        callers needn't re-check those conditions.
+        """
+        since = self._fetch_failing_since
+        return since is not None and time.monotonic() - since >= threshold
 
     @callback
     def precondition_series(
