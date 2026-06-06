@@ -54,7 +54,7 @@ rules:
     comment: No authentication — orchestrates local Home Assistant entities.
   test-coverage:
     status: done
-    comment: CI enforces a 95% branch-coverage gate (coverage fail_under).
+    comment: CI enforces a 97% branch-coverage gate (coverage fail_under).
 
   # --- Gold -----------------------------------------------------------------
   devices: done
