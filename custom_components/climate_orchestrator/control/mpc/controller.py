@@ -136,6 +136,18 @@ class MpcController:
         # opening outside [0, 100] is never a valid command.
         return round(clamp(valve * 100.0, 0.0, 100.0), 1)
 
+    def _residual(self, sample: Sample) -> float:
+        """Per-step model residual (K): predicted change minus observed change.
+
+        The one place the discretised model is evaluated for scoring, so the
+        formula can't drift between ``fit_rmse`` and its callers.
+        """
+        predicted = sample.dt * (
+            self.params.gain * sample.valve
+            - self.params.loss * (sample.temp - sample.outdoor)
+        )
+        return predicted - (sample.next_temp - sample.temp)
+
     def fit_rmse(self) -> float | None:
         """Root-mean-square residual (K/step) of the current fit over history.
 
@@ -145,12 +157,7 @@ class MpcController:
         """
         if len(self.history) < MIN_SAMPLES:
             return None
-        residuals = [
-            s.dt
-            * (self.params.gain * s.valve - self.params.loss * (s.temp - s.outdoor))
-            - (s.next_temp - s.temp)
-            for s in self.history
-        ]
+        residuals = [self._residual(s) for s in self.history]
         return math.sqrt(sum(r * r for r in residuals) / len(residuals))
 
     def relative_fit_error(self) -> float | None:
