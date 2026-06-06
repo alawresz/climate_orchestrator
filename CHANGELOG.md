@@ -2,6 +2,32 @@
 
 <!-- version list -->
 
+## v0.30.1 (2026-06-06)
+
+### Bug Fixes
+
+- Clear per-device repair issues on entry unload and mode change
+  ([`9c86fc8`](https://github.com/alawresz/climate_orchestrator/commit/9c86fc85a2eb12188fb937c61dbac7bb85c28b66))
+
+### Documentation
+
+- Fix ADR-0001 date and de-version the ADR-0006 example
+  ([`8bbeaa5`](https://github.com/alawresz/climate_orchestrator/commit/8bbeaa59891b42f23c4a2828c57b23aa8a4ab92d))
+
+- Fix internals drift (adapter/profile model, store contents, MPC equation)
+  ([`0138973`](https://github.com/alawresz/climate_orchestrator/commit/0138973c2f4ad2810a7a288b0a0a627fcf8cc6dd))
+
+### Refactoring
+
+- Name the MPC per-step residual in one place
+  ([`4959202`](https://github.com/alawresz/climate_orchestrator/commit/4959202edd34641e2c10926c77c431dff5288c26))
+
+### Testing
+
+- Guard that every repair key has a strings.json entry
+  ([`dcd7581`](https://github.com/alawresz/climate_orchestrator/commit/dcd75812518b3958976fd29f8b9439e303a0a06e))
+
+
 ## v0.30.0 (2026-06-06)
 
 ### Documentation
