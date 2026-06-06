@@ -2,6 +2,29 @@
 
 <!-- version list -->
 
+## v0.31.0 (2026-06-06)
+
+### Chores
+
+- Declare platinum quality scale and cap scipy below 2.0
+  ([`6b1d012`](https://github.com/alawresz/climate_orchestrator/commit/6b1d012074618e8f6a808c5cc687064ca6b2397c))
+
+### Documentation
+
+- Fix year typo
+  ([`1d0ca7e`](https://github.com/alawresz/climate_orchestrator/commit/1d0ca7ed3c76b0b3d125cbca5faa7a96d8af9c92))
+
+### Features
+
+- Surface a repair when forecast preconditioning can't fetch a forecast
+  ([`b57ce40`](https://github.com/alawresz/climate_orchestrator/commit/b57ce40fffe4ad454f91e10e177ba44eda4dddce))
+
+### Refactoring
+
+- Lazy-import scipy so non-MPC installs never load it
+  ([`cbef557`](https://github.com/alawresz/climate_orchestrator/commit/cbef55760a0c2c6c62796c37327b5924ddd4524f))
+
+
 ## v0.30.1 (2026-06-06)
 
 ### Bug Fixes
