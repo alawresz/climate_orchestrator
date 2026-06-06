@@ -24,8 +24,8 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
 
+from .const import MPC_MIN_SAMPLES as MIN_SAMPLES
 from .control.comfort import effective_temperature
-from .control.mpc.model import MIN_SAMPLES
 from .entity import SmartClimateBaseEntity
 from .models import HomeAvgSource, SmartClimateData, Status
 

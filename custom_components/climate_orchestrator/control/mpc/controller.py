@@ -14,12 +14,12 @@ import logging
 import math
 from typing import TYPE_CHECKING, Any
 
+from ...const import MPC_MIN_SAMPLES as MIN_SAMPLES
 from ..numeric import clamp
 from .model import (
     DEFAULT_PARAMS,
     MAX_GAIN,
     MAX_LOSS,
-    MIN_SAMPLES,
     Sample,
     ThermalParams,
     identify_parameters,

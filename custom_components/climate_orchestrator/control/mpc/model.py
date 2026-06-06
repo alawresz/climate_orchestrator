@@ -18,13 +18,16 @@ from typing import TYPE_CHECKING
 import numpy as np
 from scipy.optimize import least_squares
 
+from ...const import MPC_MIN_SAMPLES as MIN_SAMPLES
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-# Cold-start priors and fit settings.
+# Cold-start priors and fit settings. ``MIN_SAMPLES`` lives in ``const``
+# (scipy-free) so the sensor platform can read it without importing this
+# numpy/scipy-laden module; imported here under its local name for the fit.
 DEFAULT_GAIN = 0.10
 DEFAULT_LOSS = 0.01
-MIN_SAMPLES = 6
 _PRIOR_WEIGHT = 0.05
 # Physical sanity bounds for the fit. A radiator gaining 2 K/min at full valve
 # or a room with a 1-minute thermal time constant is already absurd; anything

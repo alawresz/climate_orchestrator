@@ -75,7 +75,6 @@ from .control.engine import (
     decide,
 )
 from .control.hysteresis import Demand
-from .control.mpc.controller import MpcController, preconditioned_valve_pct
 from .control.runtime_stats import cycles_per_hour, runtime_fraction
 from .control.slope import temperature_slope_per_min
 from .control.throttle import throttle_setpoint
@@ -121,6 +120,11 @@ from .windows import WindowMonitor
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
+
+    # Imported lazily at runtime (see _mpc_observe_and_write / async_load_mpc):
+    # the MPC modules pull in scipy/numpy, which a target/offset-only install
+    # should never pay for. Kept here only for type annotations.
+    from .control.mpc.controller import MpcController
 
 # Skip number writes within this of the current value (update minimization).
 NUMBER_WRITE_EPSILON = 0.1
@@ -341,6 +345,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         managed = set(self.device_ids)
         data = await self._stores.load_mpc()
         if data:
+            # Local import: restoring a controller needs the MPC module (and
+            # thus scipy). Only paid when there's persisted MPC state — a
+            # target/offset-only install reaches this with empty ``data``.
+            from .control.mpc.controller import MpcController  # noqa: PLC0415
+
             for trv_id, payload in data.items():
                 if trv_id not in managed:
                     _LOGGER.debug(
@@ -694,6 +703,13 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         it in an executor job keeps the event loop unblocked. Each TRV has its
         own controller, so concurrent jobs never share state.
         """
+        # Local import: this path is only reached in MPC calibration mode, so
+        # scipy/numpy load on first MPC use rather than at integration setup.
+        from .control.mpc.controller import (  # noqa: PLC0415 - lazy scipy
+            MpcController,
+            preconditioned_valve_pct,
+        )
+
         ambient = ctx.outdoor if ctx.outdoor is not None else area_temp
         runtime = self._runtime(entity_id)
         if runtime.mpc is None:
