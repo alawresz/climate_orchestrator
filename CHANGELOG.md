@@ -2,6 +2,24 @@
 
 <!-- version list -->
 
+## v0.30.0 (2026-06-06)
+
+### Documentation
+
+- Add a Decisions section and backfill ADRs 0001–0007
+  ([`efc233f`](https://github.com/alawresz/climate_orchestrator/commit/efc233f48dd9aa4cff21dcea4fbf6e3a167e49ed))
+
+### Features
+
+- Flag a TRV whose MPC model fits persistently poorly
+  ([`234a206`](https://github.com/alawresz/climate_orchestrator/commit/234a206da0618cbfdbb22eac508cd7eb08018dba))
+
+### Refactoring
+
+- Resolve per-device behaviour through a DeviceProfile seam
+  ([`ba00a87`](https://github.com/alawresz/climate_orchestrator/commit/ba00a8708a5986397885dc18c685f136fc3e79ec))
+
+
 ## v0.29.0 (2026-06-06)
 
 ### Chores
