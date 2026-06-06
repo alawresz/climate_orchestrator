@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.31.2 (2026-06-06)
+
+### Bug Fixes
+
+- Clear all repairs on unload, prune removed-device entities, pin MPC diag params
+  ([`bf96b8f`](https://github.com/alawresz/climate_orchestrator/commit/bf96b8f922b9268a1f6be7cc62b92782c6673ba5))
+
+
 ## v0.31.1 (2026-06-06)
 
 ### Bug Fixes
