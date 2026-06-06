@@ -1,7 +1,7 @@
 # ADR-0001: Device profiles for hardware quirks
 
 **Status:** Accepted
-**Date:** 2025-06
+**Date:** 2026-06
 
 ## Context
 

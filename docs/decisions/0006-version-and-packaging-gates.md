@@ -11,7 +11,7 @@ will baffle anyone who finds them cold:
 - `pyproject.toml` declares `requires-python = ">=3.14.2"`.
 - ruff is pinned to `target-version = "py313"`.
 - `pyproject`'s own `version` is frozen at `"0.0.0"`, while `manifest.json`
-  carries the real version (`0.29.0`, …) and `hacs.json` pins HA `2025.2.0`.
+  carries the real, release-stamped version and `hacs.json` pins HA `2025.2.0`.
 
 Each is deliberate, and the reasons are non-obvious. This ADR records them so
 they aren't "fixed" into breakage.
