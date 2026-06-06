@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://alawresz.github.io/climate_orchestrator/0.29/reference/troubleshooting/">
+        <link rel="canonical" href="https://alawresz.github.io/climate_orchestrator/0.29/decisions/0005-store-schema-versioning/">
       
       
-        <link rel="prev" href="../entities/">
+        <link rel="prev" href="../0004-trv-calibration-mpc/">
       
       
-        <link rel="next" href="../limitations/">
+        <link rel="next" href="../0006-version-and-packaging-gates/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Troubleshooting - Climate Orchestrator</title>
+        <title>ADR-0005: Store schema versioning - Climate Orchestrator</title>
       
     
     
@@ -83,7 +83,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#troubleshooting" class="md-skip">
+        <a href="#adr-0005-store-schema-versioning-with-downgrade-safe-discard" class="md-skip">
           Skip to content
         </a>
       
@@ -122,7 +122,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Troubleshooting
+              ADR-0005: Store schema versioning
             
           </span>
         </div>
@@ -612,8 +612,6 @@
       
   
   
-    
-  
   
   
     
@@ -626,11 +624,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
@@ -651,7 +649,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -669,7 +667,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../entities/" class="md-nav__link">
+      <a href="../../reference/entities/" class="md-nav__link">
         
   
   
@@ -694,37 +692,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../reference/troubleshooting/" class="md-nav__link">
         
   
   
@@ -740,81 +711,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#the-status-sensor" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The Status sensor
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#repairs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Repairs
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#download-diagnostics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Download diagnostics
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#enable-debug-logging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Enable debug logging
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#faq" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        FAQ
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -827,7 +723,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../limitations/" class="md-nav__link">
+      <a href="../../reference/limitations/" class="md-nav__link">
         
   
   
@@ -1313,8 +1209,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -1325,11 +1223,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
         
           
           <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
@@ -1350,7 +1248,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1368,7 +1266,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decisions/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -1396,7 +1294,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decisions/0001-device-profiles/" class="md-nav__link">
+      <a href="../0001-device-profiles/" class="md-nav__link">
         
   
   
@@ -1424,7 +1322,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decisions/0002-pure-control-core/" class="md-nav__link">
+      <a href="../0002-pure-control-core/" class="md-nav__link">
         
   
   
@@ -1452,7 +1350,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decisions/0003-area-sensor-resolution/" class="md-nav__link">
+      <a href="../0003-area-sensor-resolution/" class="md-nav__link">
         
   
   
@@ -1480,7 +1378,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decisions/0004-trv-calibration-mpc/" class="md-nav__link">
+      <a href="../0004-trv-calibration-mpc/" class="md-nav__link">
         
   
   
@@ -1505,10 +1403,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../decisions/0005-store-schema-versioning/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-0005: Store schema versioning
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1524,6 +1449,70 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#options-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options Considered
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consequences
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1536,7 +1525,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decisions/0006-version-and-packaging-gates/" class="md-nav__link">
+      <a href="../0006-version-and-packaging-gates/" class="md-nav__link">
         
   
   
@@ -1564,7 +1553,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../decisions/0007-github-app-release/" class="md-nav__link">
+      <a href="../0007-github-app-release/" class="md-nav__link">
         
   
   
@@ -1619,10 +1608,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-status-sensor" class="md-nav__link">
+  <a href="#context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The Status sensor
+        Context
       
     </span>
   </a>
@@ -1630,10 +1619,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#repairs" class="md-nav__link">
+  <a href="#decision" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Repairs
+        Decision
       
     </span>
   </a>
@@ -1641,10 +1630,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#download-diagnostics" class="md-nav__link">
+  <a href="#options-considered" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Download diagnostics
+        Options Considered
       
     </span>
   </a>
@@ -1652,21 +1641,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#enable-debug-logging" class="md-nav__link">
+  <a href="#consequences" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Enable debug logging
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#faq" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        FAQ
+        Consequences
       
     </span>
   </a>
@@ -1690,7 +1668,7 @@
 
 
   
-    <a href="https://github.com/alawresz/climate_orchestrator/edit/main/docs/reference/troubleshooting.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/alawresz/climate_orchestrator/edit/main/docs/decisions/0005-store-schema-versioning.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -1698,115 +1676,74 @@
   
 
 
-<h1 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h1>
-<h2 id="the-status-sensor">The Status sensor<a class="headerlink" href="#the-status-sensor" title="Permanent link">&para;</a></h2>
-<p>The whole-home <strong>Status</strong> diagnostic sensor is the first place to look:</p>
+<h1 id="adr-0005-store-schema-versioning-with-downgrade-safe-discard">ADR-0005: Store schema versioning with downgrade-safe discard<a class="headerlink" href="#adr-0005-store-schema-versioning-with-downgrade-safe-discard" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted
+<strong>Date:</strong> 2025-06 (retrospective)</p>
+<h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
+<p>The integration persists learned state across restarts: per-device MPC models,
+the running-mean outdoor temperature, the self-tuning AC bias, latched demand,
+and the maintenance clock (<code>persistence.py</code>, via HA's <code>Store</code>). That state
+evolves as features land — a payload written by version <em>N</em> may not match what
+version <em>N+1</em> expects, and a user who upgrades then rolls back (HACS makes this
+easy) will have a <em>newer</em> payload on disk than the running code understands.</p>
+<p>Mis-reading a stale or future payload is worse than having none: it can seed the
+MPC model or bias integral with garbage and degrade control silently. But all of
+this state is <strong>re-learnable in hours</strong> — none of it is precious.</p>
+<h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
+<p>Version the stores (<code>STORE_VERSION</code>) and adopt a deliberately <strong>blunt</strong>
+migration policy: a payload whose schema we don't positively recognise is
+<strong>discarded</strong> (re-learned), never coerced.</p>
 <ul>
-<li><strong><code>initializing</code></strong> — the post-restart warm-up. Sensors and devices are still
-  coming back; some repairs are deliberately held back during this window.</li>
-<li><strong><code>ok</code></strong> — everything has a reading and every managed device is reachable.</li>
-<li><strong><code>degraded</code></strong> — a managed device is unavailable or no temperature source can
-  be found. Any offline devices are listed in the sensor's
-  <code>unavailable_devices</code> attribute.</li>
+<li><strong>Same-major, minor drift</strong> reads forward-compatibly (loaders validate
+  field-by-field anyway).</li>
+<li><strong>Unknown older major</strong> → the migrate hook returns <code>{}</code> with a warning.</li>
+<li><strong>Newer major (downgrade)</strong> → on HA ≥ 2026.3 <code>Store</code> raises
+  <code>UnsupportedStorageVersionError</code> <em>before</em> any hook runs; we catch it and
+  discard. On older HA there is no such signal, so <code>Store</code> routes the
+  newer-major payload through the migrate hook, which discards it like any
+  unknown major.</li>
 </ul>
-<div class="admonition tip">
-<p class="admonition-title">Tip</p>
-<p>See <a href="../../guides/services-automations/">Services &amp; automations</a> for a ready-made
-automation that notifies you when the status turns <code>degraded</code>.</p>
-</div>
-<h2 id="repairs">Repairs<a class="headerlink" href="#repairs" title="Permanent link">&para;</a></h2>
-<p>A notice is raised (and auto-cleared) for silent misconfigurations:</p>
+<p>Because <code>UnsupportedStorageVersionError</code> only exists from HA 2026.3, its import
+is guarded with a never-raised fallback class so the <code>except</code> clause stays valid
+on the 2025.2 floor. No schema surprise can ever fail entry setup.</p>
+<h2 id="options-considered">Options Considered<a class="headerlink" href="#options-considered" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Pros</th>
+<th>Cons</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>No versioning</td>
+<td>Simplest</td>
+<td>A changed payload shape silently mis-seeds control</td>
+</tr>
+<tr>
+<td>Versioned + write real migrations</td>
+<td>Preserves learned state across upgrades</td>
+<td>Migration code to write and test for state that re-learns in hours — poor ROI, and can't help the <em>downgrade</em> case at all</td>
+</tr>
+<tr>
+<td>Versioned + discard-on-doubt (chosen)</td>
+<td>Setup never fails; no mis-reads; trivial to reason about</td>
+<td>A schema change costs users a few hours of re-learning</td>
+</tr>
+</tbody>
+</table>
+<h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
 <ul>
-<li>a TRV in <code>mpc</code>/<code>offset</code> mode whose <code>valve_opening_degree</code> /
-  <code>local_temperature_calibration</code> number can't be found (falls back to <code>target</code>);</li>
-<li><strong>Adaptive cooling comfort</strong> enabled with no outdoor sensor;</li>
-<li><strong>Forecast preconditioning</strong> enabled with no weather entity;</li>
-<li><strong>AC heating assist</strong> enabled while no available air conditioner can heat —
-  either none is selected, or the selected unit offers no <code>heat</code> mode, so the
-  assist demand is computed and then discarded;</li>
-<li><strong>Dew point guard</strong> enabled with an air conditioner configured but none that
-  offers a <code>dry</code> mode (a radiator-only home never sees this — there's nothing
-  to dehumidify through);</li>
-<li><strong>AC ignores open windows</strong> enabled with no air conditioner configured, so the
-  exemption has nothing to apply to;</li>
-<li>an area sensor that has gone stale (stopped reporting past the staleness
-  timeout);</li>
-<li>an inverted comfort band (cool setpoint below the heat setpoint, leaving no
-  neutral zone);</li>
-<li>no usable temperature source for any managed device.</li>
+<li><strong>Easier:</strong> schema can evolve freely; a downgrade is safe; setup is robust to
+  any stored garbage.</li>
+<li><strong>Cost:</strong> a bumped <code>STORE_VERSION</code> discards learned state on first load after
+  the change — acceptable given it re-learns quickly, and called out so it's a
+  conscious choice when bumping.</li>
+<li><strong>Tested</strong> across the matrix (same-major minor drift loads; unknown older
+  major → empty; newer major → discarded, on both HA branches), with the
+  downgrade path exercised by the floor canary.</li>
 </ul>
-<p>The capability checks above only consider <em>available</em> air conditioners — an AC
-that's merely offline has unknown modes, so it isn't mistaken for one that
-can't heat or dry.</p>
-<p>The last two (stale sensor, no temperature source) are transient right after a
-Home Assistant restart, so while the <strong>Status</strong> sensor reads <code>initializing</code>
-they're held back — they only surface once the warm-up window has elapsed and
-the gap is therefore real.</p>
-<p>A separate notice appears if the control cycle itself fails several times in
-a row — devices stop receiving fresh commands while readings continue — and
-clears on the next successful cycle.</p>
-<p>A per-device <strong>command-ignored</strong> notice catches the opposite failure mode: the
-service calls <em>succeed</em>, but the device's state never reflects the commanded
-HVAC mode for five minutes straight — it's silently ignoring them, so its room
-isn't actually being controlled. Typical culprits: a child/temperature lock
-engaged on the device, a weak Zigbee/radio link, a dying battery, or its
-integration no longer talking to the hardware. The notice clears as soon as
-the device applies a command (and isn't raised for <em>loudly</em> failing devices —
-those are covered above — or unavailable ones, which the <strong>Status</strong> sensor
-reports).</p>
-<p>Learned state (MPC models, the adaptive bias, the running-mean outdoor
-temperature, and the per-device demand latch) is persisted, so a restart resumes
-where it left off.</p>
-<h2 id="download-diagnostics">Download diagnostics<a class="headerlink" href="#download-diagnostics" title="Permanent link">&para;</a></h2>
-<p><strong>Download Diagnostics</strong> from the device page (⋮ → <em>Download diagnostics</em>) for a
-full JSON dump: merged config, resolved settings, the latest sensor snapshot,
-per-device decisions and reasons, learned MPC parameters, and the adaptive
-state.</p>
-<h2 id="enable-debug-logging">Enable debug logging<a class="headerlink" href="#enable-debug-logging" title="Permanent link">&para;</a></h2>
-<p>For a per-cycle trace of what the orchestrator is doing (and why) — sensor
-snapshots, per-device decisions, command writes, MPC learning, forecast
-fetches — turn on debug logging for the integration. Either at runtime via
-<strong>Settings → Devices &amp; Services → Climate Orchestrator → ⋮ → Enable debug
-logging</strong> (downloads the captured log when disabled again), or persistently in
-<code>configuration.yaml</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">logger</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">logs</span><span class="p">:</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">custom_components.climate_orchestrator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debug</span>
-</code></pre></div>
-<p>When reporting an issue, a debug log covering a few control cycles plus the
-diagnostics JSON (above) is usually everything needed to reproduce it.</p>
-<h2 id="faq">FAQ<a class="headerlink" href="#faq" title="Permanent link">&para;</a></h2>
-<p><strong>My TRV's valve number isn't found (a repair says the calibration number is
-missing).</strong>
-MPC and offset modes discover a TRV's <code>number</code> entities by name hints, which
-default to Zigbee2MQTT naming (<code>valve_opening_degree</code> /
-<code>local_temperature_calibration</code>). If your TRV brand names them differently, add
-its naming (comma-separated) to the <strong>TRV valve-opening</strong> / <strong>local-calibration
-number name hints</strong> fields in the integration's Configure dialog. Until then,
-the device safely falls back to <code>target</code> mode. See
-<a href="../../getting-started/first-setup/">First setup</a>.</p>
-<p><strong>A room is being controlled against the home average instead of its own
-sensor.</strong>
-The device's HA area has no temperature sensor assigned (or it has gone stale).
-Assign one under <strong>Settings → Areas → <em>Related sensors</em></strong>, or check the stale
-sensor's battery/connection. You can also raise the <strong>Sensor staleness timeout</strong>
-number if your sensors legitimately report slowly.</p>
-<p><strong>Adaptive cooling comfort / outdoor gating does nothing.</strong>
-Both need an outdoor temperature sensor configured in the integration options —
-a repair notice points this out when one of the features is on without it.</p>
-<p><strong>Forecast preconditioning does nothing.</strong>
-It needs the <strong>MPC calibration mode</strong> <em>and</em> a weather entity that provides an
-hourly forecast. Without the weather entity a repair notice asks you to add one
-(or turn the feature off).</p>
-<p><strong>The thermostat shows a different temperature than my sensor.</strong>
-While <strong>Comfort index targeting</strong> is on, the climate entity's current
-temperature is the humidity-adjusted feels-like value; the raw dry-bulb reading
-is kept in the <code>dry_bulb_temperature</code> attribute.</p>
-<p><strong>MPC mode isn't doing anything yet.</strong>
-Expected right after install or a learning reset — it needs a few hours of
-heating to fit a room's model (see <a href="../limitations/">known limitations</a>). Watch
-the <em>MPC learning status</em> sensors move from <code>learning</code> to <code>ready</code>.</p>
-<p>Next: <a href="../limitations/">Known limitations</a></p>
 
 
 
@@ -1827,7 +1764,7 @@ the <em>MPC learning status</em> sensors move from <code>learning</code> to <cod
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 6, 2026 09:36:18 UTC">June 6, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 6, 2026 10:25:01 UTC">June 6, 2026</span>
   </span>
 
     
@@ -1863,7 +1800,7 @@ the <em>MPC learning status</em> sensors move from <code>learning</code> to <cod
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../entities/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Entities &amp; settings">
+          <a href="../0004-trv-calibration-mpc/" class="md-footer__link md-footer__link--prev" aria-label="Previous: ADR-0004: TRV calibration &amp; MPC">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1873,20 +1810,20 @@ the <em>MPC learning status</em> sensors move from <code>learning</code> to <cod
                 Previous
               </span>
               <div class="md-ellipsis">
-                Entities & settings
+                ADR-0004: TRV calibration & MPC
               </div>
             </div>
           </a>
         
         
           
-          <a href="../limitations/" class="md-footer__link md-footer__link--next" aria-label="Next: Known limitations">
+          <a href="../0006-version-and-packaging-gates/" class="md-footer__link md-footer__link--next" aria-label="Next: ADR-0006: Version &amp; packaging gates">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Known limitations
+                ADR-0006: Version & packaging gates
               </div>
             </div>
             <div class="md-footer__button md-icon">

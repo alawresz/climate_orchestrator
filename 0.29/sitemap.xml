@@ -5,6 +5,38 @@
          <lastmod>2026-06-06</lastmod>
     </url>
     <url>
+         <loc>https://alawresz.github.io/climate_orchestrator/0.29/decisions/</loc>
+         <lastmod>2026-06-06</lastmod>
+    </url>
+    <url>
+         <loc>https://alawresz.github.io/climate_orchestrator/0.29/decisions/0001-device-profiles/</loc>
+         <lastmod>2026-06-06</lastmod>
+    </url>
+    <url>
+         <loc>https://alawresz.github.io/climate_orchestrator/0.29/decisions/0002-pure-control-core/</loc>
+         <lastmod>2026-06-06</lastmod>
+    </url>
+    <url>
+         <loc>https://alawresz.github.io/climate_orchestrator/0.29/decisions/0003-area-sensor-resolution/</loc>
+         <lastmod>2026-06-06</lastmod>
+    </url>
+    <url>
+         <loc>https://alawresz.github.io/climate_orchestrator/0.29/decisions/0004-trv-calibration-mpc/</loc>
+         <lastmod>2026-06-06</lastmod>
+    </url>
+    <url>
+         <loc>https://alawresz.github.io/climate_orchestrator/0.29/decisions/0005-store-schema-versioning/</loc>
+         <lastmod>2026-06-06</lastmod>
+    </url>
+    <url>
+         <loc>https://alawresz.github.io/climate_orchestrator/0.29/decisions/0006-version-and-packaging-gates/</loc>
+         <lastmod>2026-06-06</lastmod>
+    </url>
+    <url>
+         <loc>https://alawresz.github.io/climate_orchestrator/0.29/decisions/0007-github-app-release/</loc>
+         <lastmod>2026-06-06</lastmod>
+    </url>
+    <url>
          <loc>https://alawresz.github.io/climate_orchestrator/0.29/getting-started/first-setup/</loc>
          <lastmod>2026-06-06</lastmod>
     </url>
@@ -54,6 +86,10 @@
     </url>
     <url>
          <loc>https://alawresz.github.io/climate_orchestrator/0.29/internals/sensing/</loc>
+         <lastmod>2026-06-06</lastmod>
+    </url>
+    <url>
+         <loc>https://alawresz.github.io/climate_orchestrator/0.29/project/adding-hardware/</loc>
          <lastmod>2026-06-06</lastmod>
     </url>
     <url>
