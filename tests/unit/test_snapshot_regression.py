@@ -5,12 +5,13 @@ cooling-comfort relaxation across a small grid, so an unintended change to the
 math shows up as a snapshot diff in review rather than slipping through (line
 coverage and Hypothesis invariants don't catch a subtly-shifted curve).
 
-Snapshots live in ``tests/unit/__snapshots__/`` (syrupy's default directory).
+Snapshots live in ``tests/unit/snapshots/``. syrupy ships transitively with
+pytest-homeassistant-custom-component, whose ``snapshot`` fixture overrides
+syrupy's default ``__snapshots__`` directory to plain ``snapshots`` (see
+``HomeAssistantSnapshotExtension.dirname``) — so the directory name matters.
 Regenerate them *intentionally* (after confirming a diff is expected) with:
 
     uv run pytest tests/unit/test_snapshot_regression.py --snapshot-update
-
-syrupy ships transitively with pytest-homeassistant-custom-component.
 """
 
 from __future__ import annotations
