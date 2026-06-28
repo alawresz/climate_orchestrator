@@ -54,6 +54,7 @@ _REASON_OPTIONS = [
     "window_open",
     "outdoor_gating",
     "manual_override",
+    "drain_full",
     "unavailable",
     "no_data",
 ]

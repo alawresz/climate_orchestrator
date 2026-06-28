@@ -50,6 +50,9 @@ class GlobalInput:
     frost_protection: bool = True
     outdoor_gating: bool = True
     ac_heating_assist: bool = False
+    # A cooler's condensate tank needs draining (its drain sensor active past
+    # the grace window): block anything that would make more condensate.
+    drain_blocking: bool = False
     # When False, a device with its own reading is judged on it alone (no
     # home-average OR-engage / AND-release coupling); the home average then
     # only serves as the sole reading for devices without an area sensor.
@@ -103,6 +106,14 @@ def decide(device: DeviceInput, g: GlobalInput) -> DeviceDecision:
         and raw_local < g.frost_temp
     ):
         return _decision(device, Demand.HEAT, "frost_protection")
+
+    # Drain protection (coolers only): a full condensate tank blocks anything
+    # that produces more condensate — active cooling *and* the dew-point dry
+    # guard. Returning here, before the demand and the dry-mode guard below,
+    # makes the AC idle outright (the grace-window debounce lives HA-side, so
+    # ``drain_blocking`` is already "active beyond the grace window").
+    if device.kind is DeviceKind.COOLER and g.drain_blocking:
+        return _decision(device, Demand.IDLE, "drain_full")
 
     # A portable/exhaust-hose AC needs its own window open to vent, so a cooler
     # can ignore *its own area's* window — but it still stops if a window is open

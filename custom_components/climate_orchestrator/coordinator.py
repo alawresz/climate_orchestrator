@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.climate import HVACMode
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import (
     CALLBACK_TYPE,
     Event,
@@ -46,6 +46,7 @@ from .const import (
     CALIBRATION_MPC,
     CALIBRATION_OFFSET,
     CALIBRATION_TARGET,
+    CONF_AC_DRAIN_SENSOR,
     CONF_ACS,
     CONF_CALIBRATION_HINTS,
     CONF_HOME_HUMIDITY_SENSOR,
@@ -89,6 +90,7 @@ from .devices.trv import (
     find_related_number,
     local_offset,
 )
+from .drain import DrainMonitor
 from .events import EventBridge
 from .models import (
     AcSetpoint,
@@ -209,6 +211,7 @@ def _build_global_input(
     outdoor: float | None,
     *,
     master_off: bool,
+    drain_blocking: bool,
 ) -> GlobalInput:
     """Map the cycle's resolved settings/band/snapshot onto the engine input.
 
@@ -237,6 +240,7 @@ def _build_global_input(
         frost_protection=settings.frost_protection,
         outdoor_gating=settings.outdoor_temp_gating and outdoor is not None,
         ac_heating_assist=settings.ac_heating_assist,
+        drain_blocking=drain_blocking,
     )
 
 
@@ -277,6 +281,8 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         # Per-area monotonic timestamp of when its window most recently opened,
         # plus a one-shot timer to re-run control when the grace delay expires.
         self._windows = WindowMonitor(hass, self._request_window_recheck)
+        # AC drain-sensor debounce + its grace-delay recheck timer.
+        self._drain = DrainMonitor(hass, self._request_drain_recheck)
         # Trailing (time, home-avg-temp) samples and the latest slope (K/min).
         self._temp_samples: deque[tuple[float, float]] = deque(
             maxlen=_SLOPE_MAX_SAMPLES
@@ -438,6 +444,21 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         return [*self.trv_ids, *self.ac_ids]
 
     @property
+    def ac_drain_sensor(self) -> str | None:
+        """The optional binary_sensor flagging a full AC condensate tank."""
+        value = self._options.get(CONF_AC_DRAIN_SENSOR)
+        return value if isinstance(value, str) and value else None
+
+    @property
+    def ac_drain_protection_available(self) -> bool:
+        """Whether the drain toggle/grace entities are worth creating.
+
+        Only when a drain sensor is configured *and* there's an AC to protect —
+        the feature is a no-op otherwise.
+        """
+        return self.ac_drain_sensor is not None and bool(self.ac_ids)
+
+    @property
     def last_maintenance(self) -> float | None:
         """Wall-clock epoch of the last valve-maintenance run (diagnostics)."""
         return self._last_maintenance
@@ -515,7 +536,12 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         )
         data = replace(data, status=self._compute_status(data))
         self._update_temp_slope(data.home_avg_temperature)
-        self._ensure_subscription(data.tracked_entities)
+        # Track the drain sensor too, so a full-tank trip (or its clear)
+        # triggers a refresh rather than waiting for the next keepalive.
+        tracked = data.tracked_entities
+        if (drain := self.ac_drain_sensor) is not None:
+            tracked = tracked | {drain}
+        self._ensure_subscription(tracked)
         self._windows.prune(
             r.area_id for r in data.readings.values() if r.area_id is not None
         )
@@ -638,6 +664,31 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
     def _request_window_recheck(self) -> None:
         """Refresh control when a window's grace delay elapses (WindowMonitor)."""
         self._background(self.async_request_refresh(), "window recheck refresh")
+
+    @callback
+    def _request_drain_recheck(self) -> None:
+        """Refresh control when the drain grace window elapses (DrainMonitor)."""
+        self._background(self.async_request_refresh(), "drain recheck refresh")
+
+    @callback
+    def _drain_blocking(self, settings: RuntimeSettings) -> bool:
+        """Whether a full condensate tank should hold the AC off this cycle.
+
+        Reads the configured drain sensor (active = ``on``; an unknown or
+        unavailable sensor is treated as *not* active, so a flaky sensor never
+        cuts cooling) and applies the debounced grace window. With no sensor or
+        the protection switch off, the monitor is reset so re-enabling starts a
+        fresh grace period.
+        """
+        sensor = self.ac_drain_sensor
+        if sensor is None or not settings.ac_drain_protection:
+            self._drain.blocks(active=False, grace_seconds=0.0)
+            return False
+        state = self.hass.states.get(sensor)
+        active = state is not None and state.state == STATE_ON
+        return self._drain.blocks(
+            active=active, grace_seconds=settings.ac_drain_grace * 60.0
+        )
 
     async def _write_number_if_changed(self, entity_id: str, value: float) -> None:
         """Write a number entity, skipping no-op changes (update minimization)."""
@@ -876,6 +927,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         if any(d.dry_mode for d in decisions):
             return "dehumidifying"
         for reason in (
+            "drain_full",
             "window_open",
             "outdoor_gating",
             "manual_override",
@@ -1191,7 +1243,12 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         )
         self._raise_capability_issues(settings, data)
         global_input = _build_global_input(
-            settings, band, data, outdoor, master_off=hvac_mode == HVACMode.OFF
+            settings,
+            band,
+            data,
+            outdoor,
+            master_off=hvac_mode == HVACMode.OFF,
+            drain_blocking=self._drain_blocking(settings),
         )
         ctx = CycleContext(
             settings=settings, band=band, outdoor=outdoor, dt_min=dt_min, data=data
@@ -1417,6 +1474,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             self._unsub_state()
             self._unsub_state = None
         self._windows.shutdown()
+        self._drain.shutdown()
         # Repairs are keyed by DOMAIN, not the entry, so they'd outlive an
         # unload/removal as orphaned notices — clear them all (per-device and
         # whole-entry) on the way out.

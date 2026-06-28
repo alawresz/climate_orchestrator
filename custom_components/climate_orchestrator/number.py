@@ -17,6 +17,7 @@ from .const import (
 from .entity import hub_device_info
 from .sensing.registry import resolve_area_id
 from .settings import (
+    AC_DRAIN_NUMBER_SETTINGS,
     BOOST_NUMBER_SETTINGS,
     NUMBER_SETTINGS,
     PRESET_NUMBER_SETTINGS,
@@ -66,12 +67,17 @@ async def async_setup_entry(
         for edge in ("heat", "cool")
     }
     boost_settings = BOOST_NUMBER_SETTINGS if PRESET_BOOST in enabled else ()
+    # The drain grace number exists only when drain protection is in play.
+    drain_settings = (
+        AC_DRAIN_NUMBER_SETTINGS if coordinator.ac_drain_protection_available else ()
+    )
     entities: list[RestoreNumber] = [
         SmartClimateNumber(coordinator, setting)
         for setting in (
             *NUMBER_SETTINGS,
             *(s for s in PRESET_NUMBER_SETTINGS if s.key in preset_keys),
             *boost_settings,
+            *drain_settings,
         )
     ]
     area_reg = ar.async_get(hass)
