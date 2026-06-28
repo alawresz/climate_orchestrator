@@ -1828,13 +1828,15 @@ right — a flipped sign or mis-scaled <code>dt</code> in the thermal model, opt
 comfort curves can still pass. <strong>mutmut</strong> mutates the pure control modules and
 surfaces any mutant the suite fails to kill.</p>
 <ul>
-<li><strong>Scope</strong> (<code>[tool.mutmut]</code> in <code>pyproject.toml</code>): <code>paths_to_mutate</code> is
+<li>
+<p><strong>Scope</strong> (<code>[tool.mutmut]</code> in <code>pyproject.toml</code>): <code>paths_to_mutate</code> is
   <code>custom_components/climate_orchestrator/control/</code> only — the highest-value,
   subtlest code. <code>tests_dir</code> is <code>tests/unit/</code> (the pure tests are what kill
   <code>control/</code> mutants; skipping the hass-fixture suites makes mutation runs far
   faster). <code>also_copy</code> includes the whole <code>custom_components/</code> package because
   mutmut copies only <code>paths_to_mutate</code> into its <code>mutants/</code> work dir, but
-  <code>control/</code> imports the rest of the package.</li>
+  <code>control/</code> imports the rest of the package.</p>
+</li>
 <li>
 <p><strong>Running.</strong> Run in the HA dev env (Python 3.14):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>mutmut<span class="w"> </span>run
@@ -1848,8 +1850,7 @@ after-fork problem, <a href="https://github.com/boxed/mutmut/issues/446">boxed/m
 </code></pre></div>
 </li>
 <li>
-<p><strong>Triage.</strong> For each surviving mutant, inspect it (<code>uv run mutmut show
-  &lt;id&gt;</code>) and decide: a <em>meaningful</em> survivor (the mutation changes observable
+<p><strong>Triage.</strong> For each surviving mutant, inspect it (<code>uv run mutmut show &lt;id&gt;</code>) and decide: a <em>meaningful</em> survivor (the mutation changes observable
   behaviour) gets a new test that kills it; an <em>equivalent</em> mutant (no
   observable behaviour change — e.g. a defensive clamp that current inputs
   never reach) is recorded with its rationale in the ledger below rather than
@@ -1962,7 +1963,7 @@ turned out to be genuinely new and were killed).</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 5, 2026 22:55:13 UTC">June 5, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 28, 2026 21:12:34 UTC">June 28, 2026</span>
   </span>
 
     

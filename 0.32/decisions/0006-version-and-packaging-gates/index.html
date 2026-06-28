@@ -1669,12 +1669,21 @@ will baffle anyone who finds them cold:</p>
 <p>Each is deliberate, and the reasons are non-obvious. This ADR records them so
 they aren't "fixed" into breakage.</p>
 <h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
-<p><strong>1. <code>requires-python &gt;=3.14.2</code> is a dev-environment statement, not the runtime
-floor.</strong> It exists for lockfile coherence — <code>uv</code> resolves the dev toolchain
-against the interpreter the maintainer runs (3.14). A HACS-installed integration
-is <em>not</em> pip-installed: the release is a zip of <code>custom_components/…</code> with <strong>no
-packaging metadata</strong>, so <code>requires-python</code> is never consulted at install or
-runtime. Nothing enforces it on users.</p>
+<p><strong>1. <code>requires-python &gt;=3.14.2,&lt;3.15</code> is a dev-environment statement, not the
+runtime floor.</strong> It exists for lockfile coherence — <code>uv</code> resolves the dev
+toolchain against the interpreter the maintainer runs (3.14). A HACS-installed
+integration is <em>not</em> pip-installed: the release is a zip of <code>custom_components/…</code>
+with <strong>no packaging metadata</strong>, so <code>requires-python</code> is never consulted at
+install or runtime. Nothing enforces it on users.</p>
+<p>The <strong>upper bound is load-bearing</strong>, not cosmetic. Unbounded, <code>uv</code>/Dependabot
+do universal resolution across all future Python and fork a <code>python &gt;= 3.15</code>
+branch; no Home Assistant satisfies that branch (HA pins conflicting <code>aiohttp</code>
+versions across python ranges), so resolution fails. For <code>uv lock</code> that is
+merely an extra fork, but for <strong>Dependabot it is fatal</strong>: it reports "can't
+resolve your Python dependency files" and silently stops opening <em>security</em>
+update PRs (this blocked the pyjwt and cryptography advisories). Capping at the
+dev interpreter's minor (<code>&lt;3.15</code>) removes the impossible fork. Raise the floor
+<em>and</em> the cap together when adopting 3.15.</p>
 <p><strong>2. ruff's <code>target-version = "py313"</code> is the real install-time floor.</strong> Since
 no metadata gates installation, the only thing that actually keeps the source
 runnable on the oldest supported HA is the syntax/feature level the linter
@@ -1693,9 +1702,10 @@ across releases.</p>
 CI canary running the suite against a pinned 2025.2 environment.</p>
 <h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Do not</strong> "align" <code>requires-python</code> with the ruff target, or bump
-  <code>pyproject</code>'s version to match <code>manifest.json</code> — either change breaks a real
-  invariant (lockfile coherence; the install-time floor) for a cosmetic tidy.</li>
+<li><strong>Do not</strong> "align" <code>requires-python</code> with the ruff target, drop its upper
+  bound, or bump <code>pyproject</code>'s version to match <code>manifest.json</code> — each change
+  breaks a real invariant (lockfile coherence; Dependabot's ability to resolve
+  and open security PRs; the install-time floor) for a cosmetic tidy.</li>
 <li>The <em>runtime</em> floor lives in <code>hacs.json</code> + the ruff target + the floor canary,
   <strong>not</strong> in <code>requires-python</code>.</li>
 <li>Raising the floor (e.g. to adopt a newer HA API) means: bump <code>hacs.json</code>,
@@ -1721,7 +1731,7 @@ CI canary running the suite against a pinned 2025.2 environment.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 6, 2026 12:42:48 UTC">June 6, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 28, 2026 22:02:49 UTC">June 28, 2026</span>
   </span>
 
     
