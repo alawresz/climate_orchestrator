@@ -23,13 +23,13 @@ dev = [
   # its exact pins. Bumping PHACC moves the whole stack together, coherently.
   "pytest-homeassistant-custom-component>=0.13",
   # Not provided by PHACC, so declared explicitly:
-  "scipy>=1.11",            # also the integration's runtime requirement
-  "hypothesis>=6.0",        # property-based tests
+  "scipy>=1.18.0",            # also the integration's runtime requirement
+  "hypothesis>=6.155.7",        # property-based tests
   "pytest-randomly>=3.15",  # randomize test order to surface inter-test leakage
   "pytest-timeout>=2.3",    # CI passes --timeout explicitly (hang protection)
-  "ruff==0.15.15",          # linter/formatter (exact, matches CI + pre-commit)
+  "ruff==0.15.20",          # linter/formatter (exact, matches CI + pre-commit)
   "mypy>=1.11",             # type checker
-  "mutmut>=3.5,<4",         # mutation testing for the pure control/ math
+  "mutmut>=3.6.0,<4",         # mutation testing for the pure control/ math
   "python-semantic-release>=10.5,<11",  # local release tooling (CI uses the action)
   # Markdown formatter for the docs (run: `uv run mdformat .`). Options live in
   # .mdformat.toml so the CLI and any editor mdformat integration agree.
