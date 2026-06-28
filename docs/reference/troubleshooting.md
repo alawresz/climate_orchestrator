@@ -35,6 +35,10 @@ A notice is raised (and auto-cleared) for silent misconfigurations:
   to dehumidify through);
 - **AC ignores open windows** enabled with no air conditioner configured, so the
   exemption has nothing to apply to;
+- **AC drain protection** on with a configured condensate drain / tank-full
+  sensor that's missing or unavailable — protection fails open (cooling is never
+  cut by a sensor it can't read), so it's silently inactive until the sensor
+  reports again;
 - an area sensor that has gone stale (stopped reporting past the staleness
   timeout);
 - an inverted comfort band (cool setpoint below the heat setpoint, leaving no

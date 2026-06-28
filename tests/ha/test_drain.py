@@ -7,8 +7,10 @@ from datetime import timedelta
 from typing import Any
 
 from freezegun.api import FrozenDateTimeFactory
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_capture_events,
@@ -200,3 +202,47 @@ async def test_full_tank_idles_the_ac_and_resumes_when_cleared(
     assert coordinator.last_decisions[AC_ENTITY].demand is Demand.COOL
     assert len(_events_of(events, EVENT_TYPE_DRAIN_PAUSE_ENDED)) == 1
     assert notification_id not in _notifications(hass)
+
+
+async def test_unavailable_drain_sensor_raises_repair_and_clears(
+    hass: HomeAssistant,
+    living_area: str,
+    register_entity_in_area: Callable[[str, str | None], str],
+) -> None:
+    """A configured-but-unavailable drain sensor (protection on) is flagged.
+
+    Protection fails open when it can't read the sensor, so it's silently
+    inactive — surfaced like the other "configured source missing" repairs.
+    (The shared warm-up gate that holds these back during ``initializing`` is
+    covered by the status tests; here a room sensor is present, so the entry
+    settles immediately.)
+    """
+    register_entity_in_area(TRV_ENTITY, living_area)
+    register_entity_in_area(AC_ENTITY, living_area)
+    hass.states.async_set(TRV_ENTITY, "off", {"hvac_modes": ["off", "heat"]})
+    hass.states.async_set(AC_ENTITY, "off", {"hvac_modes": ["off", "cool"]})
+    hass.states.async_set(_DRAIN, STATE_UNAVAILABLE, {"device_class": "moisture"})
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=DEFAULT_TITLE,
+        data={
+            CONF_TRVS: [TRV_ENTITY],
+            CONF_ACS: [AC_ENTITY],
+            CONF_AC_DRAIN_SENSOR: _DRAIN,
+        },
+        entry_id="sc_drain_unavail",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    registry = ir.async_get(hass)
+
+    # Protection on + configured sensor unavailable -> the repair fires.
+    await refresh(hass, entry)
+    assert registry.async_get_issue(DOMAIN, "ac_drain_sensor_unavailable") is not None
+
+    # Sensor reports again -> protection can run, notice clears.
+    hass.states.async_set(_DRAIN, "off", {"device_class": "moisture"})
+    await refresh(hass, entry)
+    assert registry.async_get_issue(DOMAIN, "ac_drain_sensor_unavailable") is None

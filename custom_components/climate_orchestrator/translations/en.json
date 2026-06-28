@@ -238,6 +238,10 @@
       "title": "Climate Orchestrator: stale sensor reading",
       "description": "One or more area sensors have stopped updating for longer than the configured staleness timeout, so Climate Orchestrator is ignoring their values and falling back to the home average. Check the affected sensor's battery/connection, or raise the **Sensor staleness timeout** number if your sensors legitimately report slowly."
     },
+    "ac_drain_sensor_unavailable": {
+      "title": "Climate Orchestrator: AC drain sensor unavailable",
+      "description": "AC drain protection is on and a condensate drain / tank-full sensor is configured, but that sensor is missing or unavailable. Protection fails open while it can't be read (cooling is never cut by a sensor it can't trust), so your overflow protection is currently inactive. Check the sensor's battery/connection, or turn **AC drain protection** off if you removed it. This notice clears once the sensor reports again."
+    },
     "control_loop_failing": {
       "title": "Climate Orchestrator: control cycle repeatedly failing",
       "description": "The control cycle has failed several times in a row, so your devices are no longer receiving fresh commands (sensor readings still update). Check the Home Assistant log for the underlying error — it usually points at an unresponsive device or integration. This notice clears itself on the next successful cycle."

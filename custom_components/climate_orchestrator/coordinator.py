@@ -690,6 +690,21 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             active=active, grace_seconds=settings.ac_drain_grace * 60.0
         )
 
+    @callback
+    def _drain_sensor_unavailable(self, settings: RuntimeSettings) -> bool:
+        """Whether drain protection is on but its sensor can't be read.
+
+        Protection then fails open (never cuts cooling), so it's silently inert
+        despite being configured — the case the ``ac_drain_sensor_unavailable``
+        repair surfaces. Only meaningful with a sensor configured, an AC to
+        protect, and the toggle on.
+        """
+        sensor = self.ac_drain_sensor
+        if sensor is None or not settings.ac_drain_protection or not self.ac_ids:
+            return False
+        state = self.hass.states.get(sensor)
+        return state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN)
+
     async def _write_number_if_changed(self, entity_id: str, value: float) -> None:
         """Write a number entity, skipping no-op changes (update minimization)."""
         current = float_state(self.hass, entity_id)
@@ -1239,6 +1254,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             forecast_failing=self._adaptation.is_forecast_failing(
                 threshold=FORECAST_FAILURE_SECONDS
             ),
+            drain_sensor_unavailable=self._drain_sensor_unavailable(settings),
             has_devices=bool(self.device_ids),
         )
         self._raise_capability_issues(settings, data)

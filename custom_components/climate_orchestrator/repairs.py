@@ -35,6 +35,7 @@ _GLOBAL_ISSUE_IDS = (
     "ac_ignore_window_inert",
     "no_temperature_source",
     "stale_sensor",
+    "ac_drain_sensor_unavailable",
     "control_loop_failing",
 )
 
@@ -180,6 +181,7 @@ def environment_issues(
     outdoor_sensor: str | None,
     weather_entity: str | None,
     forecast_failing: bool,
+    drain_sensor_unavailable: bool,
     has_devices: bool,
 ) -> None:
     """Surface misconfigurations that would otherwise fail silently."""
@@ -231,4 +233,14 @@ def environment_issues(
         "stale_sensor",
         settled and bool(data.stale_sensors),
         "stale_sensor",
+    )
+    # A configured drain sensor that's missing/unavailable means AC drain
+    # protection is silently failing open (the coordinator fails open on an
+    # unreadable sensor so a flaky one never cuts cooling). Gated past warm-up
+    # like the other source repairs, since the binary_sensor may report late.
+    toggle_issue(
+        hass,
+        "ac_drain_sensor_unavailable",
+        settled and drain_sensor_unavailable,
+        "ac_drain_sensor_unavailable",
     )
