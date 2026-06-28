@@ -37,11 +37,11 @@ on the 2025.2 floor. No schema surprise can ever fail entry setup.
 
 ## Options Considered
 
-| Option | Pros | Cons |
-|--------|------|------|
-| No versioning | Simplest | A changed payload shape silently mis-seeds control |
-| Versioned + write real migrations | Preserves learned state across upgrades | Migration code to write and test for state that re-learns in hours — poor ROI, and can't help the *downgrade* case at all |
-| Versioned + discard-on-doubt (chosen) | Setup never fails; no mis-reads; trivial to reason about | A schema change costs users a few hours of re-learning |
+| Option                                | Pros                                                     | Cons                                                                                                                      |
+| ------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| No versioning                         | Simplest                                                 | A changed payload shape silently mis-seeds control                                                                        |
+| Versioned + write real migrations     | Preserves learned state across upgrades                  | Migration code to write and test for state that re-learns in hours — poor ROI, and can't help the *downgrade* case at all |
+| Versioned + discard-on-doubt (chosen) | Setup never fails; no mis-reads; trivial to reason about | A schema change costs users a few hours of re-learning                                                                    |
 
 ## Consequences
 

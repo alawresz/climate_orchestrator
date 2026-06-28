@@ -12,11 +12,11 @@ the active preset's number moves the live setpoint at once. Heating runs below
 the heat setpoint, cooling above the cool setpoint, nothing between. Each edge
 is editable within 7–35 °C.
 
-| Preset | Heat setpoint | Cool setpoint |
-|--------|:-------------:|:-------------:|
-| Away | 16.0 °C | 30.0 °C |
-| Home (default) | 20.5 °C | 24.5 °C |
-| Sleep | 19.5 °C | 23.5 °C |
+| Preset         | Heat setpoint | Cool setpoint |
+| -------------- | :-----------: | :-----------: |
+| Away           |    16.0 °C    |    30.0 °C    |
+| Home (default) |    20.5 °C    |    24.5 °C    |
+| Sleep          |    19.5 °C    |    23.5 °C    |
 
 The preset edges live as `number` entities on the hub device (e.g. *Preset Home
 heat setpoint*), so automations can edit them too.
@@ -91,18 +91,19 @@ starts), and **response** (how gently it ramps).
 
 With a Home preset of 20.5/24.5 and the defaults (onset 25.5°):
 
-| Running-mean outdoor | Cool setpoint |
-|---------------------:|:-------------:|
-| ≤ 22° | 24.5° (no shift) |
-| 28° | ~25.5° |
-| 33° | ~26.1° |
-| 45° | ~26.5° |
+| Running-mean outdoor |  Cool setpoint   |
+| -------------------: | :--------------: |
+|                ≤ 22° | 24.5° (no shift) |
+|                  28° |      ~25.5°      |
+|                  33° |      ~26.1°      |
+|                  45° |      ~26.5°      |
 
 The adjusted cool edge is *always computed* (the **Adaptive cool setpoint**
 sensor previews it even when the toggle is off) but only *applied* when the toggle
 is on, which requires an outdoor sensor.
 
 !!! tip
+
     Watch the **Adaptive cool setpoint** sensor through a hot week before
     enabling the toggle — it shows exactly what the feature would do, with no
     effect on control.

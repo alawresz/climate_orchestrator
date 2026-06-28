@@ -139,17 +139,22 @@ async def test_failed_platform_unload_keeps_the_entry_loaded(
     """If the platforms refuse to unload, the coordinator isn't shut down.
 
     Tearing the coordinator down under still-loaded platforms would leave
-    their entities pointing at a dead coordinator.
+    their entities pointing at a dead coordinator. We assert that behavioural
+    contract directly — ``async_shutdown`` is not called — rather than HA's
+    post-unload state enum, which has varied across HA versions (older HA set
+    ``FAILED_UNLOAD`` on a ``False`` return; newer HA leaves it ``LOADED``).
     """
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
-    with patch(
-        "homeassistant.config_entries.ConfigEntries.async_unload_platforms",
-        return_value=False,
+    with (
+        patch(
+            "homeassistant.config_entries.ConfigEntries.async_unload_platforms",
+            return_value=False,
+        ),
+        patch.object(coordinator, "async_shutdown") as shutdown,
     ):
         assert not await hass.config_entries.async_unload(init_integration.entry_id)
-    assert init_integration.state is ConfigEntryState.FAILED_UNLOAD
-    # The coordinator deliberately kept running (the platforms still hold it);
-    # stop it by hand so the test doesn't leave its refresh timer behind.
+        shutdown.assert_not_called()  # platforms still hold it -> kept alive
+    # Stop the still-running coordinator by hand so no refresh timer lingers.
     await coordinator.async_shutdown()
 
 

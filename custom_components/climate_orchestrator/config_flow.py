@@ -19,6 +19,7 @@ from homeassistant.helpers import selector
 import voluptuous as vol
 
 from .const import (
+    CONF_AC_DRAIN_SENSOR,
     CONF_ACS,
     CONF_CALIBRATION_HINTS,
     CONF_HOME_HUMIDITY_SENSOR,
@@ -49,6 +50,9 @@ _HUMIDITY_SENSOR_SELECTOR = selector.EntitySelector(
 )
 _WEATHER_SELECTOR = selector.EntitySelector(
     selector.EntitySelectorConfig(domain="weather")
+)
+_DRAIN_SENSOR_SELECTOR = selector.EntitySelector(
+    selector.EntitySelectorConfig(domain="binary_sensor")
 )
 _TEXT_SELECTOR = selector.TextSelector()
 _PRESET_SELECTOR = selector.SelectSelector(
@@ -93,6 +97,9 @@ def _build_schema(defaults: dict[str, Any]) -> vol.Schema:
             _optional(
                 CONF_HOME_HUMIDITY_SENSOR, defaults.get(CONF_HOME_HUMIDITY_SENSOR)
             ): _HUMIDITY_SENSOR_SELECTOR,
+            _optional(
+                CONF_AC_DRAIN_SENSOR, defaults.get(CONF_AC_DRAIN_SENSOR)
+            ): _DRAIN_SENSOR_SELECTOR,
             vol.Optional(
                 CONF_PRESETS,
                 default=list(defaults.get(CONF_PRESETS, SELECTABLE_PRESETS)),

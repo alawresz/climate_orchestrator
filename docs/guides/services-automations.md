@@ -35,15 +35,16 @@ Operational transitions are announced on the event bus as
 `climate_orchestrator_event`, discriminated by a `type` field — one event per
 *edge*, never one per cycle, so they're safe to notify on directly:
 
-| `type` | When | Extra data |
-|--------|------|------------|
-| `frost_protection_started` / `_ended` | A room crosses the frost-protection temperature (either way). | `entities` — the devices in forced heating. |
-| `dehumidifying_started` / `_ended` | The dew-point guard puts an AC in (or out of) dry mode. | `entities` |
-| `window_pause_started` / `_ended` | An open window starts/stops suppressing one device (after the grace delay). | `entity_id`, `area_id` |
-| `status_changed` | The status sensor moves between `ok` / `degraded` / `initializing`. | `from`, `to`, `unavailable_devices` |
-| `device_ignoring_commands` / `device_commands_applied` | The [command-ignored watchdog](../reference/troubleshooting.md#repairs) trips / the device complies again. | `entity_id`, `commanded_mode` |
-| `boost_started` / `boost_ended` | The boost preset engages / reverts. | started: `direction`, `previous_preset`, `until`; ended: `reason` (`expired`/`cancelled`), `reverted_to` |
-| `manual_override_started` / `_ended` | A [manual takeover](how-it-controls.md#manual-override-takeover) of one device begins / ends. | `entity_id`; started: `duration_minutes`; ended: `reason` (`expired`/`reasserted`/`unavailable`/`frost_protection`) |
+| `type`                                                 | When                                                                                                       | Extra data                                                                                                          |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `frost_protection_started` / `_ended`                  | A room crosses the frost-protection temperature (either way).                                              | `entities` — the devices in forced heating.                                                                         |
+| `dehumidifying_started` / `_ended`                     | The dew-point guard puts an AC in (or out of) dry mode.                                                    | `entities`                                                                                                          |
+| `window_pause_started` / `_ended`                      | An open window starts/stops suppressing one device (after the grace delay).                                | `entity_id`, `area_id`                                                                                              |
+| `ac_drain_pause_started` / `_ended`                    | An AC is held off (or released) because its condensate tank needs emptying (after the grace window).       | `entities` — the paused coolers.                                                                                    |
+| `status_changed`                                       | The status sensor moves between `ok` / `degraded` / `initializing`.                                        | `from`, `to`, `unavailable_devices`                                                                                 |
+| `device_ignoring_commands` / `device_commands_applied` | The [command-ignored watchdog](../reference/troubleshooting.md#repairs) trips / the device complies again. | `entity_id`, `commanded_mode`                                                                                       |
+| `boost_started` / `boost_ended`                        | The boost preset engages / reverts.                                                                        | started: `direction`, `previous_preset`, `until`; ended: `reason` (`expired`/`cancelled`), `reverted_to`            |
+| `manual_override_started` / `_ended`                   | A [manual takeover](how-it-controls.md#manual-override-takeover) of one device begins / ends.              | `entity_id`; started: `duration_minutes`; ended: `reason` (`expired`/`reasserted`/`unavailable`/`frost_protection`) |
 
 Trigger on them like any bus event:
 
@@ -111,6 +112,7 @@ automation:
 ```
 
 !!! tip
+
     The [binary sensors](../reference/entities.md#binary-sensors) (Window open, Frost
     protection active, Dehumidifying) and the diagnostic sensors are built for
     exactly this kind of dashboard and automation use.

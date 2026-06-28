@@ -50,12 +50,12 @@ functions) in a profile — never edits to the adapter or coordinator.
 
 ### Option A: Status quo (per-device `if` branches as needed)
 
-| Dimension | Assessment |
-|-----------|------------|
-| Complexity | Low now, high later |
-| Cost | Zero upfront |
-| Scalability | Poor — quirks tangle the adapter and coordinator |
-| Team familiarity | High |
+| Dimension        | Assessment                                       |
+| ---------------- | ------------------------------------------------ |
+| Complexity       | Low now, high later                              |
+| Cost             | Zero upfront                                     |
+| Scalability      | Poor — quirks tangle the adapter and coordinator |
+| Team familiarity | High                                             |
 
 **Pros:** nothing to build today.
 **Cons:** every new device mutates shared, well-tested control code; no model
@@ -64,11 +64,11 @@ out.
 
 ### Option B: `DeviceProfile` seam, generic-only, profiles added on demand (chosen)
 
-| Dimension | Assessment |
-|-----------|------------|
-| Complexity | Low–medium |
-| Cost | One small module + adapter rewire |
-| Scalability | Good — new hardware is additive (a new profile) |
+| Dimension        | Assessment                                       |
+| ---------------- | ------------------------------------------------ |
+| Complexity       | Low–medium                                       |
+| Cost             | One small module + adapter rewire                |
+| Scalability      | Good — new hardware is additive (a new profile)  |
 | Team familiarity | High (mirrors the existing collaborator pattern) |
 
 **Pros:** behaviour-preserving introduction; quirks are isolated, typed, and
@@ -78,12 +78,12 @@ plain value objects, consistent with the rest of the codebase.
 
 ### Option C: Per-model registry with IO hooks, up front
 
-| Dimension | Assessment |
-|-----------|------------|
-| Complexity | High |
-| Cost | Large, mostly speculative |
-| Scalability | Excellent |
-| Team familiarity | Medium |
+| Dimension        | Assessment                |
+| ---------------- | ------------------------- |
+| Complexity       | High                      |
+| Cost             | Large, mostly speculative |
+| Scalability      | Excellent                 |
+| Team familiarity | Medium                    |
 
 **Pros:** maximally flexible; battle-tested shape.
 **Cons:** builds machinery for devices we do not have; IO-in-hooks is harder to

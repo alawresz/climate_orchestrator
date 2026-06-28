@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v0.32.0 (2026-06-28)
+
+### Chores
+
+- Bump codecov/codecov-action from 6.0.1 to 7.0.0
+  ([#11](https://github.com/alawresz/climate_orchestrator/pull/11),
+  [`68a4942`](https://github.com/alawresz/climate_orchestrator/commit/68a49426d94f6732c074e9bf1e68cc2663cc3998))
+
+### Features
+
+- Add AC drain protection config along with tests and documentation
+  ([`301bdb3`](https://github.com/alawresz/climate_orchestrator/commit/301bdb3754d567c3802ae3901a0a2f88928d7dce))
+
+
 ## v0.31.2 (2026-06-06)
 
 ### Bug Fixes

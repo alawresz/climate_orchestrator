@@ -106,6 +106,7 @@ surfaces any mutant the suite fails to kill.
   faster). `also_copy` includes the whole `custom_components/` package because
   mutmut copies only `paths_to_mutate` into its `mutants/` work dir, but
   `control/` imports the rest of the package.
+
 - **Running.** Run in the HA dev env (Python 3.14):
 
     ```bash
@@ -122,8 +123,7 @@ surfaces any mutant the suite fails to kill.
       sh -c "uv sync --dev && uv run mutmut run; uv run mutmut results"
     ```
 
-- **Triage.** For each surviving mutant, inspect it (`uv run mutmut show
-  <id>`) and decide: a *meaningful* survivor (the mutation changes observable
+- **Triage.** For each surviving mutant, inspect it (`uv run mutmut show <id>`) and decide: a *meaningful* survivor (the mutation changes observable
   behaviour) gets a new test that kills it; an *equivalent* mutant (no
   observable behaviour change — e.g. a defensive clamp that current inputs
   never reach) is recorded with its rationale in the ledger below rather than
@@ -132,6 +132,7 @@ surfaces any mutant the suite fails to kill.
 ## Survivor ledger
 
 !!! note
+
     Mutation testing covers the `control/` package only (the pure control
     and MPC math, where a flipped sign survives every other net). The
     stateful modules extracted from the coordinator — `windows.py`,
@@ -147,20 +148,21 @@ with a test or triaged onto this list with a rationale. Inspect any entry
 with `uv run mutmut show <name>` (prefix:
 `custom_components.climate_orchestrator.control.`).
 
-| Module / mutants | Count | Why they survive |
-|---|---|---|
-| `mpc.controller` — `compute_valve_pct__mutmut_1` | 1 | Default-arg artifact: mutates the `max_opening_pct=100.0` default to `101.0`. Observably equivalent *because of* the final `[0, 100]` hardware clamp — any optimum above 1.0 clamps to 100 either way. |
-| `mpc.optimizer` — `_rollout_cost__mutmut_3`, `optimize_valve__mutmut_{1,2,8,11,31}` | 6 | Default-arg artifacts (`horizon`, `effort_weight`, `max_opening` defaults) and bound-edge variants the bounded minimiser maps to the same clamped output. |
-| `slope` — `temperature_slope_per_min__mutmut_{10,22,23,26,29,30}` | 6 | Equivalent variants of the least-squares slope accumulation: reordered/refactored sum terms that produce identical results for every reachable input. |
-| `comfort` — `effective_temperature__mutmut_{1,2}` | 2 | Equivalent rearrangements of the blend expression. |
-| `adaptive_bias` — `update_bias_integral__mutmut_{1,2}` | 2 | Default-arg artifacts on `decay`. |
-| `adaptive_comfort` — `cool_edge_shift__mutmut_{3,5}` | 2 | Equivalent under the saturating-exponential contract (clamps already bound the output). |
-| `engine` — `decide__mutmut_{84,118}` | 2 | Equivalent: alternate orderings of independent guard checks with identical decisions. |
-| `runtime_stats` — `runtime_fraction__mutmut_{28,40}` | 2 | Equivalent boundary rewrites already pinned by the exact-value tests; the mutated forms compute the same fractions. |
-| `hysteresis` — `evaluate_demand__mutmut_1` | 1 | Default-arg artifact. |
-| `forecast` — `expand_forecast__mutmut_4` | 1 | Equivalent interpolation rewrite (same series for every step grid). |
+| Module / mutants                                                                    | Count | Why they survive                                                                                                                                                                                       |
+| ----------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `mpc.controller` — `compute_valve_pct__mutmut_1`                                    | 1     | Default-arg artifact: mutates the `max_opening_pct=100.0` default to `101.0`. Observably equivalent *because of* the final `[0, 100]` hardware clamp — any optimum above 1.0 clamps to 100 either way. |
+| `mpc.optimizer` — `_rollout_cost__mutmut_3`, `optimize_valve__mutmut_{1,2,8,11,31}` | 6     | Default-arg artifacts (`horizon`, `effort_weight`, `max_opening` defaults) and bound-edge variants the bounded minimiser maps to the same clamped output.                                              |
+| `slope` — `temperature_slope_per_min__mutmut_{10,22,23,26,29,30}`                   | 6     | Equivalent variants of the least-squares slope accumulation: reordered/refactored sum terms that produce identical results for every reachable input.                                                  |
+| `comfort` — `effective_temperature__mutmut_{1,2}`                                   | 2     | Equivalent rearrangements of the blend expression.                                                                                                                                                     |
+| `adaptive_bias` — `update_bias_integral__mutmut_{1,2}`                              | 2     | Default-arg artifacts on `decay`.                                                                                                                                                                      |
+| `adaptive_comfort` — `cool_edge_shift__mutmut_{3,5}`                                | 2     | Equivalent under the saturating-exponential contract (clamps already bound the output).                                                                                                                |
+| `engine` — `decide__mutmut_{84,118}`                                                | 2     | Equivalent: alternate orderings of independent guard checks with identical decisions.                                                                                                                  |
+| `runtime_stats` — `runtime_fraction__mutmut_{28,40}`                                | 2     | Equivalent boundary rewrites already pinned by the exact-value tests; the mutated forms compute the same fractions.                                                                                    |
+| `hysteresis` — `evaluate_demand__mutmut_1`                                          | 1     | Default-arg artifact.                                                                                                                                                                                  |
+| `forecast` — `expand_forecast__mutmut_4`                                            | 1     | Equivalent interpolation rewrite (same series for every step grid).                                                                                                                                    |
 
 !!! note
+
     Mutant *names are positional*: editing a function renumbers its mutants,
     so after touching a `control/` module expect renamed survivors and
     re-triage just those (as in round #127, where four renumbered survivors

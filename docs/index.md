@@ -23,6 +23,7 @@ toggles and numbers; there's no YAML to write.
   how to contribute.
 
 !!! tip "New here?"
+
     Read the [introduction](getting-started/introduction.md) for the full
     feature tour, then follow [installation](getting-started/installation.md)
     and the [first-setup walkthrough](getting-started/first-setup.md) — you'll

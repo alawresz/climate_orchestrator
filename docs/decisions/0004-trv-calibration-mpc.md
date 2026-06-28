@@ -28,8 +28,7 @@ Offer **three calibration modes**, selectable per install (the
   so the valve's internal loop regulates to the *room* temperature. Needs a
   calibration number.
 - **`mpc`.** Drive the `valve_opening_degree` directly with **model-predictive
-  control**: a first-order per-room thermal model (`dT/dt = gain·valve −
-  loss·(room − outdoor)`) whose `gain`/`loss` are learned online by
+  control**: a first-order per-room thermal model (`dT/dt = gain·valve − loss·(room − outdoor)`) whose `gain`/`loss` are learned online by
   least-squares system identification (SciPy), a Kalman filter to smooth the
   slow/noisy sensor between updates, and a short look-ahead optimiser (which
   also consumes the weather forecast for preconditioning).
@@ -45,12 +44,12 @@ opaque.
 
 ## Options Considered
 
-| Option | Pros | Cons |
-|--------|------|------|
-| Single `target` mode only | Trivial; universal | Inherits TRV sensor bias; no path to better control |
-| `target` + `offset` only | Fixes the bias cheaply | Still bang-bang; needs a calibration number |
-| Add `mpc` (chosen) | Handles lag + outdoor feed-forward; introspectable; best comfort | SciPy dependency; learning code to maintain and harden |
-| PID instead of MPC | Familiar | Per-room tuning; no feed-forward; opaque gains |
+| Option                    | Pros                                                             | Cons                                                   |
+| ------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------ |
+| Single `target` mode only | Trivial; universal                                               | Inherits TRV sensor bias; no path to better control    |
+| `target` + `offset` only  | Fixes the bias cheaply                                           | Still bang-bang; needs a calibration number            |
+| Add `mpc` (chosen)        | Handles lag + outdoor feed-forward; introspectable; best comfort | SciPy dependency; learning code to maintain and harden |
+| PID instead of MPC        | Familiar                                                         | Per-room tuning; no feed-forward; opaque gains         |
 
 ## Consequences
 
