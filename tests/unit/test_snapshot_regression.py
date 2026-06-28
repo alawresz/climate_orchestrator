@@ -5,8 +5,8 @@ cooling-comfort relaxation across a small grid, so an unintended change to the
 math shows up as a snapshot diff in review rather than slipping through (line
 coverage and Hypothesis invariants don't catch a subtly-shifted curve).
 
-Snapshots live in ``tests/unit/snapshots/``. Regenerate them *intentionally*
-(after confirming a diff is expected) with:
+Snapshots live in ``tests/unit/__snapshots__/`` (syrupy's default directory).
+Regenerate them *intentionally* (after confirming a diff is expected) with:
 
     uv run pytest tests/unit/test_snapshot_regression.py --snapshot-update
 

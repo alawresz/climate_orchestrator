@@ -2,10 +2,11 @@
 #
 # Run:  uv run mdformat .
 #
-# Requires Python 3.13+ for the `exclude` This excludes `mdformat .` from
-# descending into the virtualenv / build output and, critically, from
-# reformatting the semantic-release-owned changelogs (those carry YAML
-# frontmatter mdformat would mangle, and PSR rewrites them).
+# Requires Python 3.13+ for the `exclude` key (the project's interpreter floor
+# is well past that). The excludes keep `mdformat .` from descending into the
+# virtualenv / build output and, critically, from reformatting the
+# semantic-release-owned changelogs (those carry YAML frontmatter mdformat would
+# mangle, and PSR rewrites them).
 #
 # Plugins (declared in the `dev` dependency group): mdformat-gfm (aligns GFM
 # tables), mdformat-mkdocs (preserves MkDocs Material admonitions, content tabs,

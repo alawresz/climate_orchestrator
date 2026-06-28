@@ -18,12 +18,22 @@ they aren't "fixed" into breakage.
 
 ## Decision
 
-**1. `requires-python >=3.14.2` is a dev-environment statement, not the runtime
-floor.** It exists for lockfile coherence — `uv` resolves the dev toolchain
-against the interpreter the maintainer runs (3.14). A HACS-installed integration
-is *not* pip-installed: the release is a zip of `custom_components/…` with **no
-packaging metadata**, so `requires-python` is never consulted at install or
-runtime. Nothing enforces it on users.
+**1. `requires-python >=3.14.2,<3.15` is a dev-environment statement, not the
+runtime floor.** It exists for lockfile coherence — `uv` resolves the dev
+toolchain against the interpreter the maintainer runs (3.14). A HACS-installed
+integration is *not* pip-installed: the release is a zip of `custom_components/…`
+with **no packaging metadata**, so `requires-python` is never consulted at
+install or runtime. Nothing enforces it on users.
+
+The **upper bound is load-bearing**, not cosmetic. Unbounded, `uv`/Dependabot
+do universal resolution across all future Python and fork a `python >= 3.15`
+branch; no Home Assistant satisfies that branch (HA pins conflicting `aiohttp`
+versions across python ranges), so resolution fails. For `uv lock` that is
+merely an extra fork, but for **Dependabot it is fatal**: it reports "can't
+resolve your Python dependency files" and silently stops opening *security*
+update PRs (this blocked the pyjwt and cryptography advisories). Capping at the
+dev interpreter's minor (`<3.15`) removes the impossible fork. Raise the floor
+*and* the cap together when adopting 3.15.
 
 **2. ruff's `target-version = "py313"` is the real install-time floor.** Since
 no metadata gates installation, the only thing that actually keeps the source
@@ -46,9 +56,10 @@ CI canary running the suite against a pinned 2025.2 environment.
 
 ## Consequences
 
-- **Do not** "align" `requires-python` with the ruff target, or bump
-  `pyproject`'s version to match `manifest.json` — either change breaks a real
-  invariant (lockfile coherence; the install-time floor) for a cosmetic tidy.
+- **Do not** "align" `requires-python` with the ruff target, drop its upper
+  bound, or bump `pyproject`'s version to match `manifest.json` — each change
+  breaks a real invariant (lockfile coherence; Dependabot's ability to resolve
+  and open security PRs; the install-time floor) for a cosmetic tidy.
 - The *runtime* floor lives in `hacs.json` + the ruff target + the floor canary,
   **not** in `requires-python`.
 - Raising the floor (e.g. to adopt a newer HA API) means: bump `hacs.json`,

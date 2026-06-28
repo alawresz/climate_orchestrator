@@ -10,7 +10,14 @@ readme = "README.md"
 # resolution forks for hypothetical old interpreters, pinned to ancient HA
 # releases full of known CVEs. Source compatibility is governed separately
 # by ruff's target-version below.
-requires-python = ">=3.14.2"
+#
+# Upper bound is deliberate: without it, uv/Dependabot fork a universal-
+# resolution branch for python >= 3.15, where no Home Assistant satisfies the
+# (conflicting, per-python) aiohttp pins, so resolution fails — which silently
+# blocks Dependabot from opening *security* update PRs (it reports "can't
+# resolve your Python dependency files"). The dev interpreter is 3.14.x; cap to
+# match and raise both together when adopting 3.15.
+requires-python = ">=3.14.2,<3.15"
 license = { text = "MIT" }
 authors = [{ name = "Aleksander Ławresz" }]
 dependencies = []
