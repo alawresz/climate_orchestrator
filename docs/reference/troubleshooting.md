@@ -12,6 +12,7 @@ The whole-home **Status** diagnostic sensor is the first place to look:
   `unavailable_devices` attribute.
 
 !!! tip
+
     See [Services & automations](../guides/services-automations.md) for a ready-made
     automation that notifies you when the status turns `degraded`.
 

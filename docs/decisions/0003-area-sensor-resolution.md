@@ -7,7 +7,7 @@
 
 A whole-home orchestrator needs, for each managed climate device, the *room's*
 temperature and humidity — not the device's own internal sensor (a TRV's sensor
-sits on the hot radiator). Something has to associate "this valve" with "that 
+sits on the hot radiator). Something has to associate "this valve" with "that
 room sensor."
 
 The obvious approach, and what most multi-device integrations do, is to make

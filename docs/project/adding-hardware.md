@@ -14,12 +14,12 @@ to one class of device. Every field defaults to the standard climate contract,
 so a bare `DeviceProfile()` *is* the generic behaviour; a concrete profile sets
 only what differs:
 
-| Field | Purpose | Default |
-|-------|---------|---------|
-| `name` | Identifier for logs/tests | `"generic"` |
-| `current_temp_attr` | Attribute carrying the room temperature | `current_temperature` |
-| `target_temp_attr` | Attribute carrying the active setpoint | `temperature` |
-| `valve_hints` | Name fragments for the valve-opening `number` | `None` (use configured) |
+| Field               | Purpose                                           | Default                 |
+| ------------------- | ------------------------------------------------- | ----------------------- |
+| `name`              | Identifier for logs/tests                         | `"generic"`             |
+| `current_temp_attr` | Attribute carrying the room temperature           | `current_temperature`   |
+| `target_temp_attr`  | Attribute carrying the active setpoint            | `temperature`           |
+| `valve_hints`       | Name fragments for the valve-opening `number`     | `None` (use configured) |
 | `calibration_hints` | Name fragments for the local-calibration `number` | `None` (use configured) |
 
 Profiles are matched per entity by `(integration, manufacturer, model)`, read
@@ -57,9 +57,9 @@ Everything happens in `custom_components/climate_orchestrator/devices/profiles.p
     )
     ```
 
-   Match on whatever is stable for the device. Model strings often carry across
-   Zigbee2MQTT and ZHA where the manufacturer string does not — the SONOFF
-   TRVZB matcher keys off the model alone for exactly this reason.
+    Match on whatever is stable for the device. Model strings often carry across
+    Zigbee2MQTT and ZHA where the manufacturer string does not — the SONOFF
+    TRVZB matcher keys off the model alone for exactly this reason.
 
 3. **Test it.** Add a pure case to `tests/unit/devices/test_profiles.py`
    (resolution + any custom parsing) and, if it has a real device shape, an

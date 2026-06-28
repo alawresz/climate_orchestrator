@@ -49,6 +49,7 @@ stale, the *computed* mean stands in (keeping status/repairs truthful and
 control alive).
 
 !!! note "NaN/inf hardening"
+
     `nan`/`inf` parse as floats without raising, so every numeric read funnels
     through `util.as_float`, which rejects them.
 

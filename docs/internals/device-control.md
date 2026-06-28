@@ -55,6 +55,7 @@ default), `mpc` (drive valve via MPC), `offset` (bias local temperature).
   open and keep heating (a recurring failure mode in comparable integrations).
 
     !!! warning "Hardware-unvalidated"
+
         `valve_opening_degree` semantics are firmware-dependent on the TRVZB,
         so MPC remains hardware-unvalidated; `target` is the safe default.
 
@@ -62,10 +63,12 @@ default), `mpc` (drive valve via MPC), `offset` (bias local temperature).
   feed the TRV a biased local temperature (true measured − external truth) so
   its internal loop keeps the valve open until the *room* reaches target. Used
   when valve control is unavailable or as a complement.
+
 - **Forecast preconditioning** (opt-in, MPC mode only) feeds the weather
   entity's hourly forecast into the valve optimisation so a radiator pre-heats
   ahead of a cold spell, and can only ever *raise* the valve — see
   [MPC: forecast preconditioning](mpc.md#forecast-preconditioning).
+
 - A TRV in `mpc`/`offset` mode with no discoverable valve/calibration number
   falls back to `target` and raises a repair.
 

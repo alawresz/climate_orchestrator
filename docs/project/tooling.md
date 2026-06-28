@@ -7,17 +7,17 @@ practices enforced by ruff + mypy in CI.
 
 ## Stack at a glance
 
-| Concern | Choice | Notes |
-|---------|--------|-------|
-| Env/deps | **uv** | Fast, lockfile, `uv run` for tasks. |
-| Lint + format | **ruff** | Replaces black + flake8 + isort; format + lint in one. |
-| Types | **mypy** (strict-ish) | pyright optional in editor. |
-| Tests | **pytest** + **pytest-homeassistant-custom-component** | The standard HA harness: `hass` fixture, config-entry/flow helpers, service mocking. |
-| Snapshots | **syrupy** | Entity-state and diagnostics snapshot tests. |
-| Coverage | **pytest-cov** | Target ≥ 95% line + branch on `control/`, `sensing/`, `devices/`; gate in CI. |
-| Hooks | **pre-commit** | ruff + mypy + end-of-file/whitespace. |
-| CI | **GitHub Actions** | See below. |
-| HA validation | **hassfest** + **HACS action** | Manifest/structure and HACS packaging validation. |
+| Concern       | Choice                                                 | Notes                                                                                |
+| ------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Env/deps      | **uv**                                                 | Fast, lockfile, `uv run` for tasks.                                                  |
+| Lint + format | **ruff**                                               | Replaces black + flake8 + isort; format + lint in one.                               |
+| Types         | **mypy** (strict-ish)                                  | pyright optional in editor.                                                          |
+| Tests         | **pytest** + **pytest-homeassistant-custom-component** | The standard HA harness: `hass` fixture, config-entry/flow helpers, service mocking. |
+| Snapshots     | **syrupy**                                             | Entity-state and diagnostics snapshot tests.                                         |
+| Coverage      | **pytest-cov**                                         | Target ≥ 95% line + branch on `control/`, `sensing/`, `devices/`; gate in CI.        |
+| Hooks         | **pre-commit**                                         | ruff + mypy + end-of-file/whitespace.                                                |
+| CI            | **GitHub Actions**                                     | See below.                                                                           |
+| HA validation | **hassfest** + **HACS action**                         | Manifest/structure and HACS packaging validation.                                    |
 
 ## uv and the lockfile
 

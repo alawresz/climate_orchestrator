@@ -59,6 +59,7 @@ uv run --group docs mkdocs serve
   its `comment` rationale — in the same PR.
 
 !!! note "Coding style"
+
     The full set of code conventions (typing, frozen dataclasses, enums over
     magic strings, pure functions, async correctness) lives in
     [Tooling](tooling.md#ruff-ruleset-rationale) and is enforced by ruff +

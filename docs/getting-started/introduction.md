@@ -68,6 +68,7 @@ validated on real devices**, so the default `target`
 [calibration mode](../guides/hardware.md) is the safe baseline.
 
 !!! warning
+
     As with any early-stage thermostat replacement, keep an independent fallback
     for heating/cooling until it has proven itself in your setup.
 

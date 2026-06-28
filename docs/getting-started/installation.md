@@ -16,12 +16,13 @@
 1. Copy `custom_components/climate_orchestrator/` into your Home Assistant
    configuration's `custom_components/` directory:
 
-   ```
-   <config>/custom_components/climate_orchestrator/
-   ```
+    ```
+    <config>/custom_components/climate_orchestrator/
+    ```
 
 2. **Fully restart** Home Assistant (a new integration is only discovered on
    startup; "reload" is not enough). On first start HA installs `scipy`.
+
 3. **Settings → Devices & Services → Add Integration → "Climate Orchestrator"**, then
    select your TRVs, ACs, and (optionally) an outdoor sensor, a weather entity,
    and your own whole-home average temperature/humidity sensors — see

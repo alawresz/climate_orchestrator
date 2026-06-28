@@ -31,6 +31,14 @@ dev = [
   "mypy>=1.11",             # type checker
   "mutmut>=3.5,<4",         # mutation testing for the pure control/ math
   "python-semantic-release>=10.5,<11",  # local release tooling (CI uses the action)
+  # Markdown formatter for the docs (run: `uv run mdformat .`). Options live in
+  # .mdformat.toml so the CLI and any editor mdformat integration agree.
+  # mdformat-mkdocs preserves MkDocs Material syntax (admonitions/tabs/math);
+  # mdformat-gfm aligns GFM tables. Pinned minor: mdformat output can shift
+  # between minors and there is no CI gate to catch a drift.
+  "mdformat>=1.0,<1.1",
+  "mdformat-gfm>=1.0,<1.1",
+  "mdformat-mkdocs>=5.1,<6",
 ]
 # Docs toolchain (site under docs/ + mkdocs.yml). Exact pins: the same
 # versions build locally (`uv run --group docs mkdocs serve`), in the CI gate,

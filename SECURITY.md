@@ -19,7 +19,7 @@ report until asked — they can contain entity names and layout details of your
 home.
 
 This is a single-maintainer project: reports are handled on a best-effort
-basis. Confirmed vulnerabilities are fixed in a regular release and noted in 
+basis. Confirmed vulnerabilities are fixed in a regular release and noted in
 the changelog.
 
 ## Scope
