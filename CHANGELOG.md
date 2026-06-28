@@ -2,6 +2,54 @@
 
 <!-- version list -->
 
+## v0.33.0 (2026-06-28)
+
+### Chores
+
+- Bump actions/checkout from 6.0.3 to 7.0.0
+  ([#15](https://github.com/alawresz/climate_orchestrator/pull/15),
+  [`01a09f0`](https://github.com/alawresz/climate_orchestrator/commit/01a09f0d161bf08537c7c73e2da20dd4e464baa9))
+
+- Bump https://github.com/astral-sh/ruff-pre-commit from v0.15.15 to 0.15.16
+  ([#10](https://github.com/alawresz/climate_orchestrator/pull/10),
+  [`b16ebfe`](https://github.com/alawresz/climate_orchestrator/commit/b16ebfe6af09e35866b8f8345f0ded52274e4309))
+
+- Bump python-semantic-release/publish-action from 68eaac9f1f594e9ec4b985245d06355734f43eea to
+  310a9983a0ae878b29f3aac778d7c77c1db27378
+  ([#12](https://github.com/alawresz/climate_orchestrator/pull/12),
+  [`13ecf4f`](https://github.com/alawresz/climate_orchestrator/commit/13ecf4fd05666664d6c150db0522cfb9a54588bd))
+
+- Bump the python-tooling group across 1 directory with 4 updates
+  ([#18](https://github.com/alawresz/climate_orchestrator/pull/18),
+  [`5a273d5`](https://github.com/alawresz/climate_orchestrator/commit/5a273d500d2e8524a8fbf02a935f2aea0e81153f))
+
+- Bump zeroconf from 0.148.0 to 0.149.16
+  ([#17](https://github.com/alawresz/climate_orchestrator/pull/17),
+  [`983d05e`](https://github.com/alawresz/climate_orchestrator/commit/983d05e3c2de94c69d71e553224c683be22fcb82))
+
+- Cap requires-python <3.15 and uv lock --upgrade (unblocks Dependabot security updates; move syrupy
+  snapshots to __snapshots__
+  ([`33d6c6f`](https://github.com/alawresz/climate_orchestrator/commit/33d6c6fa2fa94c88e58912088a6fd3ab6539e326))
+
+### Code Style
+
+- Align all Markdown tables to improve formatting consistency across documentation, add mdformat
+  ([`d69085d`](https://github.com/alawresz/climate_orchestrator/commit/d69085dea8aff40846b9941bb3b32324eff7cd9f))
+
+### Features
+
+- Repair when AC drain protection's sensor is configured but unavailable
+  ([`886bfa1`](https://github.com/alawresz/climate_orchestrator/commit/886bfa17257af2637bae6e4176ba2bf85ed847d1))
+
+### Testing
+
+- Assert coordinator-not-shutdown on failed unload (HA-version-robust)
+  ([`91f096b`](https://github.com/alawresz/climate_orchestrator/commit/91f096be4007a543bcf535b85030981b68759620))
+
+- Restore snapshot dir to snapshots/ for HA syrupy extension
+  ([`fea9394`](https://github.com/alawresz/climate_orchestrator/commit/fea9394ed14bd1c76e0c34d913a9ff2cc57693b9))
+
+
 ## v0.32.0 (2026-06-28)
 
 ### Chores
