@@ -13,14 +13,15 @@ mode** select chooses how Climate Orchestrator handles that:
 - **`target` (default, safe).** The TRV is told to heat to the band's heat target
   (`heat setpoint + tolerance`), trusting the TRV's own loop. Always works, but
   inherits the TRV's sensor bias. The recommended starting point.
+
 - **`offset`.** Climate Orchestrator writes the TRV's `local_temperature_calibration`
   with `(room sensor − TRV's own reading)`, so the TRV's internal loop regulates
   to the **room** temperature instead of the air next to the radiator.
+
 - **`mpc` (Model Predictive Control).** Climate Orchestrator learns each room and drives
   the valve opening directly:
 
-    1. **Thermal model per room** — first-order: `temperature change per minute =
-       gain × valve − loss × (room − outdoor)`. `gain` is how fast a fully-open
+    1. **Thermal model per room** — first-order: `temperature change per minute = gain × valve − loss × (room − outdoor)`. `gain` is how fast a fully-open
        valve heats the room (K/min); `loss` is how fast it leaks heat (per minute).
     2. **Learning (system identification)** — fits `gain` and `loss` from observed
        `(valve, temperature change, outdoor)` samples with a least-squares solver
@@ -41,6 +42,7 @@ discovery hints are configurable in the options dialog for other brands),
 `mpc`/`offset` can't act and the device falls back to `target` safely.
 
 !!! warning
+
     The hardware-specific TRV valve/offset writes are not yet validated on real
     devices. Validate on your hardware before trusting it on the radiators —
     `target` is the safe baseline.

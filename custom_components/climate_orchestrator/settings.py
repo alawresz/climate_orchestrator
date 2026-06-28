@@ -21,6 +21,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 
 from .const import (
+    AC_DRAIN_GRACE_DEFAULT,
     AC_SETPOINT_BIAS_DEFAULT,
     AC_SETPOINT_BIAS_MAX_DEFAULT,
     ADAPTIVE_COMFORT_BIAS_DEFAULT,
@@ -223,6 +224,25 @@ BOOST_NUMBER_SETTINGS: tuple[NumberSetting, ...] = (
     ),
 )
 
+# AC drain protection (created only when a drain sensor is configured and an AC
+# is managed): the grace window the sensor must stay active before the AC is
+# held off, and the on/off toggle (default on, so configuring a sensor turns
+# protection on). Both live in ``RuntimeSettings``; ``resolve_settings`` reads
+# them with the default fallback when the entities aren't present.
+AC_DRAIN_NUMBER_SETTINGS: tuple[NumberSetting, ...] = (
+    NumberSetting(
+        "ac_drain_grace",
+        AC_DRAIN_GRACE_DEFAULT,
+        0.0,
+        120.0,
+        5.0,
+        unit=UnitOfTime.MINUTES,
+    ),
+)
+AC_DRAIN_SWITCH_SETTINGS: tuple[SwitchSetting, ...] = (
+    SwitchSetting("ac_drain_protection", True),
+)
+
 SWITCH_SETTINGS: tuple[SwitchSetting, ...] = (
     SwitchSetting("comfort_index_targeting", True),
     SwitchSetting("home_average_trigger", True),
@@ -263,6 +283,7 @@ class RuntimeSettings:
     adaptive_cooling_comfort_onset_bias: float
     adaptive_cooling_comfort_response: float
     window_open_delay: float
+    ac_drain_grace: float
     valve_maintenance_interval: float
     sensor_max_age: float
     preconditioning_horizon: float
@@ -276,6 +297,7 @@ class RuntimeSettings:
     frost_protection: bool
     ac_heating_assist: bool
     self_tuning_ac_bias: bool
+    ac_drain_protection: bool
     auto_valve_maintenance: bool
     adaptive_cooling_comfort: bool
     forecast_preconditioning: bool
@@ -366,8 +388,12 @@ def resolve_settings(hass: HomeAssistant, entry_id: str) -> RuntimeSettings:
     two raises ``TypeError`` here (missing or unexpected keyword).
     """
     values: dict[str, Any] = {
-        s.key: _number_value(hass, entry_id, s) for s in NUMBER_SETTINGS
+        s.key: _number_value(hass, entry_id, s)
+        for s in (*NUMBER_SETTINGS, *AC_DRAIN_NUMBER_SETTINGS)
     }
-    values |= {s.key: _switch_value(hass, entry_id, s) for s in SWITCH_SETTINGS}
+    values |= {
+        s.key: _switch_value(hass, entry_id, s)
+        for s in (*SWITCH_SETTINGS, *AC_DRAIN_SWITCH_SETTINGS)
+    }
     values["calibration_mode"] = _calibration_mode(hass, entry_id)
     return RuntimeSettings(**values)

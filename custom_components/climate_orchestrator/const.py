@@ -37,6 +37,11 @@ CONF_WEATHER_ENTITY: Final = "weather_entity"
 # mean stands in and the home_avg_source diagnostic reports the fallback.
 CONF_HOME_TEMP_SENSOR: Final = "home_temperature_sensor"
 CONF_HOME_HUMIDITY_SENSOR: Final = "home_humidity_sensor"
+# Optional binary_sensor flagging that an AC's condensate tank needs emptying
+# (a float/leak sensor, for units without a drain line). When configured and the
+# drain-protection switch is on, the AC is stopped/held off once the sensor has
+# been active for the grace window, and resumes when it clears.
+CONF_AC_DRAIN_SENSOR: Final = "ac_drain_sensor"
 # Name hints (comma-separated, set in the options UI) used to discover a TRV's
 # valve-opening and local-calibration `number` entities for mpc/offset modes.
 # Defaults target Zigbee2MQTT naming; override for other brands/firmware.
@@ -122,6 +127,8 @@ EVENT_TYPE_DEHUMIDIFYING_STARTED: Final = "dehumidifying_started"
 EVENT_TYPE_DEHUMIDIFYING_ENDED: Final = "dehumidifying_ended"
 EVENT_TYPE_WINDOW_PAUSE_STARTED: Final = "window_pause_started"
 EVENT_TYPE_WINDOW_PAUSE_ENDED: Final = "window_pause_ended"
+EVENT_TYPE_DRAIN_PAUSE_STARTED: Final = "ac_drain_pause_started"
+EVENT_TYPE_DRAIN_PAUSE_ENDED: Final = "ac_drain_pause_ended"
 EVENT_TYPE_STATUS_CHANGED: Final = "status_changed"
 EVENT_TYPE_IGNORING_STARTED: Final = "device_ignoring_commands"
 EVENT_TYPE_IGNORING_ENDED: Final = "device_commands_applied"
@@ -242,6 +249,12 @@ SERVICE_RUN_VALVE_MAINTENANCE: Final = "run_valve_maintenance"
 # Grace period (minutes) a window may stay open before heating/cooling stops;
 # 0 = stop immediately (docs/internals/control-model.md).
 WINDOW_OPEN_DELAY_DEFAULT: Final = 0.0
+
+# Grace window (minutes) the AC drain sensor must stay active before the AC is
+# held off, mirroring the window-open delay: a buffer so a brief blip (or the
+# headroom most condensate tanks have above the float) doesn't cut cooling at
+# once. 0 stops the AC the instant the sensor trips.
+AC_DRAIN_GRACE_DEFAULT: Final = 30.0
 
 # --- TRV calibration strategy ------------------------------------------------
 CALIBRATION_TARGET: Final = "target"  # set the TRV's mode + setpoint (default)

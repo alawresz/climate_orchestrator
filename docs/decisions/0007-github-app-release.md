@@ -35,13 +35,13 @@ pushes are accepted while `main` stays protected against everything else.
 
 ## Options Considered
 
-| Option | Outcome |
-|--------|---------|
-| `GITHUB_TOKEN` pushes to `main` | Rejected by the ruleset (`GH013`) |
-| Add "GitHub Actions" as a bypass actor | Impossible on a user repo (422) |
-| Drop to classic branch protection | Loosens protection, and Scorecard can't read classic protection via the API — regresses the security posture |
-| Personal access token (PAT) | Works, but ties releases to a human account and a long-lived secret; worse blast radius than a scoped App token |
-| **Dedicated GitHub App (chosen)** | Addable to bypass; short-lived scoped token; not tied to a person |
+| Option                                 | Outcome                                                                                                         |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `GITHUB_TOKEN` pushes to `main`        | Rejected by the ruleset (`GH013`)                                                                               |
+| Add "GitHub Actions" as a bypass actor | Impossible on a user repo (422)                                                                                 |
+| Drop to classic branch protection      | Loosens protection, and Scorecard can't read classic protection via the API — regresses the security posture    |
+| Personal access token (PAT)            | Works, but ties releases to a human account and a long-lived secret; worse blast radius than a scoped App token |
+| **Dedicated GitHub App (chosen)**      | Addable to bypass; short-lived scoped token; not tied to a person                                               |
 
 ## Consequences
 

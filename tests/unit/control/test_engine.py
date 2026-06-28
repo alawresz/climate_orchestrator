@@ -143,6 +143,31 @@ def test_dew_point_guard_runs_ac_dry_when_idle() -> None:
     assert decision.reason == "dew_point_guard"
 
 
+def test_drain_blocking_idles_the_cooler() -> None:
+    """A full condensate tank stops a cooler that would otherwise cool."""
+    hot = make_cooler(local_temp=26.0)
+    assert decide(hot, make_global()).demand is Demand.COOL
+    blocked = decide(hot, make_global(drain_blocking=True))
+    assert blocked.demand is Demand.IDLE
+    assert blocked.reason == "drain_full"
+
+
+def test_drain_blocking_also_suppresses_dry_mode() -> None:
+    """Drain protection blocks dry-mode dehumidify too (it makes condensate)."""
+    muggy = make_cooler(local_temp=22.0, local_humidity=90)
+    # Without drain protection the muggy room would trigger the dry guard.
+    assert decide(muggy, make_global(dew_point_threshold=16.0)).dry_mode is True
+    blocked = decide(muggy, make_global(dew_point_threshold=16.0, drain_blocking=True))
+    assert blocked.dry_mode is False
+    assert blocked.reason == "drain_full"
+
+
+def test_drain_blocking_does_not_affect_heaters() -> None:
+    """The drain guard is cooler-only; a TRV still heats a cold room."""
+    cold = make_heater(local_temp=18.0)
+    assert decide(cold, make_global(drain_blocking=True)).demand is Demand.HEAT
+
+
 def test_comfort_index_engages_cooling_earlier() -> None:
     """With comfort on, a humid room cools at a dry-bulb temp that wouldn't."""
     cooler = make_cooler(local_temp=24.0, local_humidity=80)

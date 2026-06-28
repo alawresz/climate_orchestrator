@@ -4,10 +4,10 @@
 transitions as ``climate_orchestrator_event`` bus events (one event type,
 discriminated by a ``type`` field — the zha_event pattern). Everything is
 edge-triggered against the previous cycle, never fired once per cycle, so the
-events are safe to notify on directly. The two interrupt-worthy conditions
-(frost protection, degraded status) additionally raise a persistent
-notification in HA's notification panel, created on the rising edge and
-dismissed by itself when the condition clears.
+events are safe to notify on directly. The interrupt-worthy conditions (frost
+protection, degraded status, an AC paused for a full condensate tank)
+additionally raise a persistent notification in HA's notification panel, created
+on the rising edge and dismissed by itself when the condition clears.
 """
 
 from __future__ import annotations
@@ -22,6 +22,8 @@ from .const import (
     EVENT_CLIMATE_ORCHESTRATOR,
     EVENT_TYPE_DEHUMIDIFYING_ENDED,
     EVENT_TYPE_DEHUMIDIFYING_STARTED,
+    EVENT_TYPE_DRAIN_PAUSE_ENDED,
+    EVENT_TYPE_DRAIN_PAUSE_STARTED,
     EVENT_TYPE_FROST_ENDED,
     EVENT_TYPE_FROST_STARTED,
     EVENT_TYPE_STATUS_CHANGED,
@@ -121,7 +123,30 @@ class EventBridge:
                 else EVENT_TYPE_DEHUMIDIFYING_ENDED,
                 {"entities": drying},
             )
-        self._flags = {"frost": frost, "dew": dew}
+
+        drain = any(d.reason == "drain_full" for d in decisions.values())
+        if drain != self._flags.get("drain", False):
+            drained = sorted(
+                key for key, d in decisions.items() if d.reason == "drain_full"
+            )
+            self.fire(
+                EVENT_TYPE_DRAIN_PAUSE_STARTED
+                if drain
+                else EVENT_TYPE_DRAIN_PAUSE_ENDED,
+                {"entities": drained},
+            )
+            self._sync_notification(
+                "ac_drain_full",
+                rising=drain and settings.event_notifications,
+                clear=not drain,
+                title="Climate Orchestrator: AC drain",
+                message=(
+                    "An air conditioner is held off because its condensate tank "
+                    "needs emptying: " + ", ".join(drained) + ". Cooling resumes "
+                    "once the drain sensor clears."
+                ),
+            )
+        self._flags = {"frost": frost, "dew": dew, "drain": drain}
 
         paused = frozenset(eid for eid, blocked in window_state.items() if blocked)
         for started, entities in (

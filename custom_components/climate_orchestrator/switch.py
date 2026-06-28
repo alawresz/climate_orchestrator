@@ -9,7 +9,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .entity import hub_device_info
-from .settings import SWITCH_SETTINGS, SwitchSetting
+from .settings import AC_DRAIN_SWITCH_SETTINGS, SWITCH_SETTINGS, SwitchSetting
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -30,8 +30,14 @@ async def async_setup_entry(
 ) -> None:
     """Set up the feature-flag switches."""
     coordinator = entry.runtime_data
+    # The drain-protection toggle exists only when a drain sensor is configured
+    # and there's an AC to protect.
+    drain_settings = (
+        AC_DRAIN_SWITCH_SETTINGS if coordinator.ac_drain_protection_available else ()
+    )
     async_add_entities(
-        SmartClimateSwitch(coordinator, setting) for setting in SWITCH_SETTINGS
+        SmartClimateSwitch(coordinator, setting)
+        for setting in (*SWITCH_SETTINGS, *drain_settings)
     )
 
 

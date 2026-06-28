@@ -180,7 +180,10 @@ each cycle:
    below; **coolers can be exempted** via `ac_ignore_window` for a
    portable/exhaust-hose split that needs its window open to vent — heaters are
    never exempted), **frost protection** (force heating if any area below frost
-   temp, overrides everything), **outdoor-temp gating** (next section).
+   temp, overrides everything), **AC drain protection** (cooler-only — hold the
+   AC off, cooling *and* dry-mode, once the configured condensate drain / tank-
+   full sensor has been on for the grace window; reason `drain_full`),
+   **outdoor-temp gating** (next section).
 3. Mutual exclusion: a device cannot heat and cool simultaneously; the neutral
    deadband normally guarantees this, and the arbiter asserts it as an
    invariant (unit-tested).
@@ -230,8 +233,8 @@ Presets are first-class and persisted. The active comfort **band is defined
 directly by its two edges** — heat below the lower edge, cool above the upper
 edge, neutral between:
 
-| Field | Meaning | Exposed as |
-|-------|---------|-----------|
+| Field | Meaning                                      | Exposed as                                      |
+| ----- | -------------------------------------------- | ----------------------------------------------- |
 | `min` | lower band edge — heat when measured < `min` | `number.climate_orchestrator_preset_<name>_min` |
 | `max` | upper band edge — cool when measured > `max` | `number.climate_orchestrator_preset_<name>_max` |
 
@@ -278,6 +281,7 @@ shifted). The *underlying* values are always carried as state attributes —
 `base_target_temp_high` (the user-set band).
 
 !!! warning "Reading the base band back"
+
     The coordinator's `_desired()` reads the **base** band back from those
     attributes, not from `target_temp_high`; otherwise the displayed
     (already-shifted) cool edge would be re-shifted every cycle into a runaway.

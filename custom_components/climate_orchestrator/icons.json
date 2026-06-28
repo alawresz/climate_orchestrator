@@ -15,6 +15,7 @@
       "adaptive_cooling_comfort_onset_bias": { "default": "mdi:tune-vertical" },
       "adaptive_cooling_comfort_response": { "default": "mdi:chart-bell-curve" },
       "window_open_delay": { "default": "mdi:window-open-variant" },
+      "ac_drain_grace": { "default": "mdi:timer-sand" },
       "valve_maintenance_interval": { "default": "mdi:calendar-refresh" },
       "sensor_max_age": { "default": "mdi:timer-sand" },
       "preconditioning_horizon": { "default": "mdi:clock-fast" },
@@ -41,7 +42,8 @@
       "auto_valve_maintenance": { "default": "mdi:wrench-clock" },
       "adaptive_cooling_comfort": { "default": "mdi:thermometer-auto" },
       "forecast_preconditioning": { "default": "mdi:weather-partly-snowy" },
-      "event_notifications": { "default": "mdi:bell-ring-outline" }
+      "event_notifications": { "default": "mdi:bell-ring-outline" },
+      "ac_drain_protection": { "default": "mdi:water-pump-off" }
     },
     "select": {
       "calibration_mode": { "default": "mdi:tune-variant" }

@@ -91,8 +91,7 @@ estimates plus residual diagnostics.
   to the prediction residuals, so a cold start (or degenerate data) stays near
   the safe priors (`DEFAULT_GAIN`, `DEFAULT_LOSS`). With fewer than
   `MIN_SAMPLES` (6) transitions, the prior is returned unchanged.
-- **Physical bounds.** The fit runs inside `bounds=([0, 0], [MAX_GAIN,
-  MAX_LOSS])` — `MAX_GAIN` = 2.0 K/min at full valve, `MAX_LOSS` = 1.0 /min. A
+- **Physical bounds.** The fit runs inside `bounds=([0, 0], [MAX_GAIN, MAX_LOSS])` — `MAX_GAIN` = 2.0 K/min at full valve, `MAX_LOSS` = 1.0 /min. A
   radiator gaining 2 K/min or a room with a 1-minute thermal time constant is
   already absurd; anything the solver pushes past these is degenerate data, not
   physics. Finite bounds also keep the optimiser's rollout from overflowing on
@@ -133,6 +132,7 @@ and **corrects** with the new measurement.
 The optimiser plans from the filtered `estimated_temperature`.
 
 !!! note "Raw transitions for identification"
+
     System identification deliberately consumes **raw** transitions — fitting
     the model to its own Kalman-smoothed output would be circular. The filter
     only shapes what the optimiser plans from.
@@ -143,8 +143,7 @@ Transitions longer than `MAX_SAMPLE_DT_MIN` (30 min — an HA freeze, restart
 gap, or long device outage) carry essentially no information about the valve's
 effect: the room has re-equilibrated several times over, and a huge `dt` skews
 the fit and blows up the Kalman projection. Such gaps **re-anchor** the
-estimate on the new measurement (`KalmanState(temp=measurement,
-variance=MEASUREMENT_VAR)`) instead of being learned from. Non-finite
+estimate on the new measurement (`KalmanState(temp=measurement, variance=MEASUREMENT_VAR)`) instead of being learned from. Non-finite
 observations are ignored outright.
 
 ## Receding-horizon optimizer

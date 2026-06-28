@@ -70,7 +70,8 @@ sensors*). Full steps, manual installation, upgrading, and removal:
 - **Self-tuning AC drive** and **learning MPC valve control** (opt-in), with
   forecast preconditioning that pre-heats ahead of a cold spell.
 - **Layered guards** — window-open (with grace delay), frost protection,
-  outdoor-temperature gating, per-area comfort offsets.
+  outdoor-temperature gating, per-area comfort offsets, and AC drain protection
+  that stops a tank-style AC before its condensate tank overflows.
 - **Lives with you, not against you** — pick which presets to offer, **boost**
   for a timed extra push, and a manual-override takeover that stands back from
   any device you adjust by hand instead of fighting the change.

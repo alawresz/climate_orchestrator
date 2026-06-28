@@ -16,10 +16,10 @@ test-first with modern tooling.
 The integration is built around two classes of `climate` device, distinguished
 by *how* each can be steered:
 
-| Class | Representative devices | Control levers |
-|-------|------------------------|----------------|
+| Class                    | Representative devices                                                | Control levers                                                                  |
+| ------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | **Radiator valve (TRV)** | Zigbee thermostatic valves such as the SONOFF TRVZB (via Zigbee2MQTT) | valve opening % (0–100), `local_temperature_calibration`, and a normal setpoint |
-| **Air conditioner** | mini-split / window / portable units (e.g. Midea-class) | setpoint, mode, fan, swing — **setpoint-only**, no sensor-offset lever |
+| **Air conditioner**      | mini-split / window / portable units (e.g. Midea-class)               | setpoint, mode, fan, swing — **setpoint-only**, no sensor-offset lever          |
 
 Design implication: TRVs support *both* valve control and sensor-offset
 calibration; an AC supports *neither* — only setpoint, mode, fan, swing. The

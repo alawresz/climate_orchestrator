@@ -13,8 +13,7 @@ code, and all of it is easy to get subtly wrong (a flipped sign, a mis-scaled
 that integration tests only catch by luck.
 
 Home Assistant code is, by contrast, awkward to test: it needs an event loop, a
-`hass` instance, entity/area registries, and the `pytest-homeassistant-custom-
-component` harness. If the decision math is interleaved with `hass.states.get`
+`hass` instance, entity/area registries, and the `pytest-homeassistant-custom- component` harness. If the decision math is interleaved with `hass.states.get`
 calls and service calls, every test of the math pays the full HA setup cost and
 the math can only be exercised through the seams HA exposes.
 
