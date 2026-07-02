@@ -45,7 +45,7 @@ dev = [
   # between minors and there is no CI gate to catch a drift.
   "mdformat>=1.0,<1.1",
   "mdformat-gfm>=1.0,<1.1",
-  "mdformat-mkdocs>=5.1,<6",
+  "mdformat-mkdocs>=5.2.0,<6",
 ]
 # Docs toolchain (site under docs/ + mkdocs.yml). Exact pins: the same
 # versions build locally (`uv run --group docs mkdocs serve`), in the CI gate,
