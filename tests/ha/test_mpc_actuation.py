@@ -49,7 +49,7 @@ async def _engage_mpc_heating(
     """Switch to MPC, then turn the system on into a cold room and recompute."""
     cid = config_entry.entry_id
     await select_calibration_mode(hass, cid, "mpc")
-    set_desired_preset(hass, entity_id_for("climate", cid))
+    await set_desired_preset(hass, entity_id_for("climate", cid))
     hass.states.async_set(AREA_TEMP_SENSOR, "17.0")
     coordinator: SmartClimateCoordinator = config_entry.runtime_data
     await coordinator.async_refresh()
@@ -85,7 +85,7 @@ async def test_mpc_closes_valve_when_not_heating(
     cid = config_entry.entry_id
     await select_calibration_mode(hass, cid, "mpc")
     # A warm room -> the heater idles (it can't cool), so the valve must close.
-    set_desired_preset(hass, entity_id_for("climate", cid))
+    await set_desired_preset(hass, entity_id_for("climate", cid))
     hass.states.async_set(AREA_TEMP_SENSOR, "25.0")
     coordinator: SmartClimateCoordinator = config_entry.runtime_data
     await coordinator.async_refresh()
@@ -157,7 +157,7 @@ async def test_offset_mode_writes_calibration_number(
     set_value = async_mock_service(hass, "number", "set_value")
     cid = config_entry.entry_id
     await select_calibration_mode(hass, cid, "offset")
-    set_desired_preset(hass, entity_id_for("climate", cid))
+    await set_desired_preset(hass, entity_id_for("climate", cid))
     hass.states.async_set(AREA_TEMP_SENSOR, "17.0")
     coordinator: SmartClimateCoordinator = config_entry.runtime_data
     await coordinator.async_refresh()
@@ -234,7 +234,7 @@ async def test_offset_fallback_without_calibration_number(
     cid = init_integration.entry_id
     await select_calibration_mode(hass, cid, "offset")
     set_value = async_mock_service(hass, "number", "set_value")
-    set_desired_preset(hass, entity_id_for("climate", cid))
+    await set_desired_preset(hass, entity_id_for("climate", cid))
     hass.states.async_set(AREA_TEMP_SENSOR, "17.0")
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     await coordinator.async_refresh()
@@ -254,7 +254,7 @@ async def test_mpc_fallback_without_valve_number(
     cid = init_integration.entry_id
     await select_calibration_mode(hass, cid, "mpc")
     set_value = async_mock_service(hass, "number", "set_value")
-    set_desired_preset(hass, entity_id_for("climate", cid))
+    await set_desired_preset(hass, entity_id_for("climate", cid))
     hass.states.async_set(AREA_TEMP_SENSOR, "17.0")
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     await coordinator.async_refresh()

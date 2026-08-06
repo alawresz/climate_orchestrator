@@ -32,13 +32,16 @@ async def test_heating_demand_commands_the_trv(
     entity_id_for: Callable[[str, str], str],
 ) -> None:
     """A cold room with the system on commands the TRV to heat."""
+    # Turn the system on through the real service *before* the climate
+    # services are replaced by recorders below — a mocked service would
+    # swallow the call rather than apply it to the entity.
+    climate_id = entity_id_for("climate", init_integration.entry_id)
+    await set_desired_preset(hass, climate_id, "heat_cool")
+
     set_hvac = async_mock_service(hass, "climate", "set_hvac_mode")
     async_mock_service(hass, "climate", "set_temperature")
-    climate_id = entity_id_for("climate", init_integration.entry_id)
-
     hass.states.async_set(TRV_ENTITY, "off", TRV_ATTRS)
     hass.states.async_set(AREA_TEMP_SENSOR, "19.0")
-    set_desired_preset(hass, climate_id, "heat_cool")
 
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     await coordinator.async_refresh()
@@ -56,14 +59,17 @@ async def test_no_redundant_writes_when_already_satisfied(
     entity_id_for: Callable[[str, str], str],
 ) -> None:
     """If the TRV is already heating at the target, nothing is re-sent."""
+    # Turn the system on through the real service *before* the climate
+    # services are replaced by recorders below — a mocked service would
+    # swallow the call rather than apply it to the entity.
+    climate_id = entity_id_for("climate", init_integration.entry_id)
+    await set_desired_preset(hass, climate_id, "heat_cool")
+
     set_hvac = async_mock_service(hass, "climate", "set_hvac_mode")
     set_temp = async_mock_service(hass, "climate", "set_temperature")
-    climate_id = entity_id_for("climate", init_integration.entry_id)
-
     # Already at the heat target (heat_edge 20.5 + tolerance 0.3 -> 20.8 -> 21.0).
     hass.states.async_set(TRV_ENTITY, "heat", {**TRV_ATTRS, "temperature": 21.0})
     hass.states.async_set(AREA_TEMP_SENSOR, "19.0")
-    set_desired_preset(hass, climate_id, "heat_cool")
 
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     await coordinator.async_refresh()
@@ -96,10 +102,15 @@ async def test_ac_setpoint_is_throttled_between_cycles(
         hass.states.async_set(eid, call.data[ATTR_HVAC_MODE], st.attributes)
 
     # Stateful mocks so the device reflects what we write (reconcile needs that).
+    # Turn the system on through the real service *before* the climate
+    # services are replaced by recorders below — a mocked service would
+    # swallow the call rather than apply it to the entity.
+    climate_id = entity_id_for("climate", init_integration.entry_id)
+    await set_desired_preset(hass, climate_id, "heat_cool")
+
     hass.services.async_register("climate", "set_temperature", _set_temp)
     hass.services.async_register("climate", "set_hvac_mode", _set_mode)
 
-    climate_id = entity_id_for("climate", init_integration.entry_id)
     hass.states.async_set(TRV_ENTITY, "off", TRV_ATTRS)
     hass.states.async_set(
         AC_ENTITY,
@@ -111,7 +122,6 @@ async def test_ac_setpoint_is_throttled_between_cycles(
         },
     )
     hass.states.async_set(AREA_TEMP_SENSOR, "28.0", {"device_class": "temperature"})
-    set_desired_preset(hass, climate_id, "heat_cool")
 
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
 
@@ -137,12 +147,15 @@ async def test_unavailable_device_does_not_break_the_cycle(
     entity_id_for: Callable[[str, str], str],
 ) -> None:
     """An offline TRV is excluded; the cycle still completes for the rest."""
+    # Turn the system on through the real service *before* the climate
+    # services are replaced by recorders below — a mocked service would
+    # swallow the call rather than apply it to the entity.
+    climate_id = entity_id_for("climate", init_integration.entry_id)
+    await set_desired_preset(hass, climate_id, "heat_cool")
+
     async_mock_service(hass, "climate", "set_hvac_mode")
     async_mock_service(hass, "climate", "set_temperature")
-    climate_id = entity_id_for("climate", init_integration.entry_id)
-
     hass.states.async_set(TRV_ENTITY, STATE_UNAVAILABLE)
-    set_desired_preset(hass, climate_id, "heat_cool")
 
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     await coordinator.async_refresh()
@@ -159,6 +172,12 @@ async def test_home_average_trigger_switch_wires_into_control(
     entity_id_for: Callable[[str, str], str],
 ) -> None:
     """Switch off -> a cold home average no longer starts a satisfied room."""
+    # Turn the system on through the real service *before* the climate
+    # services are replaced by recorders below — a mocked service would
+    # swallow the call rather than apply it to the entity.
+    climate_id = entity_id_for("climate", init_integration.entry_id)
+    await set_desired_preset(hass, climate_id, "heat_cool")
+
     set_hvac = async_mock_service(hass, "climate", "set_hvac_mode")
     async_mock_service(hass, "climate", "set_temperature")
     cid = init_integration.entry_id
@@ -174,11 +193,9 @@ async def test_home_average_trigger_switch_wires_into_control(
     )
     await hass.async_block_till_done()
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
-    climate_id = entity_id_for("climate", cid)
 
     hass.states.async_set(TRV_ENTITY, "off", TRV_ATTRS)
     hass.states.async_set(AREA_TEMP_SENSOR, "22.0")
-    set_desired_preset(hass, climate_id, "heat_cool")
 
     await coordinator.async_refresh()
     await hass.async_block_till_done()
@@ -213,7 +230,11 @@ async def test_command_failures_log_once_per_outage(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """A failing device warns once, stays quiet, and logs once on recovery."""
+    # Turn the system on first: the rejecting services registered below replace
+    # the real ones, so afterwards even this entity's own service call fails.
     climate_id = entity_id_for("climate", init_integration.entry_id)
+    await set_desired_preset(hass, climate_id)
+
     # Deterministic outage: the climate services exist but reject every command.
     # (Overrides the real entity services the climate component registered, and
     # avoids racing setup's first control cycle, whose ServiceNotFound warning
@@ -253,9 +274,6 @@ async def test_command_failures_log_once_per_outage(
     caplog.clear()
 
     async def _cycle() -> None:
-        # Each refresh makes the real climate entity rewrite its state, wiping
-        # the faked desired mode — re-fake it before every cycle.
-        set_desired_preset(hass, climate_id)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
 

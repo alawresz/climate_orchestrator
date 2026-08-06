@@ -5,6 +5,16 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from homeassistant.components.climate import (
+    ATTR_HVAC_MODE,
+    ATTR_PRESET_MODE,
+    SERVICE_SET_HVAC_MODE,
+    SERVICE_SET_PRESET_MODE,
+    HVACMode,
+)
+from homeassistant.components.climate import (
+    DOMAIN as CLIMATE_DOMAIN,
+)
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -12,6 +22,7 @@ from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.climate_orchestrator.const import (
+    DEFAULT_PRESET,
     DOMAIN,
     FORECAST_FAILURE_SECONDS,
     STARTUP_GRACE_SECONDS,
@@ -37,21 +48,41 @@ AC_ATTRS = {
 }
 
 
-def set_desired_preset(
+async def set_desired_preset(
     hass: HomeAssistant,
     climate_id: str,
-    mode: str = "heat_cool",
+    mode: str | None = None,
     *,
-    target: float = 22.5,
+    preset: str = DEFAULT_PRESET,
 ) -> None:
-    """Fake the whole-home entity's desired state (home preset band).
+    """Put the whole-home entity into ``mode`` on ``preset``, via its services.
 
-    Writes the state directly instead of going through the climate services —
-    for suites that haven't set up the climate platform (pure coordinator
-    tests); prefer real service calls when the entity exists.
+    Driving the real services is what makes this stick. Writing the state
+    directly (``hass.states.async_set``) does not: the climate entity writes
+    its own state during the control cycle, so from HA 2026.8 the faked state
+    is overwritten *before* the coordinator reads it and every device falls
+    through to the ``master_off`` decision.
+
+    ``mode`` defaults to whichever "on" mode the configured hardware exposes
+    (``heat_cool`` for a TRV+AC home, ``heat``/``cool`` for a single-purpose
+    one) — unlike a faked state, a real service call rejects a mode the entity
+    doesn't support.
     """
-    hass.states.async_set(
-        climate_id, mode, {"temperature": target, "preset_mode": "home"}
+    if mode is None:
+        state = hass.states.get(climate_id)
+        assert state is not None, f"{climate_id} has no state"
+        mode = next(m for m in state.attributes["hvac_modes"] if m != HVACMode.OFF)
+    await hass.services.async_call(
+        CLIMATE_DOMAIN,
+        SERVICE_SET_HVAC_MODE,
+        {ATTR_ENTITY_ID: climate_id, ATTR_HVAC_MODE: mode},
+        blocking=True,
+    )
+    await hass.services.async_call(
+        CLIMATE_DOMAIN,
+        SERVICE_SET_PRESET_MODE,
+        {ATTR_ENTITY_ID: climate_id, ATTR_PRESET_MODE: preset},
+        blocking=True,
     )
 
 

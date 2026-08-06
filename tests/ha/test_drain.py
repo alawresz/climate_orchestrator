@@ -149,19 +149,21 @@ async def test_full_tank_idles_the_ac_and_resumes_when_cleared(
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
+
+    # Turn the system on through the real service *before* the climate services
+    # are replaced by recorders: a mocked service would swallow the call. Being
+    # a real entity it then stays on, so no cycle has to re-assert it.
+    climate_id = entity_id_for("climate", entry.entry_id)
+    await set_desired_preset(hass, climate_id, "heat_cool")
     async_mock_service(hass, "climate", "set_hvac_mode")
     async_mock_service(hass, "climate", "set_temperature")
 
     coordinator: SmartClimateCoordinator = entry.runtime_data
     assert coordinator.ac_drain_protection_available is True
-    climate_id = entity_id_for("climate", entry.entry_id)
     events = async_capture_events(hass, EVENT_CLIMATE_ORCHESTRATOR)
     notification_id = f"climate_orchestrator_{entry.entry_id}_ac_drain_full"
 
     async def _cycle() -> None:
-        # Re-assert the desired band each cycle: the real climate entity
-        # overwrites the directly-set state after every refresh.
-        set_desired_preset(hass, climate_id, "heat_cool")
         await refresh(hass, entry)
 
     # Baseline: a hot room with the tank empty -> the AC cools.
@@ -182,10 +184,6 @@ async def test_full_tank_idles_the_ac_and_resumes_when_cleared(
     await _cycle()
     assert coordinator.last_decisions[AC_ENTITY].demand is Demand.IDLE
     assert coordinator.last_decisions[AC_ENTITY].reason == "drain_full"
-    # hvac_action_reason() reads the live desired mode, which the climate entity
-    # reverts to "off" after each refresh; re-assert the band (no refresh) so the
-    # headline reflects this cycle's decisions.
-    set_desired_preset(hass, climate_id, "heat_cool")
     assert coordinator.hvac_action_reason() == "drain_full"
     started = _events_of(events, EVENT_TYPE_DRAIN_PAUSE_STARTED)
     assert len(started) == 1
