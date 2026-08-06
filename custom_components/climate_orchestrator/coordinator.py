@@ -13,6 +13,7 @@ import asyncio
 from collections import deque
 from dataclasses import dataclass, field, replace
 from datetime import timedelta
+from importlib import import_module
 import logging
 import math
 import time
@@ -122,11 +123,13 @@ from .util import as_float, float_state
 from .windows import WindowMonitor
 
 if TYPE_CHECKING:
-    from collections.abc import Coroutine
+    from collections.abc import Callable, Coroutine
+    from types import ModuleType
 
-    # Imported lazily at runtime (see _mpc_observe_and_write / async_load_mpc):
-    # the MPC modules pull in scipy/numpy, which a target/offset-only install
-    # should never pay for. Kept here only for type annotations.
+    # Imported lazily at runtime (see _async_mpc_module): the MPC modules pull
+    # in scipy/numpy, which a target/offset-only install should never pay for
+    # — and whose import does blocking I/O, so it goes through the import
+    # executor. Kept here only for type annotations.
     from .control.mpc.controller import MpcController
 
 # Skip number writes within this of the current value (update minimization).
@@ -305,6 +308,24 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
             mpc_payload=self._mpc_persist_data,
             state_payload=self._state_persist_data,
         )
+        # Cached scipy-backed MPC module (see _async_mpc_module).
+        self._mpc_module: ModuleType | None = None
+
+    async def _async_mpc_module(self) -> ModuleType:
+        """Import the scipy-backed MPC module off the event loop.
+
+        Importing scipy walks site-packages (listdir/open/read_text) and pulls
+        in submodules lazily, all of which is blocking I/O — doing it inline
+        trips Home Assistant's blocking-call detector. ``async_add_import_
+        executor_job`` is the sanctioned way to import heavy third-party
+        modules from async code. Cached because the first import pays the
+        cost; later ones are a dict lookup in ``sys.modules``.
+        """
+        if self._mpc_module is None:
+            self._mpc_module = await self.hass.async_add_import_executor_job(
+                import_module, ".control.mpc.controller", __package__
+            )
+        return self._mpc_module
 
     @callback
     def current_settings(self) -> RuntimeSettings:
@@ -352,10 +373,11 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         managed = set(self.device_ids)
         data = await self._stores.load_mpc()
         if data:
-            # Local import: restoring a controller needs the MPC module (and
+            # Deferred import: restoring a controller needs the MPC module (and
             # thus scipy). Only paid when there's persisted MPC state — a
             # target/offset-only install reaches this with empty ``data``.
-            from .control.mpc.controller import MpcController  # noqa: PLC0415
+            mpc_module = await self._async_mpc_module()
+            controller_cls: type[MpcController] = mpc_module.MpcController
 
             for trv_id, payload in data.items():
                 if trv_id not in managed:
@@ -366,7 +388,7 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
                     )
                     continue
                 try:
-                    self._runtime(trv_id).mpc = MpcController.from_dict(payload)
+                    self._runtime(trv_id).mpc = controller_cls.from_dict(payload)
                 except (KeyError, TypeError, ValueError):
                     # A corrupt entry costs that TRV its learned state (it
                     # re-learns in hours) — never the whole integration setup.
@@ -775,17 +797,20 @@ class SmartClimateCoordinator(DataUpdateCoordinator[SmartClimateData]):
         it in an executor job keeps the event loop unblocked. Each TRV has its
         own controller, so concurrent jobs never share state.
         """
-        # Local import: this path is only reached in MPC calibration mode, so
+        # Deferred import: this path is only reached in MPC calibration mode, so
         # scipy/numpy load on first MPC use rather than at integration setup.
-        from .control.mpc.controller import (  # noqa: PLC0415 - lazy scipy
-            MpcController,
-            preconditioned_valve_pct,
+        # Annotated because module attributes are ``Any``: without these the
+        # valve figure would silently lose its type on the way out.
+        mpc_module = await self._async_mpc_module()
+        preconditioned_valve_pct: Callable[..., float] = (
+            mpc_module.preconditioned_valve_pct
         )
+        controller_cls: type[MpcController] = mpc_module.MpcController
 
         ambient = ctx.outdoor if ctx.outdoor is not None else area_temp
         runtime = self._runtime(entity_id)
         if runtime.mpc is None:
-            runtime.mpc = MpcController()
+            runtime.mpc = controller_cls()
         controller = runtime.mpc
         last_valve = 0.0 if runtime.valve is None else runtime.valve
         series = self._adaptation.precondition_series(ctx.dt_min, ctx.settings)

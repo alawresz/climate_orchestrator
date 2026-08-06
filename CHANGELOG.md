@@ -2,6 +2,68 @@
 
 <!-- version list -->
 
+## v0.33.1 (2026-08-06)
+
+### Bug Fixes
+
+- Defer scipy-backed MPC imports to async executor for non-blocking I/O
+  ([`2c6b933`](https://github.com/alawresz/climate_orchestrator/commit/2c6b9331317ddba798c10f33a708b3a7f8e00635))
+
+### Chores
+
+- Bump actions/attest-build-provenance from 4.1.0 to 4.1.1 in the github-actions group
+  ([#20](https://github.com/alawresz/climate_orchestrator/pull/20),
+  [`a3146f2`](https://github.com/alawresz/climate_orchestrator/commit/a3146f28f8f21b5d69d42a3921cdb84fd90f6e76))
+
+- Bump gitpython from 3.1.50 to 3.1.54
+  ([#38](https://github.com/alawresz/climate_orchestrator/pull/38),
+  [`b6b6de3`](https://github.com/alawresz/climate_orchestrator/commit/b6b6de343102e2b84422ccda7810fcb27799d915))
+
+- Bump https://github.com/astral-sh/ruff-pre-commit from v0.15.16 to 0.15.20
+  ([#19](https://github.com/alawresz/climate_orchestrator/pull/19),
+  [`1812fce`](https://github.com/alawresz/climate_orchestrator/commit/1812fcea163ab00bf0648ab45b25347693b8e973))
+
+- Bump https://github.com/astral-sh/ruff-pre-commit from v0.15.20 to 0.15.21
+  ([#27](https://github.com/alawresz/climate_orchestrator/pull/27),
+  [`e89ff6e`](https://github.com/alawresz/climate_orchestrator/commit/e89ff6e0b2cada04f102206a25e4302b63e578b5))
+
+- Bump https://github.com/astral-sh/ruff-pre-commit from v0.15.21 to 0.16.0
+  ([#39](https://github.com/alawresz/climate_orchestrator/pull/39),
+  [`54a8514`](https://github.com/alawresz/climate_orchestrator/commit/54a8514b5283ee0f35a2cb2225ace86b541b1e38))
+
+- Bump https://github.com/astral-sh/ruff-pre-commit from v0.16.0 to 0.16.1
+  ([#42](https://github.com/alawresz/climate_orchestrator/pull/42),
+  [`9af9cfc`](https://github.com/alawresz/climate_orchestrator/commit/9af9cfc2ffa0aeccc09c0d4ea0265a1e765fcca2))
+
+- Bump https://github.com/codespell-project/codespell from v2.4.2 to 2.4.3
+  ([#26](https://github.com/alawresz/climate_orchestrator/pull/26),
+  [`524e371`](https://github.com/alawresz/climate_orchestrator/commit/524e371fa5d914b7ceae0617fd8b49067361b65f))
+
+- Bump https://github.com/pre-commit/mirrors-mypy from v2.1.0 to 2.2.0
+  ([#22](https://github.com/alawresz/climate_orchestrator/pull/22),
+  [`96a19ca`](https://github.com/alawresz/climate_orchestrator/commit/96a19ca5df9cf2499c7852c78e22447e8c84935b))
+
+- Bump lycheeverse/lychee-action from 2.8.0 to 2.9.0 in the github-actions group
+  ([#28](https://github.com/alawresz/climate_orchestrator/pull/28),
+  [`abbbf44`](https://github.com/alawresz/climate_orchestrator/commit/abbbf4428e3ad43a05be1b57be5ab7790e5bf4d4))
+
+- Bump mdformat-mkdocs from 5.1.4 to 5.2.0 in the python-tooling group
+  ([#21](https://github.com/alawresz/climate_orchestrator/pull/21),
+  [`204d86f`](https://github.com/alawresz/climate_orchestrator/commit/204d86f6ba1c3125af35586ef4cdc2645790bd47))
+
+- Bump the github-actions group across 1 directory with 5 updates
+  ([#40](https://github.com/alawresz/climate_orchestrator/pull/40),
+  [`81d2119`](https://github.com/alawresz/climate_orchestrator/commit/81d2119fc574d2a917dd52c0909c0b1e3dbe0b29))
+
+- Bump the github-actions group with 3 updates
+  ([#44](https://github.com/alawresz/climate_orchestrator/pull/44),
+  [`38a3cac`](https://github.com/alawresz/climate_orchestrator/commit/38a3cacf277da3fbf68683d147264b649ddc76c9))
+
+- Bump the github-actions group with 6 updates
+  ([#23](https://github.com/alawresz/climate_orchestrator/pull/23),
+  [`f1f6849`](https://github.com/alawresz/climate_orchestrator/commit/f1f68495c39202c47a72914082d88b17268529b2))
+
+
 ## v0.33.0 (2026-06-28)
 
 ### Chores
