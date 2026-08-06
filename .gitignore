@@ -7,8 +7,9 @@ __pycache__/
 *.egg-info/
 .eggs/
 
-# Virtual envs / uv
+# Local envs
 .venv/
+.envrc
 
 # Test / coverage
 .pytest_cache/
