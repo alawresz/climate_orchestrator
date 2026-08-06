@@ -197,6 +197,34 @@ async def test_persisted_state_restored_on_load(
     assert runtime(fresh, TRV_ENTITY).demand is Demand.HEAT
 
 
+async def test_mpc_module_is_imported_off_the_event_loop(
+    hass: HomeAssistant, config_entry: MockConfigEntry
+) -> None:
+    """The scipy-backed MPC module loads via the import executor, and is cached.
+
+    Importing scipy walks site-packages (listdir/open/read_text) and imports
+    submodules lazily — all blocking I/O. Done inline it trips Home Assistant's
+    blocking-call detector during setup, so it must go through
+    ``async_add_import_executor_job``.
+    """
+    config_entry.add_to_hass(hass)
+    saver = SmartClimateCoordinator(hass, config_entry)
+    runtime(saver, TRV_ENTITY).mpc = MpcController()
+    await mpc_store(saver).async_save(mpc_payload(saver))
+
+    fresh = SmartClimateCoordinator(hass, config_entry)
+    with patch.object(
+        hass, "async_add_import_executor_job", wraps=hass.async_add_import_executor_job
+    ) as import_job:
+        await fresh.async_load_mpc()
+        assert import_job.call_count == 1
+        # Second use reuses the cached module rather than re-importing.
+        assert await fresh._async_mpc_module() is not None  # noqa: SLF001
+        assert import_job.call_count == 1
+
+    assert runtime(fresh, TRV_ENTITY).mpc is not None
+
+
 async def test_offset_fallback_without_calibration_number(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
