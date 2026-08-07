@@ -181,16 +181,16 @@ async def test_auto_maintenance_defers_while_a_trv_heats(
         {ATTR_ENTITY_ID: entity_id_for("switch", f"{cid}_auto_valve_maintenance")},
         blocking=True,
     )
+    # Get the room cold and the system on first, so the TRV is already heating.
+    # Any cycle that runs while it isn't — and switching the entity on, or even
+    # writing the sensor state, runs one — would find nothing to defer to and
+    # let the overdue maintenance through, which is exactly what this asserts
+    # doesn't happen. Making the clock overdue last removes that window.
+    hass.states.async_set(AREA_TEMP_SENSOR, "17.0")
+    await set_desired_preset(hass, entity_id_for("climate", cid))
     overdue = time.time() - 30 * 86400
     set_maintenance_clock(coordinator, overdue)
 
-    # A cold room with the system on: the TRV heats this cycle. Chill the room
-    # *before* switching on — turning the entity on runs a control cycle of its
-    # own, and with the room still comfortable that cycle would find no heating
-    # TRV and let the overdue maintenance run, which is what we're asserting
-    # doesn't happen.
-    hass.states.async_set(AREA_TEMP_SENSOR, "17.0")
-    await set_desired_preset(hass, entity_id_for("climate", cid))
     await coordinator.async_refresh()
     await hass.async_block_till_done(wait_background_tasks=True)
 

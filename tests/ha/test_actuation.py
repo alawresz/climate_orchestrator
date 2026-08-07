@@ -59,17 +59,20 @@ async def test_no_redundant_writes_when_already_satisfied(
     entity_id_for: Callable[[str, str], str],
 ) -> None:
     """If the TRV is already heating at the target, nothing is re-sent."""
-    # Turn the system on through the real service *before* the climate
-    # services are replaced by recorders below — a mocked service would
-    # swallow the call rather than apply it to the entity.
+    # Order matters here, and differently from the tests above: the device must
+    # already be satisfied *before* the system is switched on, because switching
+    # on runs a control cycle of its own. Arranging afterwards would let that
+    # cycle see an unsatisfied device and issue the very write this asserts is
+    # absent. Both steps stay ahead of the recorders, so the settling writes
+    # aren't counted.
+    # Already at the heat target (heat_edge 20.5 + tolerance 0.3 -> 20.8 -> 21.0).
+    hass.states.async_set(TRV_ENTITY, "heat", {**TRV_ATTRS, "temperature": 21.0})
+    hass.states.async_set(AREA_TEMP_SENSOR, "19.0")
     climate_id = entity_id_for("climate", init_integration.entry_id)
     await set_desired_preset(hass, climate_id, "heat_cool")
 
     set_hvac = async_mock_service(hass, "climate", "set_hvac_mode")
     set_temp = async_mock_service(hass, "climate", "set_temperature")
-    # Already at the heat target (heat_edge 20.5 + tolerance 0.3 -> 20.8 -> 21.0).
-    hass.states.async_set(TRV_ENTITY, "heat", {**TRV_ATTRS, "temperature": 21.0})
-    hass.states.async_set(AREA_TEMP_SENSOR, "19.0")
 
     coordinator: SmartClimateCoordinator = init_integration.runtime_data
     await coordinator.async_refresh()
