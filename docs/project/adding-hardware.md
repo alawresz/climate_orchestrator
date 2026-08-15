@@ -51,6 +51,7 @@ Everything happens in `custom_components/climate_orchestrator/devices/profiles.p
     def _is_acme_trv(integration, manufacturer, model):
         return manufacturer == "acme" and model is not None and "trv" in model
 
+
     _PROFILES = (
         (_is_sonoff_trvzb, SONOFF_TRVZB),
         (_is_acme_trv, ACME_TRV),
