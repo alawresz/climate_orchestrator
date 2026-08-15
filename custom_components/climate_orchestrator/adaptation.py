@@ -150,7 +150,7 @@ class WeatherAdaptation:
                 blocking=True,
                 return_response=True,
             )
-        except Exception:  # noqa: BLE001 - any forecast failure must not break the cycle
+        except Exception:
             _LOGGER.debug("climate_orchestrator: forecast fetch failed", exc_info=True)
             return None
         # The service response is loosely typed JSON; narrow every step.
