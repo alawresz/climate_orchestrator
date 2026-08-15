@@ -28,16 +28,16 @@ dev = [
   # stack transitively (pytest, pytest-asyncio, pytest-cov, syrupy, homeassistant,
   # numpy, ...). Do NOT pin those separately here — our floors would collide with
   # its exact pins. Bumping PHACC moves the whole stack together, coherently.
-  "pytest-homeassistant-custom-component>=0.13",
+  "pytest-homeassistant-custom-component>=0.13.355",
   # Not provided by PHACC, so declared explicitly:
   "scipy>=1.18.0",            # also the integration's runtime requirement
-  "hypothesis>=6.155.7",        # property-based tests
+  "hypothesis>=6.165.3",        # property-based tests
   "pytest-randomly>=3.15",  # randomize test order to surface inter-test leakage
   "pytest-timeout>=2.3",    # CI passes --timeout explicitly (hang protection)
-  "ruff==0.15.20",          # linter/formatter (exact, matches CI + pre-commit)
-  "mypy>=1.11",             # type checker
-  "mutmut>=3.6.0,<4",         # mutation testing for the pure control/ math
-  "python-semantic-release>=10.5,<11",  # local release tooling (CI uses the action)
+  "ruff==0.16.2",          # linter/formatter (exact, matches CI + pre-commit)
+  "mypy>=2.3.0",             # type checker
+  "mutmut>=3.7.0,<4",         # mutation testing for the pure control/ math
+  "python-semantic-release>=10.6.1,<11",  # local release tooling (CI uses the action)
   # Markdown formatter for the docs (run: `uv run mdformat .`). Options live in
   # .mdformat.toml so the CLI and any editor mdformat integration agree.
   # mdformat-mkdocs preserves MkDocs Material syntax (admonitions/tabs/math);
@@ -45,13 +45,13 @@ dev = [
   # between minors and there is no CI gate to catch a drift.
   "mdformat>=1.0,<1.1",
   "mdformat-gfm>=1.0,<1.1",
-  "mdformat-mkdocs>=5.2.0,<6",
+  "mdformat-mkdocs>=5.3.0,<6",
 ]
 # Docs toolchain (site under docs/ + mkdocs.yml). Exact pins: the same
 # versions build locally (`uv run --group docs mkdocs serve`), in the CI gate,
 # and in the Pages deploy — no drift between preview and production.
 docs = [
-  "mkdocs-material==9.7.6",
+  "mkdocs-material==9.7.7",
   "mkdocs-panzoom-plugin==0.5.2",
   "mkdocs-git-revision-date-localized-plugin==1.5.3",
   "mike==2.2.0",
