@@ -2,6 +2,60 @@
 
 <!-- version list -->
 
+## v0.33.2 (2026-08-15)
+
+### Bug Fixes
+
+- Remove unnecessary noqa
+  ([`f73cc3d`](https://github.com/alawresz/climate_orchestrator/commit/f73cc3d4263762bf4e9e4e03812fd4cb2a0d79bf))
+
+### Chores
+
+- Bump https://github.com/astral-sh/ruff-pre-commit from v0.16.1 to 0.16.2
+  ([#48](https://github.com/alawresz/climate_orchestrator/pull/48),
+  [`6277e02`](https://github.com/alawresz/climate_orchestrator/commit/6277e02e286c20d39edd88ffd783a789f90ec4dc))
+
+- Bump pillow from 12.2.0 to 12.3.0
+  ([#46](https://github.com/alawresz/climate_orchestrator/pull/46),
+  [`86b7ad7`](https://github.com/alawresz/climate_orchestrator/commit/86b7ad7aed84a0509cf77180cd917e04ddf1c6c9))
+
+- Bump pyjwt from 2.12.1 to 2.13.0 ([#45](https://github.com/alawresz/climate_orchestrator/pull/45),
+  [`bbdd330`](https://github.com/alawresz/climate_orchestrator/commit/bbdd3309694394b371cce417652aa839a966eb3e))
+
+- Bump pymdown-extensions from 11.0 to 11.0.1
+  ([#47](https://github.com/alawresz/climate_orchestrator/pull/47),
+  [`20a82dd`](https://github.com/alawresz/climate_orchestrator/commit/20a82dd2e20493b6c31646a23329516cf6c85c6c))
+
+- Bump the github-actions group with 4 updates
+  ([#50](https://github.com/alawresz/climate_orchestrator/pull/50),
+  [`414de66`](https://github.com/alawresz/climate_orchestrator/commit/414de665ff4e4cd6b49221d8baec1266db527b87))
+
+- Bump the python-tooling group across 1 directory with 8 updates
+  ([#49](https://github.com/alawresz/climate_orchestrator/pull/49),
+  [`07e8bae`](https://github.com/alawresz/climate_orchestrator/commit/07e8bae43d501f543f6787a86068557b6a2b4486))
+
+- Remove stray newline in `adding-hardware.md`
+  ([`4845809`](https://github.com/alawresz/climate_orchestrator/commit/4845809e112be0bac2b1d8f63b58757d35a0abbb))
+
+### Testing
+
+- Add snapshots for regression tests on adaptive cooling and comfort curve
+  ([`77db966`](https://github.com/alawresz/climate_orchestrator/commit/77db966e707a0939c588a7098d9c49363d51b3b3))
+
+- Drop the duplicate snapshot file
+  ([`4e92272`](https://github.com/alawresz/climate_orchestrator/commit/4e92272dd8e7b4c3ced61aa8b1f7632b6b6b9483))
+
+- Own the snapshot directory instead of inheriting it
+  ([`4b751af`](https://github.com/alawresz/climate_orchestrator/commit/4b751af36ddad134dcf14c30517c37232f1048fb))
+
+- Reorganize integration test setup to ensure correct control cycle execution in TRV heating
+  scenarios
+  ([`b516654`](https://github.com/alawresz/climate_orchestrator/commit/b516654715395a332bf636ffa9e98c66e698cf7f))
+
+- Switch to async `set_desired_preset` and refactor integration tests
+  ([`0db911b`](https://github.com/alawresz/climate_orchestrator/commit/0db911b70065c8dfa63bcca1f3da65e3dfad3349))
+
+
 ## v0.33.1 (2026-08-06)
 
 ### Bug Fixes
