@@ -120,6 +120,10 @@ ignore = [
   # is the design); guard-clause style legitimately returns early and often.
   "PLR0913",
   "PLR0911",
+  # PLR0917 is PLR0913's positional-only sibling, same rationale — and in
+  # tests the "callers" are pytest fixtures and Hypothesis strategies, which
+  # inject arguments we don't choose the arity of.
+  "PLR0917",
 ]
 
 [tool.ruff.lint.pylint]
