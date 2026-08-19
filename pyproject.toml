@@ -34,7 +34,7 @@ dev = [
   "hypothesis>=6.165.3",        # property-based tests
   "pytest-randomly>=3.15",  # randomize test order to surface inter-test leakage
   "pytest-timeout>=2.3",    # CI passes --timeout explicitly (hang protection)
-  "ruff==0.16.2",          # linter/formatter (exact, matches CI + pre-commit)
+  "ruff==0.16.3",          # linter/formatter (exact, matches CI + pre-commit)
   "mypy>=2.3.0",             # type checker
   "mutmut>=3.7.0,<4",         # mutation testing for the pure control/ math
   "python-semantic-release>=10.6.1,<11",  # local release tooling (CI uses the action)
