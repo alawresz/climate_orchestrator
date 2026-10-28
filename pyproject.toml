@@ -34,7 +34,7 @@ dev = [
   "hypothesis>=6.165.3",        # property-based tests
   "pytest-randomly>=3.15",  # randomize test order to surface inter-test leakage
   "pytest-timeout>=2.3",    # CI passes --timeout explicitly (hang protection)
-  "ruff==0.16.4",          # linter/formatter (exact, matches CI + pre-commit)
+  "ruff==0.17.2",          # linter/formatter (exact, matches CI + pre-commit)
   "mypy>=2.3.0",             # type checker
   "mutmut>=3.7.0,<4",         # mutation testing for the pure control/ math
   "python-semantic-release>=10.6.1,<11",  # local release tooling (CI uses the action)
@@ -51,9 +51,9 @@ dev = [
 # versions build locally (`uv run --group docs mkdocs serve`), in the CI gate,
 # and in the Pages deploy — no drift between preview and production.
 docs = [
-  "mkdocs-material==9.7.7",
-  "mkdocs-panzoom-plugin==0.5.2",
-  "mkdocs-git-revision-date-localized-plugin==1.5.4",
+  "mkdocs-material==9.8.0",
+  "mkdocs-panzoom-plugin==0.5.3",
+  "mkdocs-git-revision-date-localized-plugin==1.6.1",
   "mike==2.2.0",
 ]
 
